@@ -4,8 +4,7 @@ FILES=".gitconfig .stalonetrayrc .vim .vimrc .xinitrc .xmobarrc .xmonad .xsessio
 
 WORKDIR=$(pwd)
 
-cd ~
-
 for FILE in $FILES; do
-  ln -s "$WORKDIR/$FILE" "$FILE"
+  rm ~/$FILE
+  ln -s $WORKDIR/$FILE ~/$FILE
 done
