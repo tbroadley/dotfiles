@@ -7,3 +7,4 @@
 [submodule ".zsh-plugins/zsh-git-prompt"]
 	path = .zsh-plugins/zsh-git-prompt
 	url = https://github.com/olivierverdier/zsh-git-prompt
+	ignore = untracked
