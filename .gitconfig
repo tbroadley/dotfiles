@@ -1,0 +1,61 @@
+[user]
+	name = Thomas Broadley
+	email = buriedunderbooks@hotmail.com
+[alias]
+	a = add
+	alias = "!f() { git config --global alias.${1} \"${2}\"; }; f"
+	amend = commit --amend --no-edit
+	amend-all = commit --amend --no-edit -a
+	amend-author = commit --amend --reset-author --no-edit
+	amend-msg = commit --amend
+	ap = add --patch
+	b = branch
+	ba = branch --all
+	bd = "!f() { CURRBRANCH=`git rev-parse --abbrev-ref HEAD`; if [ -z ${1} ]; then git co master; else git co ${1}; fi; git b -D ${CURRBRANCH} && git pull; }; f"
+	bm = branch -m
+	br = branch -r
+	cam = commit -am
+	cb = checkout -b
+	cm = commit -m
+	co = checkout
+	co-remote = "!f() { git fetch ${1} ${2} && git checkout --track remotes/${1}/${2}; }; f"
+	com = checkout master
+	cor = "!f() { git co origin/${1}; }; f"
+	cp = cherry-pick
+	cpa = cherry-pick --abort
+	cpc = cherry-pick --continue
+	d = diff
+	dc = diff --cached
+	dh = "!f() { if [ -z ${1} ]; then git diff HEAD; else git diff HEAD~${1}; fi; }; f"
+	ds = diff --stat
+	dsh = "!f() { if [ -z ${1} ]; then git diff --stat HEAD; else git diff --stat HEAD~${1}; fi; }; f"
+	ec = config --edit --global
+	f = fetch
+	fixb = "!f() { git b ${1}; git reset --hard HEAD~${2} && git co ${1}; }; f"
+	fixup = "!f() { CURRBRANCH=`git rev-parse --abbrev-ref HEAD`; RESETTO=`git merge-base master ${CURRBRANCH}`; COMMITMSG=`git rev-list --format=%B master..${CURRBRANCH} | tail -2`; git reset ${RESETTO}; git add .; git commit -m \"${COMMITMSG}\"; }; f"
+	ghc = "!f() { git clone https://github.com/${1}.git; }; f"
+	i = init
+	l = log
+	last-commit = log HEAD^..HEAD
+	lc = log HEAD^..HEAD
+	pf = push --force-with-lease
+	pl = pull
+	ps = push
+	pst = "!f() { git push && git push --tags; }; f"
+	rb = rebase
+	rba = rebase --abort
+	rbc = rebase --continue
+	rbs = rebase --skip
+	rh = "!f() { if [ -z ${1} ]; then git reset HEAD; else git reset HEAD~${1}; fi; }; f"
+	ri = rebase -i
+	rv = revert
+	rvc = revert --continue
+	rvh = revert HEAD
+	s = status
+	smu = "!f() { git submodule update --recursive --remote && git commit --all --message 'Update submodules'; }; f"
+	st = stash
+	stp = stash pop
+	tap = commit --allow-empty -m 'empty commit'
+	up = "!f() { CURRBRANCH=`git rev-parse --abbrev-ref HEAD`; git push --set-upstream origin ${CURRBRANCH}; }; f"
+[fetch]
+	prune = true
