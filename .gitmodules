@@ -4,3 +4,6 @@
 [submodule ".vim/bundle/vim-sensible"]
 	path = .vim/bundle/vim-sensible
 	url = https://github.com/tpope/vim-sensible
+[submodule ".zsh-plugins/zsh-git-prompt"]
+	path = .zsh-plugins/zsh-git-prompt
+	url = https://github.com/olivierverdier/zsh-git-prompt
