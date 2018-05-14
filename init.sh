@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-FILES=".gitconfig .vim .vimrc"
+FILES=".gitconfig .vim .vimrc .xinitrc .xmobarrc .xmonad .xsessionrc"
 
 WORKDIR=$(pwd)
 
