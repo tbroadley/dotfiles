@@ -114,3 +114,5 @@ KEYTIMEOUT=1
 
 export RC=~/.zshrc
 export DOTFILES=~/Documents/src/dotfiles
+
+alias pbcopy='xclip -selection clipboard'
