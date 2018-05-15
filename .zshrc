@@ -103,3 +103,12 @@ eval $(thefuck --alias)
 source ~/.zsh-plugins/zsh-git-prompt/zshrc.sh
 PROMPT='${ret_status}%{$fg[cyan]%}%c%{$reset_color%} $(git_super_status) '
 GIT_PROMPT_EXECUTABLE="haskell"
+
+HISTFILE=~/.zhist
+HISTSIZE=50000
+SAVEHIST=10000
+setopt appendhistory autocd extendedglob nomatch notify
+unsetopt beep
+bindkey -v
+unsetopt correct
+KEYTIMEOUT=1
