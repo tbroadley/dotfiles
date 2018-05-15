@@ -111,3 +111,6 @@ unsetopt beep
 bindkey -v
 unsetopt correct
 KEYTIMEOUT=1
+
+export RC=~/.zshrc
+export DOTFILES=~/Documents/src/dotfiles
