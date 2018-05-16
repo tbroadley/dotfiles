@@ -20,4 +20,7 @@ main = do
         [ ((mod4Mask .|. shiftMask, xK_z), spawn "xscreensaver-command -lock; xset dpms force off")
         , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
         , ((0, xK_Print), spawn "scrot")
+        , ((0, 0x1008FF11), spawn "amixer -c 1 -q sset Master 2%-")
+        , ((0, 0x1008FF13), spawn "amixer -c 1 -q sset Master 2%+")
+        , ((0, 0x1008FF12), spawn "amixer -D pulse set Master 1+ toggle")
         ]
