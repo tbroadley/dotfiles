@@ -116,3 +116,5 @@ export RC=~/.zshrc
 export DOTFILES=~/Documents/src/dotfiles
 
 alias pbcopy='xclip -selection clipboard'
+
+export FFSTYLES=~/.mozilla/firefox/fjf2kejb.default/chrome/userContent.css
