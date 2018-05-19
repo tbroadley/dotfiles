@@ -118,3 +118,8 @@ export DOTFILES=~/Documents/src/dotfiles
 alias pbcopy='xclip -selection clipboard'
 
 export FFSTYLES=~/.mozilla/firefox/fjf2kejb.default/chrome/userContent.css
+
+if [ -z "$SSH_AUTH_SOCK" ] ; then
+  eval `ssh-agent -s`
+  ssh-add
+fi
