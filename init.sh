@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-FILES=".config/termite .gitconfig .stalonetrayrc .vim .vimrc .xinitrc .xmobarrc .xmonad .xsessionrc .zlogout .zsh-plugins .zshrc"
+FILES=".config/termite .gitconfig .gitignore_global .profile .stalonetrayrc .vim .vimrc .xinitrc .xmobarrc .xmonad .xsessionrc .zlogout .zsh-plugins .zshrc"
 
 WORKDIR=$(pwd)
 
