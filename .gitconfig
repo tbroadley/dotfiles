@@ -59,3 +59,5 @@
 	up = "!f() { CURRBRANCH=`git rev-parse --abbrev-ref HEAD`; git push --set-upstream origin ${CURRBRANCH}; }; f"
 [fetch]
 	prune = true
+[core]
+	excludesfile = /home/thomas/.gitignore_global
