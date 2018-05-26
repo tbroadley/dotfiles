@@ -121,7 +121,6 @@ export FFSTYLES=~/.mozilla/firefox/fjf2kejb.default/chrome/userContent.css
 
 if [ -z "$SSH_AUTH_SOCK" ] ; then
   eval `ssh-agent -s`
-  ssh-add
 fi
 
 export PATH="$PATH:/usr/lib/postgresql/10/bin"
