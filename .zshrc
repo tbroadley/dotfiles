@@ -116,14 +116,18 @@ export RC=~/.zshrc
 export DOTFILES=~/Documents/src/dotfiles
 
 alias pbcopy='xclip -selection clipboard'
+alias dirsize='du -d 1 -B 1K'
+alias editrc='$EDITOR $RC'
+alias reload='source $RC'
+alias serve='python -m SimpleHTTPServer'
+alias naut='nautilus'
 
 export FFSTYLES=~/.mozilla/firefox/fjf2kejb.default/chrome/userContent.css
 
-if [ -z "$SSH_AUTH_SOCK" ] ; then
-  eval `ssh-agent -s`
-fi
-
 export PATH="$PATH:/usr/lib/postgresql/10/bin"
+
+export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="/usr/local/bin/gcc-linaro-7.2.1-2017.11-x86_64_aarch64-elf/bin:/usr/local/bin/aarch64-none-elf/bin:$PATH"
 
 source ~/.profile
 
@@ -132,3 +136,24 @@ export PATH="$PATH:$HOME/.rvm/bin"
 
 export EDITOR=vim
 export VISUAL=vim
+
+export RDEDUP_DIR="/data/backup"
+
+alias testbackup="RDEDUP_DIR=/data/backup rdedup load $(RDEDUP_DIR=/data/backup rdedup list | sort | tail -1) | rdup-up "$HOME.restored""
+
+alias v="vim"
+
+export PASSWORD_STORE_ENABLE_EXTENSIONS=true
+alias sshpass="eval \$(ssh-agent) && $HOME/Documents/src/misc/ssh-add-pass.ex"
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# added by travis gem
+[ -f /home/thomas/.travis/travis.sh ] && source /home/thomas/.travis/travis.sh
+
+export GOPATH="$HOME/go"
+export PATH="$GOPATH/bin:$PATH"
+export PATH="/usr/local/texlive/2018/bin/x86_64-linux:$PATH"
+. $HOME/.ghcup/env

@@ -3,6 +3,7 @@
 	email = buriedunderbooks@hotmail.com
 [alias]
 	a = add
+	aa = commit --amend --no-edit -a
 	alias = "!f() { git config --global alias.${1} \"${2}\"; }; f"
 	amend = commit --amend --no-edit
 	amend-all = commit --amend --no-edit -a
@@ -16,6 +17,7 @@
 	br = branch -r
 	cam = commit -am
 	cb = checkout -b
+	cl = "!f() { git clone git@github.com:${1}/${2} $HOME/Documents/src/${2}; }; f"
 	cm = commit -m
 	co = checkout
 	co-remote = "!f() { git fetch ${1} ${2} && git checkout --track remotes/${1}/${2}; }; f"
@@ -33,7 +35,7 @@
 	f = fetch
 	fixb = "!f() { git b ${1}; git reset --hard HEAD~${2} && git co ${1}; }; f"
 	fixup = "!f() { CURRBRANCH=`git rev-parse --abbrev-ref HEAD`; RESETTO=`git merge-base master ${CURRBRANCH}`; COMMITMSG=`git rev-list --format=%B master..${CURRBRANCH} | tail -2`; git reset ${RESETTO}; git add .; git commit -m \"${COMMITMSG}\"; }; f"
-	ghc = "!f() { git clone https://github.com/${1}.git; }; f"
+	ghc = "!f() { git clone git@github.com:${1}.git; }; f"
 	i = init
 	l = log
 	last-commit = log HEAD^..HEAD
@@ -41,7 +43,7 @@
 	pf = push --force-with-lease
 	pl = pull
 	ps = push
-	pst = "!f() { git push --tags && git push; }; f"
+	pst = "push --tags"
 	rb = rebase
 	rba = rebase --abort
 	rbc = rebase --continue
