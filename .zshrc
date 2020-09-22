@@ -60,9 +60,6 @@ ZSH_THEME="robbyrussell"
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
   pass
-  pip
-  python
-  ubuntu
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -96,8 +93,6 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias g=git
-
-eval $(thefuck --alias)
 
 source ~/.zsh-plugins/zsh-git-prompt/zshrc.sh
 PROMPT='${ret_status}%{$fg[cyan]%}%c%{$reset_color%} $(git_super_status) '
@@ -157,3 +152,21 @@ export GOPATH="$HOME/go"
 export PATH="$GOPATH/bin:$PATH"
 export PATH="/usr/local/texlive/2018/bin/x86_64-linux:$PATH"
 . $HOME/.ghcup/env
+
+export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+
+alias y=yarn
+
+eval $(ssh-agent) > /dev/null
+export SSH_ASKPASS=~/ssh-pass-passphrase.bash
+# alias ssh="setsid -w ssh"
+alias git="setsid -w git"
+# TODO figure out how to get aliases to work
+# alias pass="setsid -w pass"
+
+alias wm="setxkbmap us; xmodmap ~/Documents/src/Workman/xmodmap/xmodmap.workman && xset r 66"
+alias unwm="setxkbmap us; xset -r 66"
+
+source ~/.xinitrc
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
