@@ -3,53 +3,32 @@ set -euo pipefail
 
 # Devcontainer dotfiles setup script
 # Runs inside the container when VS Code/Cursor opens a devcontainer
+# All installations are user-local, no root access required
 
 echo "Setting up devcontainer dotfiles..."
 
 # Set USER if not set
 USER="${USER:-$(whoami)}"
 
-# Helper to run commands as root (use sudo if available, otherwise run directly)
-run_root() {
-  if command -v sudo >/dev/null 2>&1; then
-    sudo "$@"
-  else
-    "$@"
-  fi
-}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Install packages
-run_root apt-get update && run_root apt-get install -y vim ripgrep unzip
-
-# Setup inputrc for history search
-setup_inputrc() {
-  local inputrc_file="$1"
-  local owner="$2"
-
-  if [ -f "$inputrc_file" ] && grep -q "history-search-backward" "$inputrc_file"; then
-    return 0
-  fi
-
-  run_root tee -a "$inputrc_file" > /dev/null << 'EOF'
+# Setup inputrc for history search (user-local only)
+if [ -f "$HOME/.inputrc" ] && grep -q "history-search-backward" "$HOME/.inputrc"; then
+  echo "inputrc already configured"
+else
+  cat >> "$HOME/.inputrc" << 'EOF'
 ## arrow up
 "\e[A":history-search-backward
 ## arrow down
 "\e[B":history-search-forward
 EOF
-
-  if [ -n "$owner" ]; then
-    run_root chown "$owner:$owner" "$inputrc_file"
-  fi
-}
-
-setup_inputrc "/etc/inputrc" ""
-setup_inputrc "$HOME/.inputrc" "$USER"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  echo "inputrc configured"
+fi
 
 # Setup gitconfig and gitignore
 cp "$SCRIPT_DIR/gitconfig" "$HOME/.gitconfig"
 cp "$SCRIPT_DIR/gitignore" "$HOME/.gitignore"
+echo "gitconfig and gitignore installed"
 
 # Setup bashrc additions
 add_to_bashrc() {
@@ -75,20 +54,50 @@ add_to_bashrc "source /usr/share/bash-completion/completions/git" "source /usr/s
 add_to_bashrc "__git_complete g __git_main" "__git_complete g __git_main"
 add_to_bashrc 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi' 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi'
 add_to_bashrc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
+echo "bashrc aliases configured"
 
-# Uninstall globally installed node if it exists and save global packages
-if dpkg -l | grep -q "^ii.*nodejs"; then
-  echo "Found nodejs installed via apt, saving list of global packages..."
-  if command -v npm >/dev/null 2>&1; then
-    npm list -g --depth=0 --json > /tmp/global_npm_packages.json 2>/dev/null || echo "{}" > /tmp/global_npm_packages.json
-  fi
+# Ensure ~/.local/bin exists and is in PATH
+mkdir -p "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$PATH"
 
-  echo "Uninstalling nodejs and npm..."
-  run_root apt-get remove -y nodejs npm
-  run_root apt-get autoremove -y
-  run_root rm -f /etc/apt/sources.list.d/nodesource.list
-  run_root rm -f /etc/apt/keyrings/nodesource.gpg
-  echo "Global nodejs has been uninstalled"
+# Install ripgrep to ~/.local/bin
+if command -v rg >/dev/null 2>&1; then
+  echo "ripgrep is already installed: $(rg --version | head -1)"
+else
+  echo "Installing ripgrep..."
+  ARCH=$(uname -m)
+  case $ARCH in
+    x86_64) RG_ARCH="x86_64-unknown-linux-musl" ;;
+    aarch64|arm64) RG_ARCH="aarch64-unknown-linux-gnu" ;;
+    *) echo "Unsupported architecture for ripgrep: $ARCH"; exit 1 ;;
+  esac
+
+  RG_VERSION="14.1.1"
+  wget -O /tmp/rg.tar.gz "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/ripgrep-${RG_VERSION}-${RG_ARCH}.tar.gz"
+  mkdir -p /tmp/rg
+  tar -xzf /tmp/rg.tar.gz -C /tmp/rg --strip-components=1
+  mv /tmp/rg/rg "$HOME/.local/bin/"
+  rm -rf /tmp/rg.tar.gz /tmp/rg
+  chmod +x "$HOME/.local/bin/rg"
+  echo "ripgrep installation completed"
+fi
+
+# Install jq to ~/.local/bin
+if command -v jq >/dev/null 2>&1; then
+  echo "jq is already installed: $(jq --version)"
+else
+  echo "Installing jq..."
+  ARCH=$(uname -m)
+  case $ARCH in
+    x86_64) JQ_ARCH="amd64" ;;
+    aarch64|arm64) JQ_ARCH="arm64" ;;
+    *) echo "Unsupported architecture for jq: $ARCH"; exit 1 ;;
+  esac
+
+  JQ_VERSION="1.7.1"
+  wget -O "$HOME/.local/bin/jq" "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-${JQ_ARCH}"
+  chmod +x "$HOME/.local/bin/jq"
+  echo "jq installation completed"
 fi
 
 # Install nvm and Node.js
@@ -109,67 +118,12 @@ else
   echo "Node.js is already installed via nvm: $(nvm current) ($(node --version))"
 fi
 
-# Reinstall global packages from the saved list
-if [ -f /tmp/global_npm_packages.json ]; then
-  echo "Reinstalling global npm packages..."
-  PACKAGES=$(cat /tmp/global_npm_packages.json | grep -o '"[^"]*":' | sed 's/"//g' | sed 's/://g' | grep -v "^npm$" | grep -v "^lib$" | grep -v "^dependencies$")
-  for pkg in $PACKAGES; do
-    if [ -n "$pkg" ]; then
-      echo "Installing $pkg..."
-      npm install -g "$pkg" || echo "Failed to install $pkg, skipping..."
-    fi
-  done
-fi
-
 # Install @openai/codex
 if npm list -g @openai/codex >/dev/null 2>&1; then
   echo "@openai/codex is already installed globally"
 else
   echo "Installing @openai/codex globally..."
   npm install -g @openai/codex
-fi
-
-# Install jj
-if command -v jj >/dev/null 2>&1; then
-  echo "jj is already installed: $(jj --version)"
-else
-  echo "Installing jj..."
-  ARCH=$(uname -m)
-  case $ARCH in
-    x86_64) JJ_ARCH="x86_64" ;;
-    aarch64|arm64) JJ_ARCH="aarch64" ;;
-    *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-  esac
-
-  JJ_VERSION="0.34.0"
-  wget -O /tmp/jj.tar.gz "https://github.com/jj-vcs/jj/releases/download/v${JJ_VERSION}/jj-v${JJ_VERSION}-${JJ_ARCH}-unknown-linux-musl.tar.gz"
-  mkdir -p /tmp/jj
-  tar -xzf /tmp/jj.tar.gz -C /tmp/jj
-  run_root mv /tmp/jj/jj /usr/local/bin/
-  rm -rf /tmp/jj.tar.gz /tmp/jj
-  run_root chmod +x /usr/local/bin/jj
-  echo "jj installation completed"
-fi
-
-# Install jjui
-if command -v jjui >/dev/null 2>&1; then
-  echo "jjui is already installed: $(jjui --version)"
-else
-  echo "Installing jjui..."
-  ARCH=$(uname -m)
-  case $ARCH in
-    x86_64) JJUI_ARCH="amd64" ;;
-    aarch64|arm64) JJUI_ARCH="arm64" ;;
-    *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-  esac
-
-  JJUI_VERSION="0.9.5"
-  wget -O /tmp/jjui.zip "https://github.com/idursun/jjui/releases/download/v${JJUI_VERSION}/jjui-${JJUI_VERSION}-linux-${JJUI_ARCH}.zip"
-  unzip -q /tmp/jjui.zip -d /tmp/jjui
-  run_root mv "/tmp/jjui/jjui-${JJUI_VERSION}-linux-${JJUI_ARCH}" /usr/local/bin/jjui
-  rm -rf /tmp/jjui.zip /tmp/jjui
-  run_root chmod +x /usr/local/bin/jjui
-  echo "jjui installation completed"
 fi
 
 # Install Claude Code
@@ -202,13 +156,7 @@ else
   echo "Created Claude Code settings with cleanupPeriodDays"
 fi
 
-# Configure jj
-jj config set --user editor "vim"
-jj config set --user user.name "Thomas Broadley"
-jj config set --user user.email "thomas@metr.org"
-
 # Install shell-alias-suggestions
-export PATH="$HOME/.local/bin:$PATH"
 if command -v uv >/dev/null 2>&1; then
   echo "Installing/upgrading shell-alias-suggestions..."
   uv tool install --upgrade git+https://github.com/tbroadley/shell-alias-suggestions.git
