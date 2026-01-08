@@ -6,8 +6,20 @@ set -euo pipefail
 
 echo "Setting up devcontainer dotfiles..."
 
+# Set USER if not set
+USER="${USER:-$(whoami)}"
+
+# Helper to run commands as root (use sudo if available, otherwise run directly)
+run_root() {
+  if command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    "$@"
+  fi
+}
+
 # Install packages
-sudo apt-get update && sudo apt-get install -y vim ripgrep unzip
+run_root apt-get update && run_root apt-get install -y vim ripgrep unzip
 
 # Setup inputrc for history search
 setup_inputrc() {
@@ -18,7 +30,7 @@ setup_inputrc() {
     return 0
   fi
 
-  sudo tee -a "$inputrc_file" > /dev/null << 'EOF'
+  run_root tee -a "$inputrc_file" > /dev/null << 'EOF'
 ## arrow up
 "\e[A":history-search-backward
 ## arrow down
@@ -26,7 +38,7 @@ setup_inputrc() {
 EOF
 
   if [ -n "$owner" ]; then
-    sudo chown "$owner:$owner" "$inputrc_file"
+    run_root chown "$owner:$owner" "$inputrc_file"
   fi
 }
 
@@ -72,10 +84,10 @@ if dpkg -l | grep -q "^ii.*nodejs"; then
   fi
 
   echo "Uninstalling nodejs and npm..."
-  sudo apt-get remove -y nodejs npm
-  sudo apt-get autoremove -y
-  sudo rm -f /etc/apt/sources.list.d/nodesource.list
-  sudo rm -f /etc/apt/keyrings/nodesource.gpg
+  run_root apt-get remove -y nodejs npm
+  run_root apt-get autoremove -y
+  run_root rm -f /etc/apt/sources.list.d/nodesource.list
+  run_root rm -f /etc/apt/keyrings/nodesource.gpg
   echo "Global nodejs has been uninstalled"
 fi
 
@@ -133,9 +145,9 @@ else
   wget -O /tmp/jj.tar.gz "https://github.com/jj-vcs/jj/releases/download/v${JJ_VERSION}/jj-v${JJ_VERSION}-${JJ_ARCH}-unknown-linux-musl.tar.gz"
   mkdir -p /tmp/jj
   tar -xzf /tmp/jj.tar.gz -C /tmp/jj
-  sudo mv /tmp/jj/jj /usr/local/bin/
+  run_root mv /tmp/jj/jj /usr/local/bin/
   rm -rf /tmp/jj.tar.gz /tmp/jj
-  sudo chmod +x /usr/local/bin/jj
+  run_root chmod +x /usr/local/bin/jj
   echo "jj installation completed"
 fi
 
@@ -154,9 +166,9 @@ else
   JJUI_VERSION="0.9.5"
   wget -O /tmp/jjui.zip "https://github.com/idursun/jjui/releases/download/v${JJUI_VERSION}/jjui-${JJUI_VERSION}-linux-${JJUI_ARCH}.zip"
   unzip -q /tmp/jjui.zip -d /tmp/jjui
-  sudo mv "/tmp/jjui/jjui-${JJUI_VERSION}-linux-${JJUI_ARCH}" /usr/local/bin/jjui
+  run_root mv "/tmp/jjui/jjui-${JJUI_VERSION}-linux-${JJUI_ARCH}" /usr/local/bin/jjui
   rm -rf /tmp/jjui.zip /tmp/jjui
-  sudo chmod +x /usr/local/bin/jjui
+  run_root chmod +x /usr/local/bin/jjui
   echo "jjui installation completed"
 fi
 
