@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker exec:*)",
+      "Bash(git -C /Users/thomas/Code/dotfiles status)"
+    ]
+  }
+}
