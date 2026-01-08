@@ -4,8 +4,13 @@ set -euo pipefail
 # Devcontainer dotfiles setup script
 # Runs inside the container when VS Code/Cursor opens a devcontainer
 
-# Update inputrc for history search
-add_inputrc_config() {
+echo "Setting up devcontainer dotfiles..."
+
+# Install packages
+sudo apt-get update && sudo apt-get install -y vim ripgrep unzip
+
+# Setup inputrc for history search
+setup_inputrc() {
   local inputrc_file="$1"
   local owner="$2"
 
@@ -25,10 +30,106 @@ EOF
   fi
 }
 
-add_inputrc_config "/etc/inputrc" ""
-add_inputrc_config "$HOME/.inputrc" "$USER"
+setup_inputrc "/etc/inputrc" ""
+setup_inputrc "$HOME/.inputrc" "$USER"
 
-# Add env vars and aliases to bashrc
+# Setup gitconfig
+cat > "$HOME/.gitconfig" << 'EOF'
+[user]
+	name = Thomas Broadley
+	email = thomas@metr.org
+[alias]
+	a = add
+	aa = commit --amend --no-edit -a
+	alias = "!f() { git config --global alias.${1} \"${2}\"; }; f"
+	amend = commit --amend --no-edit
+	amend-all = commit --amend --no-edit -a
+	amend-author = commit --amend --reset-author --no-edit
+	amend-msg = commit --amend
+	ap = add --patch
+	b = branch
+	ba = branch --all
+	bd = "!f() { CURRBRANCH=`git rev-parse --abbrev-ref HEAD`; if [ -z ${1} ]; then git co main; else git co ${1}; fi; git b -D ${CURRBRANCH} && git pull; }; f"
+	bm = branch -m
+	br = branch -r
+	cam = commit -am
+	cb = checkout -b
+	cl = "!f() { git clone git@github.com:${1}/${2} $HOME/Documents/src/${2}; }; f"
+	cm = commit -m
+	cmt = commit --all --message "cmt"
+	co = checkout
+	co-remote = "!f() { git fetch ${1} ${2} && git checkout --track remotes/${1}/${2}; }; f"
+	com = checkout master
+	cor = "!f() { git co origin/${1}; }; f"
+	cp = cherry-pick
+	cpa = cherry-pick --abort
+	cpc = cherry-pick --continue
+	d = diff
+	dc = diff --cached
+	dh = "!f() { if [ -z ${1} ]; then git diff HEAD; else git diff HEAD~${1}; fi; }; f"
+	do = "!f() { git diff origin/$(git rev-parse --abbrev-ref HEAD); }; f"
+	ds = diff --stat
+	dsh = "!f() { if [ -z ${1} ]; then git diff --stat HEAD; else git diff --stat HEAD~${1}; fi; }; f"
+	ec = config --edit --global
+	f = fetch
+	fixb = "!f() { git b ${1}; git reset --hard HEAD~${2} && git co ${1}; }; f"
+	fixup = "!f() { CURRBRANCH=`git rev-parse --abbrev-ref HEAD`; RESETTO=`git merge-base master ${CURRBRANCH}`; COMMITMSG=`git rev-list --format=%B master..${CURRBRANCH} | tail -2`; git reset ${RESETTO}; git add .; git commit -m \"${COMMITMSG}\"; }; f"
+	ghc = "!f() { git clone git@github.com:${1}.git; }; f"
+	gone = ! "git checkout main && git pull && git branch --format '%(refname:short) %(upstream:track)' | awk '$2 == \"[gone]\" {print $1}' | xargs -r git branch -D"
+	i = init
+	l = log
+	last-commit = log HEAD^..HEAD
+	lc = log HEAD^..HEAD
+	m = merge
+	ma = merge --abort
+	mc = merge --continue
+	mm = "!f() { git fetch origin main:main && if git merge-base --is-ancestor main HEAD; then echo \"Already up-to-date with main\"; else git merge main && git push; fi; }; f"
+	pf = push --force-with-lease
+	pl = pull
+	ps = push
+	pst = push --tags
+	rb = rebase
+	rba = rebase --abort
+	rbc = rebase --continue
+	rbs = rebase --skip
+	rh = "!f() { if [ -z ${1} ]; then git reset HEAD; else git reset HEAD~${1}; fi; }; f"
+	rho = "!f() { CURRBRANCH=`git rev-parse --abbrev-ref HEAD`; git reset --hard origin/${CURRBRANCH}; }; f"
+	ri = rebase -i
+	rp = reset --patch
+	rv = revert
+	rvc = revert --continue
+	rvh = revert HEAD
+	s = status
+	smu = "!f() { git submodule update --recursive --remote && git commit --all --message 'Update submodules'; }; f"
+	st = stash
+	stp = stash pop
+	sync = "!f() { git pull && git push; }; f"
+	tap = commit --allow-empty -m 'empty commit'
+	up = "!f() { CURRBRANCH=`git rev-parse --abbrev-ref HEAD`; git push --set-upstream origin ${CURRBRANCH}; }; f"
+[fetch]
+	prune = true
+[core]
+	excludesfile = ~/.gitignore
+[push]
+	autoSetupRemote = true
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+[http]
+	postBuffer = 157286400
+[interactive]
+	singleKey = true
+EOF
+
+# Setup gitignore
+cat > "$HOME/.gitignore" << 'EOF'
+.worktrees
+.specstory
+EOF
+
+# Setup bashrc additions
 add_to_bashrc() {
   local pattern="$1"
   local line="$2"
@@ -38,15 +139,20 @@ add_to_bashrc() {
 }
 
 add_to_bashrc "alias g=git" "alias g=git"
+add_to_bashrc "alias v=vim" "alias v=vim"
+add_to_bashrc "alias c=" 'alias c="unset ANTHROPIC_BASE_URL && claude"'
+add_to_bashrc "alias d=dvc" "alias d=dvc"
+add_to_bashrc "alias r=ruff" "alias r=ruff"
+add_to_bashrc "alias b=basedpyright" "alias b=basedpyright"
+add_to_bashrc "alias pt=pytest" "alias pt=pytest"
+add_to_bashrc 'alias psa=' 'alias psa="dvc push && git push"'
+add_to_bashrc 'alias pla=' 'alias pla="git pull && dvc pull"'
 add_to_bashrc "export EDITOR=vim" "export EDITOR=vim"
 add_to_bashrc "source /etc/bash_completion.d/git-prompt" "source /etc/bash_completion.d/git-prompt"
 add_to_bashrc "source /usr/share/bash-completion/completions/git" "source /usr/share/bash-completion/completions/git"
 add_to_bashrc "__git_complete g __git_main" "__git_complete g __git_main"
 add_to_bashrc 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi' 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi'
 add_to_bashrc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
-
-# Install vim, ripgrep, and unzip
-sudo apt-get update && sudo apt-get install -y vim ripgrep unzip
 
 # Uninstall globally installed node if it exists and save global packages
 if dpkg -l | grep -q "^ii.*nodejs"; then
@@ -181,14 +287,18 @@ jj config set --user user.email "thomas@metr.org"
 
 # Install shell-alias-suggestions
 export PATH="$HOME/.local/bin:$PATH"
-echo "Installing/upgrading shell-alias-suggestions..."
-uv tool install --upgrade git+https://github.com/tbroadley/shell-alias-suggestions.git
-if ! grep -q "alias-suggest" "$HOME/.bashrc" 2>/dev/null; then
-  echo "Installing shell-alias-suggestions hooks..."
-  alias-suggest install --bash
-  echo "shell-alias-suggestions installation completed"
+if command -v uv >/dev/null 2>&1; then
+  echo "Installing/upgrading shell-alias-suggestions..."
+  uv tool install --upgrade git+https://github.com/tbroadley/shell-alias-suggestions.git
+  if ! grep -q "alias-suggest" "$HOME/.bashrc" 2>/dev/null; then
+    echo "Installing shell-alias-suggestions hooks..."
+    alias-suggest install --bash
+    echo "shell-alias-suggestions installation completed"
+  else
+    echo "shell-alias-suggestions hooks already installed"
+  fi
 else
-  echo "shell-alias-suggestions hooks already installed"
+  echo "uv not found, skipping shell-alias-suggestions installation"
 fi
 
 echo "Devcontainer configuration completed"
