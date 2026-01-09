@@ -7,8 +7,23 @@ set -euo pipefail
 
 echo "Setting up devcontainer dotfiles..."
 
-# Set USER if not set
-USER="${USER:-$(whoami)}"
+# Checksum verification function
+verify_checksum() {
+  local file="$1"
+  local expected_checksum="$2"
+  local actual_checksum
+
+  actual_checksum=$(sha256sum "$file" | awk '{print $1}')
+  if [ "$actual_checksum" != "$expected_checksum" ]; then
+    echo "ERROR: Checksum verification failed for $file"
+    echo "  Expected: $expected_checksum"
+    echo "  Actual:   $actual_checksum"
+    rm -f "$file"
+    return 1
+  fi
+  echo "Checksum verified for $file"
+  return 0
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -67,13 +82,20 @@ else
   echo "Installing ripgrep..."
   ARCH=$(uname -m)
   case $ARCH in
-    x86_64) RG_ARCH="x86_64-unknown-linux-musl" ;;
-    aarch64|arm64) RG_ARCH="aarch64-unknown-linux-gnu" ;;
+    x86_64)
+      RG_ARCH="x86_64-unknown-linux-musl"
+      RG_CHECKSUM="4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e"
+      ;;
+    aarch64|arm64)
+      RG_ARCH="aarch64-unknown-linux-gnu"
+      RG_CHECKSUM="c827481c4ff4ea10c9dc7a4022c8de5db34a5737cb74484d62eb94a95841ab2f"
+      ;;
     *) echo "Unsupported architecture for ripgrep: $ARCH"; exit 1 ;;
   esac
 
   RG_VERSION="14.1.1"
   wget -O /tmp/rg.tar.gz "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/ripgrep-${RG_VERSION}-${RG_ARCH}.tar.gz"
+  verify_checksum /tmp/rg.tar.gz "$RG_CHECKSUM"
   mkdir -p /tmp/rg
   tar -xzf /tmp/rg.tar.gz -C /tmp/rg --strip-components=1
   mv /tmp/rg/rg "$HOME/.local/bin/"
@@ -89,13 +111,21 @@ else
   echo "Installing jq..."
   ARCH=$(uname -m)
   case $ARCH in
-    x86_64) JQ_ARCH="amd64" ;;
-    aarch64|arm64) JQ_ARCH="arm64" ;;
+    x86_64)
+      JQ_ARCH="amd64"
+      JQ_CHECKSUM="5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5"
+      ;;
+    aarch64|arm64)
+      JQ_ARCH="arm64"
+      JQ_CHECKSUM="4dd2d8a0661df0b22f1bb9a1f9830f06b6f3b8f7d91211a1ef5d7c4f06a8b4a5"
+      ;;
     *) echo "Unsupported architecture for jq: $ARCH"; exit 1 ;;
   esac
 
   JQ_VERSION="1.7.1"
-  wget -O "$HOME/.local/bin/jq" "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-${JQ_ARCH}"
+  wget -O /tmp/jq "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-${JQ_ARCH}"
+  verify_checksum /tmp/jq "$JQ_CHECKSUM"
+  mv /tmp/jq "$HOME/.local/bin/jq"
   chmod +x "$HOME/.local/bin/jq"
   echo "jq installation completed"
 fi
@@ -103,7 +133,12 @@ fi
 # Install nvm and Node.js
 if [ ! -d "$HOME/.nvm" ]; then
   echo "Installing nvm..."
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  NVM_VERSION="0.40.1"
+  NVM_CHECKSUM="abdb525ee9f5b48b34d8ed9fc67c6013fb0f659712e401ecd88ab989b3af8f53"
+  curl -fsSL -o /tmp/nvm-install.sh "https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh"
+  verify_checksum /tmp/nvm-install.sh "$NVM_CHECKSUM"
+  bash /tmp/nvm-install.sh
+  rm -f /tmp/nvm-install.sh
 fi
 
 export NVM_DIR="$HOME/.nvm"
@@ -131,7 +166,13 @@ if command -v claude >/dev/null 2>&1; then
   echo "Claude Code is already installed: $(claude --version)"
 else
   echo "Installing Claude Code..."
-  curl -fsSL https://claude.ai/install.sh | bash
+  # Note: Update this checksum when Claude Code releases new versions
+  # Verify at: curl -fsSL https://claude.ai/install.sh | sha256sum
+  CLAUDE_INSTALL_CHECKSUM="363382bed8849f78692bd2f15167a1020e1f23e7da1476ab8808903b6bebae05"
+  curl -fsSL -o /tmp/claude-install.sh https://claude.ai/install.sh
+  verify_checksum /tmp/claude-install.sh "$CLAUDE_INSTALL_CHECKSUM"
+  bash /tmp/claude-install.sh
+  rm -f /tmp/claude-install.sh
   echo "Claude Code installation completed"
 fi
 
