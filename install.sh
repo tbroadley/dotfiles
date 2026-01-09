@@ -142,6 +142,8 @@ if [ ! -d "$HOME/.nvm" ]; then
 fi
 
 export NVM_DIR="$HOME/.nvm"
+# nvm scripts have unbound variables, so temporarily disable -u
+set +u
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
 if ! nvm current >/dev/null 2>&1 || [ "$(nvm current)" = "none" ] || [ "$(nvm current)" = "system" ]; then
@@ -152,6 +154,7 @@ if ! nvm current >/dev/null 2>&1 || [ "$(nvm current)" = "none" ] || [ "$(nvm cu
 else
   echo "Node.js is already installed via nvm: $(nvm current) ($(node --version))"
 fi
+set -u
 
 # Install @openai/codex
 if npm list -g @openai/codex >/dev/null 2>&1; then
