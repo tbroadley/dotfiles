@@ -1,2 +1,4 @@
-.worktrees
+.claude/settings.local.json
+.cursorindexingignore
 .specstory
+.worktrees
