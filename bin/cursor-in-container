@@ -3,8 +3,17 @@
 # Usage: cursor [file_or_directory]
 # If no argument given, opens the current directory.
 
+# If DEVCONTAINER_NAME is not set, fall back to Cursor's built-in remote CLI
 if [ -z "$DEVCONTAINER_NAME" ]; then
-    echo "Error: DEVCONTAINER_NAME not set. Are you in a dev container started with dc?" >&2
+    # Find Cursor's built-in CLI (excluding this script)
+    THIS_SCRIPT=$(realpath "$0")
+    for cursor_path in $(type -ap cursor); do
+        cursor_real=$(realpath "$cursor_path" 2>/dev/null) || continue
+        if [ "$cursor_real" != "$THIS_SCRIPT" ]; then
+            exec "$cursor_path" "$@"
+        fi
+    done
+    echo "Error: No cursor command available. DEVCONTAINER_NAME not set and Cursor CLI not found." >&2
     exit 1
 fi
 
