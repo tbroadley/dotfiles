@@ -103,6 +103,10 @@ devc() {
         exec_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
     fi
 
+    # Host workspace path for Cursor integration
+    up_opts+=(--remote-env "DEVCONTAINER_HOST_WORKSPACE=$workspace")
+    exec_opts+=(--remote-env "DEVCONTAINER_HOST_WORKSPACE=$workspace")
+
     if ! devcontainer up \
         --workspace-folder "$workspace" \
         "${up_opts[@]}" \

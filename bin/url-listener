@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Simple HTTP server that listens for URL open requests from dev containers.
-Opens received URLs in the default browser on the host.
+Simple HTTP server that listens for requests from dev containers.
+- Opens URLs in the default browser on the host
+- Opens files/directories in Cursor (attached to the dev container)
 
 Usage: url-listener [--port PORT]
 Default port: 7077
@@ -22,6 +23,16 @@ class URLHandler(BaseHTTPRequestHandler):
         if parsed.path == "/open" and "url" in params:
             url = params["url"][0]
             subprocess.run(["open", url], check=False)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+        elif parsed.path == "/cursor" and "workspace" in params and "path" in params:
+            workspace = params["workspace"][0]
+            container_path = params["path"][0]
+            hex_workspace = workspace.encode().hex()
+            uri = f"vscode-remote://dev-container+{hex_workspace}{container_path}"
+            subprocess.run(["cursor", "--folder-uri", uri], check=False)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()

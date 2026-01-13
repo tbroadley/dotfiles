@@ -264,6 +264,11 @@ chmod +x "$HOME/.local/bin/open-url-on-host"
 add_to_rc 'export BROWSER=open-url-on-host' 'export BROWSER=open-url-on-host'
 echo "URL forwarding script installed"
 
+# Install cursor script for opening files in Cursor on host
+cp "$SCRIPT_DIR/bin/cursor-in-container" "$HOME/.local/bin/cursor"
+chmod +x "$HOME/.local/bin/cursor"
+echo "Cursor forwarding script installed"
+
 # Install shell-alias-suggestions
 if command -v uv >/dev/null 2>&1; then
   echo "Installing/upgrading shell-alias-suggestions..."
