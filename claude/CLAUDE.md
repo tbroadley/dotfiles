@@ -1,8 +1,6 @@
 # Global Rules
 
 ## Environment
-- **Dev container takes precedence**: Check if the repo has dev container config (`.devcontainer/`). If it does, build a dev container image and start a dev container using devcontainer CLI, then work inside the container instead of locally. This overrides any repo CLAUDE.md instructions about running commands locally (e.g., `uv run`).
-- Dev container Python: use `/opt/python/bin/python3` instead of `uv run`
 - AWS CLI: explicitly use production or staging profile
 
 ## Python Style
