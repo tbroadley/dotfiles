@@ -243,26 +243,13 @@ else
   echo "Claude Code installation completed"
 fi
 
-# Configure Claude Code settings
-CLAUDE_SETTINGS_DIR="$HOME/.claude"
-CLAUDE_SETTINGS_FILE="$CLAUDE_SETTINGS_DIR/settings.json"
-mkdir -p "$CLAUDE_SETTINGS_DIR"
+# Configure Claude Code settings, hooks, and skills
+CLAUDE_DIR="$HOME/.claude"
+mkdir -p "$CLAUDE_DIR"
 
-if [ -f "$CLAUDE_SETTINGS_FILE" ]; then
-  if grep -q "cleanupPeriodDays" "$CLAUDE_SETTINGS_FILE"; then
-    echo "cleanupPeriodDays is already configured in Claude Code settings"
-  else
-    if command -v jq >/dev/null 2>&1; then
-      jq '. + {"cleanupPeriodDays": 999999}' "$CLAUDE_SETTINGS_FILE" > "$CLAUDE_SETTINGS_FILE.tmp" && mv "$CLAUDE_SETTINGS_FILE.tmp" "$CLAUDE_SETTINGS_FILE"
-    else
-      sed -i 's/}$/,"cleanupPeriodDays": 999999}/' "$CLAUDE_SETTINGS_FILE"
-    fi
-    echo "Added cleanupPeriodDays to Claude Code settings"
-  fi
-else
-  echo '{"cleanupPeriodDays": 999999}' > "$CLAUDE_SETTINGS_FILE"
-  echo "Created Claude Code settings with cleanupPeriodDays"
-fi
+cp -r "$SCRIPT_DIR/claude/"* "$CLAUDE_DIR/"
+chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
+echo "Claude Code settings, hooks, and skills installed"
 
 # Install shell-alias-suggestions
 if command -v uv >/dev/null 2>&1; then
