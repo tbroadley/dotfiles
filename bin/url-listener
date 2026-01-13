@@ -30,11 +30,16 @@ class URLHandler(BaseHTTPRequestHandler):
         elif parsed.path == "/cursor" and "container" in params and "path" in params:
             container_name = params["container"][0]
             container_path = params["path"][0]
+            is_file = params.get("file", ["0"])[0] == "1"
             import json
             config = json.dumps({"containerName": f"/{container_name}"})
             hex_config = config.encode().hex()
-            uri = f"cursor://vscode-remote/attached-container+{hex_config}{container_path}"
-            subprocess.run(["open", uri], check=False)
+            if is_file:
+                uri = f"vscode-remote://attached-container+{hex_config}{container_path}"
+                subprocess.run(["cursor", "--file-uri", uri], check=False)
+            else:
+                uri = f"cursor://vscode-remote/attached-container+{hex_config}{container_path}"
+                subprocess.run(["open", uri], check=False)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()

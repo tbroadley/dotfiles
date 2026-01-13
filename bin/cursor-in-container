@@ -1,6 +1,6 @@
 #!/bin/bash
-# Opens a folder in Cursor on the host, attached to this dev container.
-# Usage: cursor [directory]
+# Opens a file or folder in Cursor on the host, attached to this dev container.
+# Usage: cursor [file_or_directory]
 # If no argument given, opens the current directory.
 
 if [ -z "$DEVCONTAINER_NAME" ]; then
@@ -10,15 +10,22 @@ fi
 
 TARGET="${1:-.}"
 
-if [ ! -d "$TARGET" ]; then
-    echo "Error: $TARGET is not a directory" >&2
+if [ ! -e "$TARGET" ]; then
+    echo "Error: $TARGET does not exist" >&2
     exit 1
 fi
 
 ABS_PATH=$(realpath "$TARGET")
 
+# Determine if target is a file or directory
+if [ -f "$TARGET" ]; then
+    IS_FILE=1
+else
+    IS_FILE=0
+fi
+
 PORT="${URL_LISTENER_PORT:-7077}"
 ENCODED_NAME=$(printf '%s' "$DEVCONTAINER_NAME" | jq -sRr @uri)
 ENCODED_PATH=$(printf '%s' "$ABS_PATH" | jq -sRr @uri)
 
-curl -sf "http://host.docker.internal:${PORT}/cursor?container=${ENCODED_NAME}&path=${ENCODED_PATH}" >/dev/null 2>&1 &
+curl -sf "http://host.docker.internal:${PORT}/cursor?container=${ENCODED_NAME}&path=${ENCODED_PATH}&file=${IS_FILE}" >/dev/null 2>&1 &
