@@ -46,6 +46,13 @@ devc() {
         disown
     fi
 
+    # Start URL listener for browser forwarding (if not already running)
+    if ! curl -sf http://localhost:7077/health &>/dev/null; then
+        echo "Starting URL listener for browser forwarding..."
+        ~/dotfiles/bin/url-listener &>/dev/null &
+        disown
+    fi
+
     echo "Setting up dotfiles..."
     devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
         if [ -d $HOME/dotfiles ]; then

@@ -1,0 +1,13 @@
+#!/bin/bash
+# Opens a URL on the host machine by sending it to the url-listener.
+# Used as BROWSER in dev containers to forward URLs to host browser.
+
+URL="$1"
+if [ -z "$URL" ]; then
+    exit 1
+fi
+
+PORT="${URL_LISTENER_PORT:-7077}"
+ENCODED_URL=$(printf '%s' "$URL" | jq -sRr @uri)
+
+curl -sf "http://host.docker.internal:${PORT}/open?url=${ENCODED_URL}" >/dev/null 2>&1 &

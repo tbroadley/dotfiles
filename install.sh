@@ -257,6 +257,12 @@ if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
   echo "Claude Code onboarding bypass configured"
 fi
 
+# Install open-url-on-host script for URL forwarding to host browser
+cp "$SCRIPT_DIR/bin/open-url-on-host" "$HOME/.local/bin/"
+chmod +x "$HOME/.local/bin/open-url-on-host"
+add_to_rc 'export BROWSER=open-url-on-host' 'export BROWSER=open-url-on-host'
+echo "URL forwarding script installed"
+
 # Install shell-alias-suggestions
 if command -v uv >/dev/null 2>&1; then
   echo "Installing/upgrading shell-alias-suggestions..."
