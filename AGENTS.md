@@ -8,11 +8,8 @@ When modifying shell functions like `devc` that exist in both:
 
 **You must update BOTH files.** The dotfiles `.zshrc` is just a reference - the user's actual shell sources `~/.zshrc` directly, not the dotfiles version.
 
-## NEVER overwrite ~/.zshrc
+## Updating ~/.zshrc
 
-**CRITICAL:** The user's `~/.zshrc` contains personal configuration that is NOT in the dotfiles version. NEVER copy or overwrite `~/.zshrc` with the dotfiles version.
+The user's `~/.zshrc` contains personal configuration beyond what's in the dotfiles version (PATH exports, aliases, prompt settings, etc.). Don't overwrite it with `cp`.
 
-When asked to "update" or "sync" the local zshrc:
-- Use the Edit tool to add/modify only the specific functions or lines that changed
-- NEVER use `cp` to replace the entire file
-- The dotfiles `.zshrc` only contains dev container functions - the user's actual `~/.zshrc` has many other things (PATH exports, aliases, tool configs, prompt settings, etc.)
+When asked to "update" or "sync" the local zshrc, use the Edit tool to modify only the specific functions or lines that changed.
