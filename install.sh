@@ -273,4 +273,14 @@ else
   echo "uv not found, skipping shell-alias-suggestions installation"
 fi
 
+# Configure GitHub CLI authentication if GH_TOKEN is available
+if [ -n "${GH_TOKEN:-}" ]; then
+  if ! gh auth status >/dev/null 2>&1; then
+    echo "Authenticating GitHub CLI with GH_TOKEN..."
+    echo "$GH_TOKEN" | gh auth login --with-token
+  fi
+  gh auth setup-git
+  echo "GitHub CLI authentication configured"
+fi
+
 echo "Devcontainer configuration completed"
