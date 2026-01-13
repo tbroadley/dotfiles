@@ -73,7 +73,7 @@ add_to_rc() {
 
 # Aliases (work in both shells)
 add_to_rc "alias b=basedpyright" "alias b=basedpyright"
-add_to_rc "alias c=" 'alias c="unset ANTHROPIC_BASE_URL && claude"'
+add_to_rc "claude()" 'claude() { ANTHROPIC_BASE_URL= command claude "$@"; }'
 add_to_rc "alias d=dvc" "alias d=dvc"
 add_to_rc "alias dotfiles=" "alias dotfiles='git -C ~/dotfiles pull && ~/dotfiles/install.sh && exec \$SHELL'"
 add_to_rc "alias dpl=" "alias dpl='dvc pull'"
