@@ -10,6 +10,7 @@ Default port: 7077
 """
 
 import argparse
+import signal
 import subprocess
 import sys
 import urllib.parse
@@ -84,6 +85,7 @@ def main():
     args = parser.parse_args()
 
     server = HTTPServer(("0.0.0.0", args.port), URLHandler)
+    signal.signal(signal.SIGTERM, lambda *_: server.shutdown())
     print(f"URL listener started on port {args.port}", file=sys.stderr)
     try:
         server.serve_forever()
