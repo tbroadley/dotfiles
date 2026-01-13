@@ -1,18 +1,24 @@
 #!/bin/bash
-# Opens a file or directory in Cursor on the host, attached to this dev container.
-# Usage: cursor [file_or_directory]
+# Opens a folder in Cursor on the host, attached to this dev container.
+# Usage: cursor [directory]
 # If no argument given, opens the current directory.
 
-if [ -z "$DEVCONTAINER_HOST_WORKSPACE" ]; then
-    echo "Error: DEVCONTAINER_HOST_WORKSPACE not set. Are you in a dev container started with dc?" >&2
+if [ -z "$DEVCONTAINER_NAME" ]; then
+    echo "Error: DEVCONTAINER_NAME not set. Are you in a dev container started with dc?" >&2
     exit 1
 fi
 
 TARGET="${1:-.}"
+
+if [ ! -d "$TARGET" ]; then
+    echo "Error: $TARGET is not a directory" >&2
+    exit 1
+fi
+
 ABS_PATH=$(realpath "$TARGET")
 
 PORT="${URL_LISTENER_PORT:-7077}"
-ENCODED_WORKSPACE=$(printf '%s' "$DEVCONTAINER_HOST_WORKSPACE" | jq -sRr @uri)
+ENCODED_NAME=$(printf '%s' "$DEVCONTAINER_NAME" | jq -sRr @uri)
 ENCODED_PATH=$(printf '%s' "$ABS_PATH" | jq -sRr @uri)
 
-curl -sf "http://host.docker.internal:${PORT}/cursor?workspace=${ENCODED_WORKSPACE}&path=${ENCODED_PATH}" >/dev/null 2>&1 &
+curl -sf "http://host.docker.internal:${PORT}/cursor?container=${ENCODED_NAME}&path=${ENCODED_PATH}" >/dev/null 2>&1 &

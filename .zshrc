@@ -103,10 +103,6 @@ devc() {
         exec_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
     fi
 
-    # Host workspace path for Cursor integration
-    up_opts+=(--remote-env "DEVCONTAINER_HOST_WORKSPACE=$workspace")
-    exec_opts+=(--remote-env "DEVCONTAINER_HOST_WORKSPACE=$workspace")
-
     if ! devcontainer up \
         --workspace-folder "$workspace" \
         "${up_opts[@]}" \
@@ -115,9 +111,13 @@ devc() {
         return 1
     fi
 
-    # Start automatic port forwarding in background
-    local container_id
+    # Get container ID and name for port forwarding and Cursor integration
+    local container_id container_name
     container_id=$(docker ps -q --filter "label=devcontainer.local_folder=$workspace")
+    container_name=$(docker inspect --format '{{.Name}}' "$container_id" 2>/dev/null | sed 's/^\///')
+    if [[ -n "$container_name" ]]; then
+        exec_opts+=(--remote-env "DEVCONTAINER_NAME=$container_name")
+    fi
     if [[ -n "$container_id" ]] && command -v apf &> /dev/null; then
         echo "Starting automatic port forwarding..."
         apf "$container_id" &> /dev/null &
