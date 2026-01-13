@@ -23,6 +23,12 @@ devc() {
         exec_opts+=(--remote-env "GH_TOKEN=$gh_token")
     fi
 
+    # Claude Code token forwarding
+    if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        up_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
+        exec_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
+    fi
+
     if ! devcontainer up \
         --workspace-folder "$workspace" \
         "${up_opts[@]}" \

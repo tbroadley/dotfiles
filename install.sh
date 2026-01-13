@@ -251,6 +251,12 @@ cp -r "$SCRIPT_DIR/claude/"* "$CLAUDE_DIR/"
 chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 echo "Claude Code settings, hooks, and skills installed"
 
+# Configure Claude Code authentication if token is available
+if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+  echo '{"hasCompletedOnboarding": true}' > "$HOME/.claude.json"
+  echo "Claude Code onboarding bypass configured"
+fi
+
 # Install shell-alias-suggestions
 if command -v uv >/dev/null 2>&1; then
   echo "Installing/upgrading shell-alias-suggestions..."
