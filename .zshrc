@@ -121,10 +121,15 @@ devc() {
     if [[ -n "$container_name" ]]; then
         exec_opts+=(--remote-env "DEVCONTAINER_NAME=$container_name")
     fi
-    if [[ -n "$container_id" ]] && command -v apf &> /dev/null; then
-        echo "Starting automatic port forwarding..."
-        apf "$container_id" &> /dev/null &
-        disown
+    if [[ -n "$container_id" ]]; then
+        if command -v apf &> /dev/null; then
+            echo "Starting automatic port forwarding..."
+            apf "$container_id" &> /dev/null &
+            disown
+        else
+            echo "ERROR: apf not found. Install apf or ensure ~/.local/bin is in PATH." >&2
+            return 1
+        fi
     fi
 
     # Start URL listener for browser forwarding (if not already running)
