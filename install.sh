@@ -85,6 +85,7 @@ add_to_rc "alias psa=" 'alias psa="dvc push && git push"'
 add_to_rc "alias pt=pytest" "alias pt=pytest"
 add_to_rc "alias r=ruff" "alias r=ruff"
 add_to_rc "alias v=vim" "alias v=vim"
+add_to_rc "export ANTHROPIC_MODEL=opus" "export ANTHROPIC_MODEL=opus"
 add_to_rc "export EDITOR=vim" "export EDITOR=vim"
 add_to_rc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
 add_to_rc 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi' 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi'
