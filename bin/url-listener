@@ -91,7 +91,7 @@ def main():
     args = parser.parse_args()
 
     server = HTTPServer(("0.0.0.0", args.port), URLHandler)
-    signal.signal(signal.SIGTERM, lambda *_: server.shutdown())
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     print(f"URL listener started on port {args.port}", file=sys.stderr)
     try:
         server.serve_forever()
