@@ -12,25 +12,20 @@ devc() {
     fi
 
     # Build auth forwarding options
-    local auth_opts=()
-
-    # SSH agent forwarding (if socket exists)
-    if [[ -n "$SSH_AUTH_SOCK" && -S "$SSH_AUTH_SOCK" ]]; then
-        auth_opts+=(
-            --mount "type=bind,source=$SSH_AUTH_SOCK,target=/tmp/ssh-agent.sock"
-            --remote-env "SSH_AUTH_SOCK=/tmp/ssh-agent.sock"
-        )
-    fi
+    local up_opts=()    # for devcontainer up (supports --mount)
+    local exec_opts=()  # for devcontainer exec (only --remote-env)
 
     # GitHub CLI token forwarding (if gh is authenticated)
+    # install.sh configures git to rewrite SSH URLs to HTTPS
     local gh_token
     if gh_token=$(gh auth token 2>/dev/null); then
-        auth_opts+=(--remote-env "GH_TOKEN=$gh_token")
+        up_opts+=(--remote-env "GH_TOKEN=$gh_token")
+        exec_opts+=(--remote-env "GH_TOKEN=$gh_token")
     fi
 
     if ! devcontainer up \
         --workspace-folder "$workspace" \
-        "${auth_opts[@]}" \
+        "${up_opts[@]}" \
         $rebuild_flag; then
         echo "Failed to start dev container"
         return 1
@@ -46,7 +41,7 @@ devc() {
     fi
 
     echo "Setting up dotfiles..."
-    devcontainer exec --workspace-folder "$workspace" "${auth_opts[@]}" sh -c '
+    devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
         if [ -d $HOME/dotfiles ]; then
             cd $HOME/dotfiles && git pull
         else
@@ -56,7 +51,7 @@ devc() {
     '
 
     echo "Entering container..."
-    devcontainer exec --workspace-folder "$workspace" "${auth_opts[@]}" bash -c '
+    devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" bash -c '
         set -a
         [ -f .env ] && . .env
         set +a

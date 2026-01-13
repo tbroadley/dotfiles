@@ -280,6 +280,8 @@ if [ -n "${GH_TOKEN:-}" ]; then
     echo "$GH_TOKEN" | gh auth login --with-token
   fi
   gh auth setup-git
+  # Rewrite SSH URLs to HTTPS so gh handles auth (OrbStack doesn't forward SSH agent)
+  git config --global url."https://github.com/".insteadOf "git@github.com:"
   echo "GitHub CLI authentication configured"
 fi
 
