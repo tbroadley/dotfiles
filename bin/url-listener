@@ -33,6 +33,7 @@ class URLHandler(BaseHTTPRequestHandler):
             container_name = params["container"][0]
             container_path = params["path"][0]
             is_file = params.get("file", ["0"])[0] == "1"
+            extensions = params.get("extensions", [""])[0]
             import json
             config = json.dumps({"containerName": f"/{container_name}"})
             hex_config = config.encode().hex()
@@ -42,6 +43,11 @@ class URLHandler(BaseHTTPRequestHandler):
             else:
                 uri = f"cursor://vscode-remote/attached-container+{hex_config}{container_path}"
                 subprocess.run(["open", uri], check=False)
+            if extensions:
+                for ext in extensions.split(","):
+                    ext = ext.strip()
+                    if ext:
+                        subprocess.run(["cursor", "--install-extension", ext], check=False)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()

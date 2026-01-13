@@ -24,8 +24,18 @@ else
     IS_FILE=0
 fi
 
+# Find and parse devcontainer.json for extensions
+EXTENSIONS=""
+for devcontainer_path in ".devcontainer/devcontainer.json" ".devcontainer.json"; do
+    if [ -f "$devcontainer_path" ]; then
+        EXTENSIONS=$(jq -r '.customizations.vscode.extensions // [] | join(",")' "$devcontainer_path" 2>/dev/null)
+        break
+    fi
+done
+
 PORT="${URL_LISTENER_PORT:-7077}"
 ENCODED_NAME=$(printf '%s' "$DEVCONTAINER_NAME" | jq -sRr @uri)
 ENCODED_PATH=$(printf '%s' "$ABS_PATH" | jq -sRr @uri)
+ENCODED_EXTENSIONS=$(printf '%s' "$EXTENSIONS" | jq -sRr @uri)
 
-curl -sf "http://host.docker.internal:${PORT}/cursor?container=${ENCODED_NAME}&path=${ENCODED_PATH}&file=${IS_FILE}" >/dev/null 2>&1 &
+curl -sf "http://host.docker.internal:${PORT}/cursor?container=${ENCODED_NAME}&path=${ENCODED_PATH}&file=${IS_FILE}&extensions=${ENCODED_EXTENSIONS}" >/dev/null 2>&1 &
