@@ -132,12 +132,24 @@ devc() {
         fi
     fi
 
-    # Start URL listener for browser forwarding (if not already running)
-    if ! curl -sf http://localhost:7077/health &>/dev/null; then
-        echo "Starting URL listener for browser forwarding..."
-        ~/dotfiles/bin/url-listener &>/dev/null &
-        disown
+    # Restart URL listener to pick up any code changes
+    local listener_pid
+    listener_pid=$(pgrep -f 'url-listener' 2>/dev/null)
+    if [[ -n "$listener_pid" ]]; then
+        echo "Restarting URL listener..."
+        kill "$listener_pid" 2>/dev/null
+        # Wait up to 2 seconds for graceful shutdown
+        for i in {1..20}; do
+            kill -0 "$listener_pid" 2>/dev/null || break
+            sleep 0.1
+        done
+        # Force kill if still running
+        kill -9 "$listener_pid" 2>/dev/null
+    else
+        echo "Starting URL listener..."
     fi
+    ~/dotfiles/bin/url-listener &>/dev/null &
+    disown
 
     echo "Setting up dotfiles..."
     devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
