@@ -138,8 +138,8 @@ devc() {
     if [[ -n "$listener_pid" ]]; then
         echo "Restarting URL listener..."
         kill "$listener_pid" 2>/dev/null
-        # Wait up to 2 seconds for graceful shutdown
-        for i in {1..20}; do
+        # Wait up to 5 seconds for graceful shutdown
+        for i in {1..50}; do
             kill -0 "$listener_pid" 2>/dev/null || break
             sleep 0.1
         done
