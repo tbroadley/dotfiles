@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/check-devcontainer.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "cleanupPeriodDays": 999999,
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "mcp__linear__list_*",
+      "mcp__linear__get_*",
+      "mcp__linear__search_documentation",
+      "mcp__linear__create_issue",
+      "mcp__linear__create_comment",
+      "mcp__todoist__find-tasks",
+      "mcp__todoist__find-tasks-by-date",
+      "mcp__todoist__find-completed-tasks",
+      "mcp__todoist__find-projects",
+      "mcp__todoist__find-sections",
+      "mcp__todoist__find-comments",
+      "mcp__todoist__find-activity",
+      "mcp__todoist__find-project-collaborators",
+      "mcp__todoist__get-overview",
+      "mcp__todoist__user-info",
+      "mcp__todoist__fetch-object",
+      "mcp__todoist__fetch",
+      "mcp__todoist__search",
+      "mcp__todoist__add-tasks",
+      "mcp__todoist__add-comments"
+    ],
+    "deny": [
+      "Bash(dd:*)",
+      "Bash(mkfs:*)",
+      "Bash(truncate:*)",
+      "Bash(sudo:*)"
+    ]
+  },
+  "model": "opus"
+}
