@@ -9,14 +9,13 @@ fi
 
 upstream=$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null) || exit 0
 
-diff_output=$(git diff "$upstream"...HEAD 2>/dev/null) || exit 0
+diff_output=$(git diff "$upstream"...HEAD 2>/dev/null | grep '^+' | grep -v '^+++') || exit 0
 
 if [ -z "$diff_output" ]; then
     exit 0
 fi
 
-scan_result=$(echo "$diff_output" | claude --print --model haiku --allowedTools '' --max-turns 1 <<'PROMPT'
-Analyze this git diff for sensitive data that should not be pushed to a repository.
+prompt="Analyze this git diff for sensitive data that should not be pushed to a repository.
 
 Look for:
 - API keys, tokens, secrets (AWS, GitHub, Stripe, etc.)
@@ -26,11 +25,15 @@ Look for:
 - .env file contents with real values
 - High-entropy strings that look like secrets
 
+<diff>
+$diff_output
+</diff>
+
 Respond with ONLY a JSON object (no markdown, no explanation):
-- If NO secrets found: {"safe": true}
-- If secrets found: {"safe": false, "findings": ["brief description of each finding"]}
-PROMPT
-) || exit 0
+- If NO secrets found: {\"safe\": true}
+- If secrets found: {\"safe\": false, \"findings\": [\"brief description of each finding\"]}"
+
+scan_result=$(claude --print --model haiku --allowedTools '' --max-turns 1 -p "$prompt" 2>/dev/null) || exit 0
 
 scan_result=$(echo "$scan_result" | sed 's/^```json//; s/^```//; /^$/d')
 
