@@ -159,6 +159,17 @@ devc() {
             git clone https://github.com/tbroadley/dotfiles.git $HOME/dotfiles
         fi
         bash $HOME/dotfiles/install.sh
+
+        # Persist auth tokens in container
+        env_file="$HOME/.devcontainer_env"
+        : > "$env_file"
+        [ -n "${GH_TOKEN:-}" ] && echo "export GH_TOKEN=\"$GH_TOKEN\"" >> "$env_file"
+        [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && echo "export CLAUDE_CODE_OAUTH_TOKEN=\"$CLAUDE_CODE_OAUTH_TOKEN\"" >> "$env_file"
+
+        # Source from bashrc if not already configured
+        if ! grep -q "devcontainer_env" "$HOME/.bashrc" 2>/dev/null; then
+            echo "[ -f \$HOME/.devcontainer_env ] && . \$HOME/.devcontainer_env" >> "$HOME/.bashrc"
+        fi
     '
 
     echo "Entering container..."
