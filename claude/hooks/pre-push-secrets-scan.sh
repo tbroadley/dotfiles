@@ -1,16 +1,13 @@
 #!/bin/bash
-set -euo pipefail
 
 input=$(cat)
-command=$(echo "$input" | jq -r '.tool_input.command // ""')
+command=$(echo "$input" | jq -r '.tool_input.command // ""' 2>/dev/null) || exit 0
 
 if ! echo "$command" | grep -qE '^git\s+push\b'; then
     exit 0
 fi
 
-upstream=$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null) || {
-    exit 0
-}
+upstream=$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null) || exit 0
 
 diff_output=$(git diff "$upstream"...HEAD 2>/dev/null) || exit 0
 
@@ -33,20 +30,19 @@ Respond with ONLY a JSON object (no markdown, no explanation):
 - If NO secrets found: {"safe": true}
 - If secrets found: {"safe": false, "findings": ["brief description of each finding"]}
 PROMPT
-) || {
-    echo "Warning: secrets scan failed, allowing push" >&2
-    exit 0
-}
+) || exit 0
 
 scan_result=$(echo "$scan_result" | sed 's/^```json//; s/^```//; /^$/d')
 
-is_safe=$(echo "$scan_result" | grep -o '"safe":\s*true' || true)
-
-if [ -n "$is_safe" ]; then
+if echo "$scan_result" | grep -q '"safe":\s*true'; then
     exit 0
 fi
 
-findings=$(echo "$scan_result" | jq -r '(.findings // [])[:5] | map("- " + .) | join("\n")' 2>/dev/null)
+if ! echo "$scan_result" | grep -q '"safe":\s*false'; then
+    exit 0
+fi
+
+findings=$(echo "$scan_result" | jq -r '(.findings // [])[:5] | map("- " + .) | join("\n")' 2>/dev/null) || findings="Unable to parse findings"
 
 jq -n --arg findings "$findings" '{
   "hookSpecificOutput": {
