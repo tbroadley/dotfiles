@@ -33,6 +33,9 @@ export PATH="$PATH:$HOME/.orbstack/bin"
 # Antigravity
 export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
 
+# Local binaries (apf, etc.)
+export PATH="$HOME/.local/bin:$PATH"
+
 # Aliases
 alias c=clear
 alias d=docker
