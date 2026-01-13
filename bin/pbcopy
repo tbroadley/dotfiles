@@ -1,0 +1,6 @@
+#!/bin/bash
+# Copies stdin to the host clipboard via url-listener.
+# Used in dev containers to forward clipboard operations to macOS host.
+
+PORT="${URL_LISTENER_PORT:-7077}"
+curl -sf --data-binary @- "http://host.docker.internal:${PORT}/copy" >/dev/null 2>&1

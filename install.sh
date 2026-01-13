@@ -269,6 +269,12 @@ cp "$SCRIPT_DIR/bin/cursor-in-container" "$HOME/.local/bin/cursor"
 chmod +x "$HOME/.local/bin/cursor"
 echo "Cursor forwarding script installed"
 
+# Install pbcopy/pbpaste for clipboard forwarding to host
+cp "$SCRIPT_DIR/bin/pbcopy" "$HOME/.local/bin/"
+cp "$SCRIPT_DIR/bin/pbpaste" "$HOME/.local/bin/"
+chmod +x "$HOME/.local/bin/pbcopy" "$HOME/.local/bin/pbpaste"
+echo "Clipboard forwarding scripts installed"
+
 # Install shell-alias-suggestions
 if command -v uv >/dev/null 2>&1; then
   echo "Installing/upgrading shell-alias-suggestions..."

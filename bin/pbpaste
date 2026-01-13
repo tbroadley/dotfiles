@@ -1,0 +1,6 @@
+#!/bin/bash
+# Outputs the host clipboard contents to stdout via url-listener.
+# Used in dev containers to forward clipboard operations to macOS host.
+
+PORT="${URL_LISTENER_PORT:-7077}"
+curl -sf "http://host.docker.internal:${PORT}/paste"
