@@ -1,9 +1,15 @@
 #!/bin/bash
 
-# SessionStart hook to detect dev container configuration
-# Outputs additionalContext that gets injected into Claude's context
-
-if [ -d ".devcontainer" ]; then
+if [ -f "/.dockerenv" ]; then
+  cat <<'EOF'
+{
+  "hookSpecificOutput": {
+    "hookEventName": "SessionStart",
+    "additionalContext": "Already running inside a dev container. Run commands directly here. Use /opt/python/bin/python3 instead of uv run for Python."
+  }
+}
+EOF
+elif [ -d ".devcontainer" ]; then
   cat <<'EOF'
 {
   "hookSpecificOutput": {
