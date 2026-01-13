@@ -72,19 +72,19 @@ add_to_rc() {
 }
 
 # Aliases (work in both shells)
-add_to_rc "alias g=git" "alias g=git"
-add_to_rc "alias v=vim" "alias v=vim"
+add_to_rc "alias b=basedpyright" "alias b=basedpyright"
 add_to_rc "alias c=" 'alias c="unset ANTHROPIC_BASE_URL && claude"'
 add_to_rc "alias d=dvc" "alias d=dvc"
+add_to_rc "alias dotfiles=" "alias dotfiles='git -C ~/dotfiles pull && ~/dotfiles/install.sh'"
 add_to_rc "alias dpl=" "alias dpl='dvc pull'"
 add_to_rc "alias dps=" "alias dps='dvc push'"
 add_to_rc "alias dr=" "alias dr='dvc repro'"
-add_to_rc "alias dotfiles=" "alias dotfiles='git -C ~/dotfiles pull && ~/dotfiles/install.sh'"
-add_to_rc "alias r=ruff" "alias r=ruff"
-add_to_rc "alias b=basedpyright" "alias b=basedpyright"
+add_to_rc "alias g=git" "alias g=git"
+add_to_rc "alias pla=" 'alias pla="git pull && dvc pull"'
+add_to_rc "alias psa=" 'alias psa="dvc push && git push"'
 add_to_rc "alias pt=pytest" "alias pt=pytest"
-add_to_rc 'alias psa=' 'alias psa="dvc push && git push"'
-add_to_rc 'alias pla=' 'alias pla="git pull && dvc pull"'
+add_to_rc "alias r=ruff" "alias r=ruff"
+add_to_rc "alias v=vim" "alias v=vim"
 add_to_rc "export EDITOR=vim" "export EDITOR=vim"
 add_to_rc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
 add_to_rc 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi' 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi'
