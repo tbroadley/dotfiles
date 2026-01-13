@@ -163,6 +163,37 @@ if [ "$(uname -s)" = "Linux" ]; then
   fi
 fi
 
+# Install gh CLI to ~/.local/bin (Linux only, macOS uses brew)
+if [ "$(uname -s)" = "Linux" ]; then
+  if command -v gh >/dev/null 2>&1; then
+    echo "gh CLI is already installed: $(gh --version | head -1)"
+  else
+    echo "Installing gh CLI..."
+    ARCH=$(uname -m)
+    case $ARCH in
+      x86_64)
+        GH_ARCH="linux_amd64"
+        GH_CHECKSUM="ca6e7641214fbd0e21429cec4b64a7ba626fd946d8f9d6d191467545b092015e"
+        ;;
+      aarch64|arm64)
+        GH_ARCH="linux_arm64"
+        GH_CHECKSUM="b1a0c0a0fcf18524e36996caddc92a062355ed014defc836203fe20fba75a38e"
+        ;;
+      *) echo "Unsupported architecture for gh: $ARCH"; exit 1 ;;
+    esac
+
+    GH_VERSION="2.83.2"
+    wget -O /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_${GH_ARCH}.tar.gz"
+    verify_checksum /tmp/gh.tar.gz "$GH_CHECKSUM"
+    mkdir -p /tmp/gh
+    tar -xzf /tmp/gh.tar.gz -C /tmp/gh --strip-components=1
+    mv /tmp/gh/bin/gh "$HOME/.local/bin/"
+    rm -rf /tmp/gh.tar.gz /tmp/gh
+    chmod +x "$HOME/.local/bin/gh"
+    echo "gh CLI installation completed"
+  fi
+fi
+
 # Install nvm and Node.js
 if [ ! -d "$HOME/.nvm" ]; then
   echo "Installing nvm..."
