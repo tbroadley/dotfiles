@@ -75,7 +75,7 @@ add_to_rc() {
 add_to_rc "alias b=basedpyright" "alias b=basedpyright"
 add_to_rc "alias c=" 'alias c="unset ANTHROPIC_BASE_URL && claude"'
 add_to_rc "alias d=dvc" "alias d=dvc"
-add_to_rc "alias dotfiles=" "alias dotfiles='git -C ~/dotfiles pull && ~/dotfiles/install.sh'"
+add_to_rc "alias dotfiles=" "alias dotfiles='git -C ~/dotfiles pull && ~/dotfiles/install.sh && exec \$SHELL'"
 add_to_rc "alias dpl=" "alias dpl='dvc pull'"
 add_to_rc "alias dps=" "alias dps='dvc push'"
 add_to_rc "alias dr=" "alias dr='dvc repro'"
