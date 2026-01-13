@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/thomas/.claude/hooks/check-devcontainer.sh"
+            "command": "~/.claude/hooks/check-devcontainer.sh"
           }
         ]
       }
