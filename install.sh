@@ -85,6 +85,9 @@ add_to_rc "alias psa=" 'alias psa="dvc push && git push"'
 add_to_rc "alias pt=pytest" "alias pt=pytest"
 add_to_rc "alias r=ruff" "alias r=ruff"
 add_to_rc "alias v=vim" "alias v=vim"
+add_to_rc "alias cl=claude" "alias cl=claude"
+add_to_rc "alias clc=" "alias clc='claude --continue'"
+add_to_rc "alias clr=" "alias clr='claude --resume'"
 add_to_rc "export ANTHROPIC_MODEL=opus" "export ANTHROPIC_MODEL=opus"
 add_to_rc "export EDITOR=vim" "export EDITOR=vim"
 add_to_rc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
