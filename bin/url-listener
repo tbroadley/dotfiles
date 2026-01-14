@@ -23,10 +23,16 @@ CURSOR_CONTAINER_CONFIG_DIR = Path.home() / "Library/Application Support/Cursor/
 
 
 def write_container_config(container_name: str, extensions: list[str]) -> None:
-    """Write extensions to Cursor's attached container config file."""
+    """Write extensions and settings to Cursor's attached container config file."""
     CURSOR_CONTAINER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     config_path = CURSOR_CONTAINER_CONFIG_DIR / f"{container_name}.json"
-    config_path.write_text(json.dumps({"extensions": extensions}, indent=2) + "\n")
+    config = {
+        "extensions": extensions,
+        "settings": {
+            "python.defaultInterpreterPath": "/opt/python/bin/python3",
+        },
+    }
+    config_path.write_text(json.dumps(config, indent=2) + "\n")
 
 
 class URLHandler(BaseHTTPRequestHandler):
