@@ -48,6 +48,9 @@ alias psa='dvc push && git push'
 alias t='pnpm -w typecheck'
 alias tf=terraform
 alias v=vim
+alias cl=claude
+alias clc='claude --continue'
+alias clr='claude --resume'
 
 # Completions
 autoload -Uz compinit && compinit
