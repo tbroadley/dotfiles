@@ -73,7 +73,7 @@ add_to_rc() {
 
 # Aliases (work in both shells)
 add_to_rc "alias b=basedpyright" "alias b=basedpyright"
-add_to_rc "claude()" 'claude() { ANTHROPIC_BASE_URL= command claude "$@"; }'
+add_to_rc "claude()" 'claude() { ANTHROPIC_API_KEY= ANTHROPIC_BASE_URL= command claude "$@"; }'
 add_to_rc "alias d=dvc" "alias d=dvc"
 add_to_rc "alias dotfiles=" "alias dotfiles='git -C ~/dotfiles pull && ~/dotfiles/install.sh && exec \$SHELL'"
 add_to_rc "alias dpl=" "alias dpl='dvc pull'"
@@ -254,7 +254,12 @@ echo "Claude Code settings, hooks, and skills installed"
 
 # Configure Claude Code authentication if token is available
 if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
-  echo '{"hasCompletedOnboarding": true}' > "$HOME/.claude.json"
+  if [ -f "$HOME/.claude.json" ]; then
+    # Merge hasCompletedOnboarding into existing file to preserve trust state
+    jq '. + {"hasCompletedOnboarding": true}' "$HOME/.claude.json" > "$HOME/.claude.json.tmp" && mv "$HOME/.claude.json.tmp" "$HOME/.claude.json"
+  else
+    echo '{"hasCompletedOnboarding": true}' > "$HOME/.claude.json"
+  fi
   echo "Claude Code onboarding bypass configured"
 fi
 
