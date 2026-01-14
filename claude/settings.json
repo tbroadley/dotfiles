@@ -51,7 +51,8 @@
       "mcp__todoist__add-tasks",
       "mcp__todoist__add-comments",
       "WebFetch(domain:github.com/METR)",
-      "WebFetch(domain:raw.githubusercontent.com/METR)"
+      "WebFetch(domain:raw.githubusercontent.com/METR)",
+      "WebFetch(domain:inspect.aisi.org.uk)"
     ],
     "deny": [
       "Bash(dd:*)",
