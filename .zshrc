@@ -170,6 +170,7 @@ devc() {
         set -a
         [ -f .env ] && . .env
         set +a
+        [ -f /opt/python/bin/activate ] && . /opt/python/bin/activate
         bash -l
     '
 }
