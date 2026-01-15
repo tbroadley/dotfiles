@@ -5,42 +5,35 @@ POLL_INTERVAL=60
 STATE_DIR="$HOME/.claude/state"
 REPO_DIR="$(pwd)"
 REPO_HASH=$(echo -n "$REPO_DIR" | md5sum 2>/dev/null | cut -c1-8 || echo -n "$REPO_DIR" | md5 | cut -c1-8)
-STATE_FILE="$STATE_DIR/improve-last-poll-$REPO_HASH"
+SEEN_TASKS_FILE="$STATE_DIR/improve-seen-tasks-$REPO_HASH"
 
 mkdir -p "$STATE_DIR"
+touch "$SEEN_TASKS_FILE"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
 log "Starting improve for: $REPO_DIR"
-log "State file: $STATE_FILE"
+log "Seen tasks file: $SEEN_TASKS_FILE"
 log "Poll interval: ${POLL_INTERVAL}s"
 
 while true; do
-    if [[ -f "$STATE_FILE" ]]; then
-        LAST_POLL=$(cat "$STATE_FILE")
-    else
-        LAST_POLL="1970-01-01T00:00:00Z"
-    fi
+    SEEN_TASKS=$(cat "$SEEN_TASKS_FILE")
 
-    log "Checking for tasks created after: $LAST_POLL"
+    log "Checking for unseen tasks..."
 
     NEW_TASKS=$(curl -s "https://api.todoist.com/rest/v2/tasks" \
         -H "Authorization: Bearer $TODOIST_TOKEN" | \
         node -e "
-const lastPoll = '$LAST_POLL';
-const lastPollDate = new Date(lastPoll);
+const seenTasks = new Set(\`$SEEN_TASKS\`.split('\n').filter(Boolean));
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
 process.stdin.on('end', () => {
     try {
         const tasks = JSON.parse(data);
-        const newTasks = tasks.filter(t => {
-            const created = t.created_at;
-            return created && new Date(created) > lastPollDate;
-        }).map(t => ({
+        const newTasks = tasks.filter(t => !seenTasks.has(t.id)).map(t => ({
             id: t.id,
             content: t.content,
             description: t.description || '',
@@ -107,11 +100,11 @@ Work autonomously. Do not ask for confirmation." 2>&1 | while IFS= read -r line;
                     ;;
             esac
         done || log "Claude Code exited with error"
+
+        echo "$NEW_TASKS" | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).map(t=>t.id).join('\n')" >> "$SEEN_TASKS_FILE"
     else
         log "No new tasks found"
     fi
-
-    date -u +%Y-%m-%dT%H:%M:%SZ > "$STATE_FILE"
 
     log "Sleeping for ${POLL_INTERVAL}s..."
     sleep $POLL_INTERVAL
