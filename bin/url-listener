@@ -57,12 +57,11 @@ class URLHandler(BaseHTTPRequestHandler):
                 write_container_config(container_name, extensions)
             config = json.dumps({"containerName": f"/{container_name}"})
             hex_config = config.encode().hex()
+            uri = f"vscode-remote://attached-container+{hex_config}{container_path}"
             if is_file:
-                uri = f"vscode-remote://attached-container+{hex_config}{container_path}"
-                subprocess.run(["cursor", "--file-uri", uri], check=False)
+                subprocess.run(["cursor", "--new-window", "--file-uri", uri], check=False)
             else:
-                uri = f"cursor://vscode-remote/attached-container+{hex_config}{container_path}"
-                subprocess.run(["open", uri], check=False)
+                subprocess.run(["cursor", "--new-window", "--folder-uri", uri], check=False)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
