@@ -1,5 +1,9 @@
 # Claude Code Instructions
 
+## Global CLAUDE.md
+
+`~/.claude/CLAUDE.md` is a symlink to `claude/CLAUDE.md` in this repo. Edit the file here directly.
+
 ## Testing install.sh
 
 Before pushing any changes to this repository, test that `install.sh` works by running it in a copy of an existing dev container:
