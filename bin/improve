@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_PATH="$0"
 POLL_INTERVAL=60
 STATE_DIR="$HOME/.claude/state"
 REPO_DIR="$(pwd)"
@@ -12,6 +13,27 @@ touch "$SEEN_TASKS_FILE"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+is_devcontainer() {
+    [[ -f /.dockerenv ]] || [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]]
+}
+
+update_and_restart() {
+    if is_devcontainer; then
+        log "Inside dev container, updating dotfiles..."
+        if git -C ~/dotfiles pull 2>/dev/null; then
+            log "Pulled latest dotfiles"
+            if ~/dotfiles/install.sh >/dev/null 2>&1; then
+                log "Ran install.sh successfully, restarting improve..."
+                exec "$SCRIPT_PATH"
+            else
+                log "install.sh failed, continuing without restart"
+            fi
+        else
+            log "git pull failed, continuing without restart"
+        fi
+    fi
 }
 
 log "Starting improve for: $REPO_DIR"
@@ -102,6 +124,8 @@ Work autonomously. Do not ask for confirmation." 2>&1 | while IFS= read -r line;
         done || log "Claude Code exited with error"
 
         echo "$NEW_TASKS" | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).map(t=>t.id).join('\n')" >> "$SEEN_TASKS_FILE"
+
+        update_and_restart
     else
         log "No new tasks found"
     fi
