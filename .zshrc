@@ -24,6 +24,9 @@ export PATH="$PATH:$HOME/go/bin"
 # Cargo/Rust
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
+# zoxide (smart cd)
+eval "$(zoxide init zsh)"
+
 # PostgreSQL
 export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"
 
