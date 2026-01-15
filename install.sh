@@ -283,6 +283,11 @@ cp "$SCRIPT_DIR/bin/pbpaste" "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/pbcopy" "$HOME/.local/bin/pbpaste"
 echo "Clipboard forwarding scripts installed"
 
+# Install improve script (Todoist watcher for Claude Code)
+cp "$SCRIPT_DIR/bin/improve" "$HOME/.local/bin/"
+chmod +x "$HOME/.local/bin/improve"
+echo "Improve script installed"
+
 # Install shell-alias-suggestions
 if command -v uv >/dev/null 2>&1; then
   echo "Installing/upgrading shell-alias-suggestions..."

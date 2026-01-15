@@ -1,0 +1,84 @@
+#!/bin/bash
+set -euo pipefail
+
+POLL_INTERVAL=60
+STATE_DIR="$HOME/.claude/state"
+REPO_DIR="$(pwd)"
+REPO_HASH=$(echo -n "$REPO_DIR" | md5sum 2>/dev/null | cut -c1-8 || echo -n "$REPO_DIR" | md5 | cut -c1-8)
+STATE_FILE="$STATE_DIR/improve-last-poll-$REPO_HASH"
+
+mkdir -p "$STATE_DIR"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+log "Starting improve for: $REPO_DIR"
+log "State file: $STATE_FILE"
+log "Poll interval: ${POLL_INTERVAL}s"
+
+while true; do
+    if [[ -f "$STATE_FILE" ]]; then
+        LAST_POLL=$(cat "$STATE_FILE")
+    else
+        LAST_POLL=$(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)
+    fi
+
+    log "Checking for tasks created after: $LAST_POLL"
+
+    NEW_TASKS=$(curl -s "https://api.todoist.com/rest/v2/tasks" \
+        -H "Authorization: Bearer $TODOIST_TOKEN" | \
+        python3 -c "
+import sys, json
+from datetime import datetime
+
+last_poll = '$LAST_POLL'
+last_poll_dt = datetime.fromisoformat(last_poll.replace('Z', '+00:00'))
+
+tasks = json.load(sys.stdin)
+new_tasks = []
+
+for t in tasks:
+    created = t.get('created_at', '')
+    if created:
+        created_dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
+        if created_dt > last_poll_dt:
+            new_tasks.append({
+                'id': t['id'],
+                'content': t['content'],
+                'description': t.get('description', ''),
+                'project_id': t.get('project_id', '')
+            })
+
+if new_tasks:
+    print(json.dumps(new_tasks))
+" 2>/dev/null || echo "")
+
+    if [[ -n "$NEW_TASKS" && "$NEW_TASKS" != "[]" ]]; then
+        TASK_COUNT=$(echo "$NEW_TASKS" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+        log "Found $TASK_COUNT new task(s), invoking Claude Code..."
+
+        cd "$REPO_DIR"
+
+        claude --print "You are watching Todoist for tasks to implement in this repo.
+
+Here are newly created Todoist tasks (JSON format):
+$NEW_TASKS
+
+For each task:
+1. Analyze if it's relevant to this repo ($(basename "$REPO_DIR"))
+2. If relevant: implement the task, commit with message referencing the task ID, push to remote
+3. After successful push, mark the task complete using:
+   curl -X POST \"https://api.todoist.com/rest/v2/tasks/{task_id}/close\" -H \"Authorization: Bearer \$TODOIST_TOKEN\"
+4. If not relevant: skip silently
+
+Work autonomously. Do not ask for confirmation." || log "Claude Code exited with error"
+    else
+        log "No new tasks found"
+    fi
+
+    date -u +%Y-%m-%dT%H:%M:%SZ > "$STATE_FILE"
+
+    log "Sleeping for ${POLL_INTERVAL}s..."
+    sleep $POLL_INTERVAL
+done

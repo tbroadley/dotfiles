@@ -27,6 +27,12 @@ devc() {
         exec_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
     fi
 
+    # Todoist token forwarding
+    if [ -n "${TODOIST_TOKEN:-}" ]; then
+        up_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
+        exec_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
+    fi
+
     if ! devcontainer up \
         --workspace-folder "$workspace" \
         "${up_opts[@]}" \
@@ -79,6 +85,7 @@ devc() {
         : > "$env_file"
         [ -n "${GH_TOKEN:-}" ] && echo "export GH_TOKEN=\"$GH_TOKEN\"" >> "$env_file"
         [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && echo "export CLAUDE_CODE_OAUTH_TOKEN=\"$CLAUDE_CODE_OAUTH_TOKEN\"" >> "$env_file"
+        [ -n "${TODOIST_TOKEN:-}" ] && echo "export TODOIST_TOKEN=\"$TODOIST_TOKEN\"" >> "$env_file"
 
         # Source from bashrc if not already configured
         if ! grep -q "devcontainer_env" "$HOME/.bashrc" 2>/dev/null; then
