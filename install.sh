@@ -316,6 +316,14 @@ if [ -n "${GH_TOKEN:-}" ]; then
   git config --global url."https://github.com/".insteadOf "git@github.com:"
   git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
   echo "GitHub CLI authentication configured"
+
+  # Install Claude Code plugins (requires GitHub auth for private repos)
+  if command -v claude >/dev/null 2>&1; then
+    echo "Installing Claude Code plugins..."
+    GITHUB_TOKEN="$GH_TOKEN" claude plugin marketplace add METR/eval-execution-claude 2>/dev/null || true
+    claude plugin install warehouse-query 2>/dev/null || true
+    echo "Claude Code plugins installed"
+  fi
 fi
 
 echo "Devcontainer configuration completed"
