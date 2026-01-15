@@ -6,6 +6,13 @@
 ## Environment
 - AWS CLI: explicitly use production or staging profile
 
+## Iteration Speed
+- If a script takes more than a few seconds to run, optimize it before running it repeatedly
+- Fast feedback loops are critical—invest time upfront to make iteration quick
+- Even when a script must take a while, still look for ways to make it faster
+- Parallelize CPU-bound work across cores, but be respectful of other processes on the machine
+- Parallelize IO-bound work (e.g., API calls) while respecting rate limits
+
 ## Python Style
 - Use json.dumps for JSON literals, not string concatenation. This ensures JSON strings are valid.
 - Prefer list comprehensions over for loop / accumulator, except with complex control flow or when intermediate variables improve readability. Walrus operator (`if (a := b(c))`) can sometimes help.
