@@ -28,34 +28,33 @@ while true; do
 
     NEW_TASKS=$(curl -s "https://api.todoist.com/rest/v2/tasks" \
         -H "Authorization: Bearer $TODOIST_TOKEN" | \
-        python3 -c "
-import sys, json
-from datetime import datetime
+        node -e "
+const lastPoll = '$LAST_POLL';
+const lastPollDate = new Date(lastPoll);
 
-last_poll = '$LAST_POLL'
-last_poll_dt = datetime.fromisoformat(last_poll.replace('Z', '+00:00'))
-
-tasks = json.load(sys.stdin)
-new_tasks = []
-
-for t in tasks:
-    created = t.get('created_at', '')
-    if created:
-        created_dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
-        if created_dt > last_poll_dt:
-            new_tasks.append({
-                'id': t['id'],
-                'content': t['content'],
-                'description': t.get('description', ''),
-                'project_id': t.get('project_id', '')
-            })
-
-if new_tasks:
-    print(json.dumps(new_tasks))
+let data = '';
+process.stdin.on('data', chunk => data += chunk);
+process.stdin.on('end', () => {
+    try {
+        const tasks = JSON.parse(data);
+        const newTasks = tasks.filter(t => {
+            const created = t.created_at;
+            return created && new Date(created) > lastPollDate;
+        }).map(t => ({
+            id: t.id,
+            content: t.content,
+            description: t.description || '',
+            project_id: t.project_id || ''
+        }));
+        if (newTasks.length > 0) {
+            console.log(JSON.stringify(newTasks));
+        }
+    } catch (e) {}
+});
 " 2>/dev/null || echo "")
 
     if [[ -n "$NEW_TASKS" && "$NEW_TASKS" != "[]" ]]; then
-        TASK_COUNT=$(echo "$NEW_TASKS" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+        TASK_COUNT=$(echo "$NEW_TASKS" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).length));")
         log "Found $TASK_COUNT new task(s), invoking Claude Code..."
 
         cd "$REPO_DIR"
