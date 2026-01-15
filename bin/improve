@@ -59,7 +59,7 @@ process.stdin.on('end', () => {
 
         cd "$REPO_DIR"
 
-        claude --print --output-format stream-json "You are watching Todoist for tasks to implement in this repo.
+        claude --print --verbose --output-format stream-json "You are watching Todoist for tasks to implement in this repo.
 
 Here are newly created Todoist tasks (JSON format):
 $NEW_TASKS
