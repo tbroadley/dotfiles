@@ -234,7 +234,13 @@ if [ "$(uname -s)" = "Linux" ]; then
 fi
 
 # Install nvm and Node.js
-export NVM_DIR="$HOME/.nvm"
+# Check common nvm locations (devcontainer images often have it pre-installed elsewhere)
+if [ -s "/usr/local/share/nvm/nvm.sh" ]; then
+  export NVM_DIR="/usr/local/share/nvm"
+else
+  export NVM_DIR="$HOME/.nvm"
+fi
+
 if [ ! -s "$NVM_DIR/nvm.sh" ]; then
   echo "Installing nvm..."
   NVM_VERSION="0.40.1"
