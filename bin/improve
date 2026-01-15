@@ -131,10 +131,12 @@ Work autonomously. Do not ask for confirmation." 2>&1 | while IFS= read -r line;
 
         echo "$NEW_TASKS" | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).map(t=>t.id).join('\n')" >> "$SEEN_TASKS_FILE"
 
-        update_and_restart
     else
         log "No new tasks found"
     fi
+
+    # Always update dotfiles and restart every poll cycle (60s)
+    update_and_restart
 
     log "Sleeping for ${POLL_INTERVAL}s... (press 'f' to flush seen tasks)"
 
