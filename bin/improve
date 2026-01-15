@@ -135,9 +135,6 @@ Work autonomously. Do not ask for confirmation." 2>&1 | while IFS= read -r line;
         log "No new tasks found"
     fi
 
-    # Always update dotfiles and restart every poll cycle (60s)
-    update_and_restart
-
     log "Sleeping for ${POLL_INTERVAL}s... (press 'f' to flush seen tasks)"
 
     # Use read with timeout to allow keyboard input during sleep
@@ -152,4 +149,7 @@ Work autonomously. Do not ask for confirmation." 2>&1 | while IFS= read -r line;
         fi
         (( SLEEP_REMAINING-- )) || true
     done
+
+    # Update dotfiles and restart after sleeping (so restart doesn't skip the delay)
+    update_and_restart
 done
