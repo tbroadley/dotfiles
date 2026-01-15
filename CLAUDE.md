@@ -1,5 +1,48 @@
 # Claude Code Instructions
 
+## About This Repo
+
+Personal dotfiles for dev container setup. The `install.sh` script configures a consistent development environment inside containers.
+
+### What Gets Installed
+
+**CLI Tools** (Linux, user-local to `~/.local/bin`):
+- ripgrep (`rg`) - fast search
+- jq - JSON processor
+- gh - GitHub CLI
+- zoxide - smart `cd` replacement (`z` command)
+- nvm + Node.js LTS
+- Claude Code CLI
+- @openai/codex
+
+**Shell Configuration**:
+- inputrc: arrow-key history search
+- gitconfig/gitignore: git aliases and global ignores
+- Shell aliases: `g`=git, `d`=dvc, `pt`=pytest, `cl`=claude, etc.
+- Environment: `ANTHROPIC_MODEL=opus`, `EDITOR=vim`
+
+**Claude Code Setup** (copied from `claude/`):
+- `settings.json`: permissions, hooks, model preferences
+- `CLAUDE.md`: global coding style rules
+- `hooks/`: pre-tool-use scripts
+- `skills/`: custom skill definitions
+
+**Host Integration** (for dev containers):
+- `open-url-on-host`: forward URLs to host browser
+- `cursor-in-container`: open files in Cursor on host
+- `pbcopy`/`pbpaste`: clipboard forwarding
+- `improve`: Todoist watcher for autonomous tasks
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `install.sh` | Main setup script, runs in containers |
+| `devc.zsh` | Host-side function to launch containers with auth forwarding |
+| `claude/CLAUDE.md` | Global coding style rules (symlinked to `~/.claude/CLAUDE.md`) |
+| `claude/settings.json` | Claude Code permissions and hooks |
+| `bin/improve` | Todoist polling script for autonomous Claude Code tasks |
+
 ## Global CLAUDE.md
 
 `~/.claude/CLAUDE.md` is a symlink to `claude/CLAUDE.md` in this repo. Edit the file here directly.
