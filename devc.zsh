@@ -51,8 +51,7 @@ devc() {
     if [[ -n "$container_id" ]]; then
         if command -v apf &> /dev/null; then
             echo "Starting automatic port forwarding..."
-            apf "$container_id" &> /dev/null &
-            disown
+            ( apf "$container_id" &> /dev/null & )
         else
             echo "ERROR: apf not found. Install apf or ensure ~/.local/bin is in PATH." >&2
             return 1
@@ -68,8 +67,7 @@ devc() {
     else
         echo "Starting URL listener..."
     fi
-    ~/dotfiles/bin/url-listener &>/dev/null &
-    disown
+    ( ~/dotfiles/bin/url-listener &>/dev/null & )
 
     echo "Setting up dotfiles..."
     devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
