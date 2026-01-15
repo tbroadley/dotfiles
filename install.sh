@@ -102,6 +102,10 @@ add_to_rc "__git_complete g __git_main" "__git_complete g __git_main 2>/dev/null
 add_to_rc "autoload -Uz compinit && compinit" "autoload -Uz compinit && compinit" false true
 add_to_rc "autoload -Uz vcs_info" "autoload -Uz vcs_info" false true
 
+# Zoxide shell initialization (enables 'z' command for smart directory jumping)
+add_to_rc 'eval "$(zoxide init bash)"' 'command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init bash)"' true false
+add_to_rc 'eval "$(zoxide init zsh)"' 'command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"' false true
+
 echo "shell rc configured"
 
 # Ensure ~/.local/bin exists and is in PATH
@@ -195,6 +199,37 @@ if [ "$(uname -s)" = "Linux" ]; then
     rm -rf /tmp/gh.tar.gz /tmp/gh
     chmod +x "$HOME/.local/bin/gh"
     echo "gh CLI installation completed"
+  fi
+fi
+
+# Install zoxide to ~/.local/bin (Linux only, macOS uses brew)
+if [ "$(uname -s)" = "Linux" ]; then
+  if command -v zoxide >/dev/null 2>&1; then
+    echo "zoxide is already installed: $(zoxide --version)"
+  else
+    echo "Installing zoxide..."
+    ARCH=$(uname -m)
+    case $ARCH in
+      x86_64)
+        ZOXIDE_ARCH="x86_64-unknown-linux-musl"
+        ZOXIDE_CHECKSUM="4092ee38aa1efde42e4efb2f9c872df5388198aacae7f1a74e5eb5c3cc7f531c"
+        ;;
+      aarch64|arm64)
+        ZOXIDE_ARCH="aarch64-unknown-linux-musl"
+        ZOXIDE_CHECKSUM="078cc9cc8cedb6c45edb84c0f5bad53518c610859c73bdb3009a52b89652c103"
+        ;;
+      *) echo "Unsupported architecture for zoxide: $ARCH"; exit 1 ;;
+    esac
+
+    ZOXIDE_VERSION="0.9.8"
+    wget -O /tmp/zoxide.tar.gz "https://github.com/ajeetdsouza/zoxide/releases/download/v${ZOXIDE_VERSION}/zoxide-${ZOXIDE_VERSION}-${ZOXIDE_ARCH}.tar.gz"
+    verify_checksum /tmp/zoxide.tar.gz "$ZOXIDE_CHECKSUM"
+    mkdir -p /tmp/zoxide
+    tar -xzf /tmp/zoxide.tar.gz -C /tmp/zoxide
+    mv /tmp/zoxide/zoxide "$HOME/.local/bin/"
+    rm -rf /tmp/zoxide.tar.gz /tmp/zoxide
+    chmod +x "$HOME/.local/bin/zoxide"
+    echo "zoxide installation completed"
   fi
 fi
 
