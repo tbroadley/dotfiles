@@ -234,7 +234,8 @@ if [ "$(uname -s)" = "Linux" ]; then
 fi
 
 # Install nvm and Node.js
-if [ ! -d "$HOME/.nvm" ]; then
+export NVM_DIR="$HOME/.nvm"
+if [ ! -s "$NVM_DIR/nvm.sh" ]; then
   echo "Installing nvm..."
   NVM_VERSION="0.40.1"
   NVM_CHECKSUM="abdb525ee9f5b48b34d8ed9fc67c6013fb0f659712e401ecd88ab989b3af8f53"
@@ -244,7 +245,6 @@ if [ ! -d "$HOME/.nvm" ]; then
   rm -f /tmp/nvm-install.sh
 fi
 
-export NVM_DIR="$HOME/.nvm"
 # nvm scripts have unbound variables, so temporarily disable -u
 set +u
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
