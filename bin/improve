@@ -15,6 +15,11 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
+flush_seen_tasks() {
+    > "$SEEN_TASKS_FILE"
+    log "Flushed seen tasks list - all tasks will be reconsidered on next poll"
+}
+
 is_devcontainer() {
     [[ -f /.dockerenv ]] || [[ -n "${REMOTE_CONTAINERS:-}" ]] || [[ -n "${CODESPACES:-}" ]]
 }
@@ -39,6 +44,7 @@ update_and_restart() {
 log "Starting improve for: $REPO_DIR"
 log "Seen tasks file: $SEEN_TASKS_FILE"
 log "Poll interval: ${POLL_INTERVAL}s"
+log "Press 'f' to flush seen tasks list"
 
 while true; do
     SEEN_TASKS=$(cat "$SEEN_TASKS_FILE")
@@ -130,6 +136,18 @@ Work autonomously. Do not ask for confirmation." 2>&1 | while IFS= read -r line;
         log "No new tasks found"
     fi
 
-    log "Sleeping for ${POLL_INTERVAL}s..."
-    sleep $POLL_INTERVAL
+    log "Sleeping for ${POLL_INTERVAL}s... (press 'f' to flush seen tasks)"
+
+    # Use read with timeout to allow keyboard input during sleep
+    SLEEP_REMAINING=$POLL_INTERVAL
+    while (( SLEEP_REMAINING > 0 )); do
+        if read -t 1 -n 1 key 2>/dev/null; then
+            case "$key" in
+                f|F)
+                    flush_seen_tasks
+                    ;;
+            esac
+        fi
+        (( SLEEP_REMAINING-- )) || true
+    done
 done
