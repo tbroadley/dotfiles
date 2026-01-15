@@ -76,7 +76,30 @@ Work autonomously. Do not ask for confirmation." 2>&1 | while IFS= read -r line;
             TYPE=$(node -pe "try{JSON.parse(process.argv[1]).type}catch{''}" "$line" 2>/dev/null || echo "")
             case "$TYPE" in
                 assistant)
+                    # Print tool calls
+                    node -pe "
+                        const content = JSON.parse(process.argv[1]).message?.content || [];
+                        content.filter(c => c.type === 'tool_use').forEach(c => {
+                            console.log('[Tool] ' + c.name + ': ' + JSON.stringify(c.input));
+                        });
+                        ''" "$line" 2>/dev/null || true
+                    # Print text content
                     node -pe "JSON.parse(process.argv[1]).message?.content?.filter(c=>c.type==='text').map(c=>c.text).join('')||''" "$line" 2>/dev/null || true
+                    ;;
+                user)
+                    # Print tool results
+                    node -pe "
+                        const content = JSON.parse(process.argv[1]).message?.content || [];
+                        content.filter(c => c.type === 'tool_result').forEach(c => {
+                            const result = typeof c.content === 'string' ? c.content : JSON.stringify(c.content);
+                            const truncated = result.length > 500 ? result.substring(0, 500) + '...' : result;
+                            console.log('[Tool Result] ' + truncated);
+                        });
+                        // Print user text messages
+                        content.filter(c => c.type === 'text').forEach(c => {
+                            console.log('[User] ' + c.text);
+                        });
+                        ''" "$line" 2>/dev/null || true
                     ;;
                 result)
                     MSG=$(node -pe "JSON.parse(process.argv[1]).result||''" "$line" 2>/dev/null || echo "")
