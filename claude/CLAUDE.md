@@ -1,5 +1,8 @@
 # Global Rules
 
+## GitHub Comments
+- Prefix all GitHub comments (PR reviews, issue comments, discussions) with "Claude Code:"
+
 ## Environment
 - AWS CLI: explicitly use production or staging profile
 
