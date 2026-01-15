@@ -1,28 +1,4 @@
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/check-devcontainer.sh"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/pre-push-secrets-scan.sh",
-            "timeout": 120000
-          }
-        ]
-      }
-    ]
-  },
   "cleanupPeriodDays": 999999,
   "permissions": {
     "allow": [
@@ -52,7 +28,8 @@
       "mcp__todoist__add-comments",
       "WebFetch(domain:github.com/METR)",
       "WebFetch(domain:raw.githubusercontent.com/METR)",
-      "WebFetch(domain:inspect.aisi.org.uk)"
+      "WebFetch(domain:inspect.aisi.org.uk)",
+      "WebFetch(domain:meridianlabs-ai.github.io)"
     ],
     "deny": [
       "Bash(dd:*)",
@@ -61,5 +38,36 @@
       "Bash(sudo:*)"
     ]
   },
-  "model": "opus"
+  "model": "opus",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/check-devcontainer.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/pre-push-secrets-scan.sh",
+            "timeout": 120000
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "cat | jq -r '.workspace.current_dir'"
+  },
+  "enabledPlugins": {
+    "warehouse-query@metr-eval-execution": true
+  }
 }
