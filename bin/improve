@@ -59,7 +59,7 @@ process.stdin.on('end', () => {
 
         cd "$REPO_DIR"
 
-        claude --print "You are watching Todoist for tasks to implement in this repo.
+        claude --print --output-format stream-json "You are watching Todoist for tasks to implement in this repo.
 
 Here are newly created Todoist tasks (JSON format):
 $NEW_TASKS
@@ -71,7 +71,19 @@ For each task:
    curl -X POST \"https://api.todoist.com/rest/v2/tasks/{task_id}/close\" -H \"Authorization: Bearer \$TODOIST_TOKEN\"
 4. If not relevant: skip silently
 
-Work autonomously. Do not ask for confirmation." || log "Claude Code exited with error"
+Work autonomously. Do not ask for confirmation." 2>&1 | while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            TYPE=$(node -pe "try{JSON.parse(process.argv[1]).type}catch{''}" "$line" 2>/dev/null || echo "")
+            case "$TYPE" in
+                assistant)
+                    node -pe "JSON.parse(process.argv[1]).message?.content?.filter(c=>c.type==='text').map(c=>c.text).join('')||''" "$line" 2>/dev/null || true
+                    ;;
+                result)
+                    MSG=$(node -pe "JSON.parse(process.argv[1]).result||''" "$line" 2>/dev/null || echo "")
+                    [[ -n "$MSG" ]] && log "Result: $MSG"
+                    ;;
+            esac
+        done || log "Claude Code exited with error"
     else
         log "No new tasks found"
     fi
