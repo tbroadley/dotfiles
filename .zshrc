@@ -98,3 +98,7 @@ dcr() {
 
 # Local config (secrets, machine-specific settings)
 [ -f ~/.zshrc.local ] && source ~/.zshrc.local
+
+# >>> alias-suggest initialize >>>
+eval "$(alias-suggest hook)"
+# <<< alias-suggest initialize <<<
