@@ -1,0 +1,10 @@
+{
+  "name": "dotfiles",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "postCreateCommand": "./install.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": []
+    }
+  }
+}
