@@ -42,9 +42,11 @@ update_and_restart() {
 }
 
 REPO_NAME=$(basename "$REPO_DIR")
+# Generate initials from repo name (e.g., "status-dashboard" -> "sd", "dotfiles" -> "d")
+REPO_INITIALS=$(echo "$REPO_NAME" | sed 's/[^a-zA-Z-]//g' | sed 's/-/ /g' | awk '{for(i=1;i<=NF;i++) printf substr($i,1,1)}')
 
 log "Starting improve for: $REPO_DIR"
-log "Repo name filter: $REPO_NAME:"
+log "Repo name filter: $REPO_NAME: or $REPO_INITIALS:"
 log "Seen tasks file: $SEEN_TASKS_FILE"
 log "Poll interval: ${POLL_INTERVAL}s"
 log "Press 'f' to flush seen tasks list"
@@ -59,6 +61,7 @@ while true; do
         node -e "
 const seenTasks = new Set(\`$SEEN_TASKS\`.split('\n').filter(Boolean));
 const repoPrefix = '$REPO_NAME:';
+const initialsPrefix = '$REPO_INITIALS:';
 
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
@@ -67,7 +70,7 @@ process.stdin.on('end', () => {
         const tasks = JSON.parse(data);
         const newTasks = tasks
             .filter(t => !seenTasks.has(t.id))
-            .filter(t => t.content.startsWith(repoPrefix))
+            .filter(t => t.content.startsWith(repoPrefix) || t.content.startsWith(initialsPrefix))
             .map(t => ({
                 id: t.id,
                 content: t.content,
