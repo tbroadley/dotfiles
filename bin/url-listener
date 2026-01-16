@@ -22,7 +22,7 @@ from pathlib import Path
 CURSOR_CONTAINER_CONFIG_DIR = Path.home() / "Library/Application Support/Cursor/User/globalStorage/anysphere.remote-containers/nameConfigs"
 
 
-def write_container_config(container_name: str, extensions: list[str]) -> None:
+def write_container_config(container_name: str, extensions: list[str], remote_user: str | None = None) -> None:
     """Write extensions and settings to Cursor's attached container config file."""
     CURSOR_CONTAINER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     config_path = CURSOR_CONTAINER_CONFIG_DIR / f"{container_name}.json"
@@ -32,6 +32,8 @@ def write_container_config(container_name: str, extensions: list[str]) -> None:
             "python.defaultInterpreterPath": "/opt/python/bin/python3",
         },
     }
+    if remote_user:
+        config["remoteUser"] = remote_user
     config_path.write_text(json.dumps(config, indent=2) + "\n")
 
 
@@ -52,9 +54,9 @@ class URLHandler(BaseHTTPRequestHandler):
             container_path = params["path"][0]
             is_file = params.get("file", ["0"])[0] == "1"
             extensions_param = params.get("extensions", [""])[0]
-            if extensions_param:
-                extensions = [e.strip() for e in extensions_param.split(",") if e.strip()]
-                write_container_config(container_name, extensions)
+            remote_user = params.get("user", [None])[0]
+            extensions = [e.strip() for e in extensions_param.split(",") if e.strip()] if extensions_param else []
+            write_container_config(container_name, extensions, remote_user)
             config = json.dumps({"containerName": f"/{container_name}"})
             hex_config = config.encode().hex()
             uri = f"vscode-remote://attached-container+{hex_config}{container_path}"
