@@ -85,11 +85,9 @@ add_to_rc "alias psa=" 'alias psa="dvc push && git push"'
 add_to_rc "alias pt=pytest" "alias pt=pytest"
 add_to_rc "alias r=ruff" "alias r=ruff"
 add_to_rc "alias v=vim" "alias v=vim"
-# Claude wrapper function that warns if running outside a dev container in a dir with devcontainer setup
-add_to_rc "_claude_devcontainer_check()" '_claude_devcontainer_check() { if [[ ! -f /.dockerenv && ( -d .devcontainer || -f .devcontainer.json ) ]]; then printf "Warning: Running outside dev container in a directory with devcontainer setup.\nAre you sure? [y/N] "; read -r reply; [[ "$reply" =~ ^[Yy]$ ]] || return 1; fi; }'
-add_to_rc "cl()" 'cl() { _claude_devcontainer_check && claude "$@"; }'
-add_to_rc "clc()" 'clc() { _claude_devcontainer_check && claude --continue "$@"; }'
-add_to_rc "clr()" 'clr() { _claude_devcontainer_check && claude --resume "$@"; }'
+add_to_rc "alias cl=claude" "alias cl=claude"
+add_to_rc "alias clc=" "alias clc='claude --continue'"
+add_to_rc "alias clr=" "alias clr='claude --resume'"
 add_to_rc "export ANTHROPIC_MODEL=opus" "export ANTHROPIC_MODEL=opus"
 add_to_rc "export EDITOR=vim" "export EDITOR=vim"
 add_to_rc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
