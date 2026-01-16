@@ -1,6 +1,7 @@
 ---
 name: worktree
 description: This skill should be used when the user asks to "create a worktree", "add a worktree", "set up a worktree", mentions "git worktree", or wants to work on multiple branches simultaneously.
+user-invocable: true
 ---
 
 # Create Git Worktree
