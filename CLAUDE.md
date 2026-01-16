@@ -38,10 +38,18 @@ Personal dotfiles for dev container setup. The `install.sh` script configures a 
 | File | Purpose |
 |------|---------|
 | `install.sh` | Main setup script, runs in containers |
+| `.zshrc` | Host machine shell config (macOS) |
 | `devc.zsh` | Host-side function to launch containers with auth forwarding |
 | `claude/CLAUDE.md` | Global coding style rules (symlinked to `~/.claude/CLAUDE.md`) |
 | `claude/settings.json` | Claude Code permissions and hooks |
 | `bin/improve` | Todoist polling script for autonomous Claude Code tasks |
+
+### Shell Aliases: Host vs Dev Container
+
+This repo maintains two separate sets of shell aliases:
+
+- **`.zshrc`**: Aliases for the **host machine** (macOS). Symlinked to `~/.zshrc`. Includes host-specific tools like Homebrew, OrbStack, and devcontainer safety checks for `cl`/`clc`/`clr`.
+- **`install.sh`**: Aliases for **dev containers** (Linux). Added to container's shell rc file during setup. Simpler versions without host-specific checks.
 
 ## Global CLAUDE.md
 

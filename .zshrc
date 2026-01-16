@@ -51,9 +51,17 @@ alias psa='dvc push && git push'
 alias t='pnpm -w typecheck'
 alias tf=terraform
 alias v=vim
-alias cl=claude
-alias clc='claude --continue'
-alias clr='claude --resume'
+# Claude wrapper functions that warn if running outside dev container in a dir with devcontainer setup
+_claude_devcontainer_check() {
+    if [[ ! -f /.dockerenv && ( -d .devcontainer || -f .devcontainer.json ) ]]; then
+        printf "Warning: Running outside dev container in a directory with devcontainer setup.\nAre you sure? [y/N] "
+        read -r reply
+        [[ "$reply" =~ ^[Yy]$ ]] || return 1
+    fi
+}
+cl() { _claude_devcontainer_check && claude "$@"; }
+clc() { _claude_devcontainer_check && claude --continue "$@"; }
+clr() { _claude_devcontainer_check && claude --resume "$@"; }
 
 # Completions
 autoload -Uz compinit && compinit
