@@ -1,7 +1,8 @@
 #!/bin/bash
-# Opens a file or folder in Cursor on the host, attached to this dev container.
-# Usage: cursor [file_or_directory]
+# Opens files or a folder in Cursor on the host, attached to this dev container.
+# Usage: cursor [file_or_directory...]
 # If no argument given, opens the current directory.
+# Multiple files can be specified to open them all in one Cursor window.
 
 # If DEVCONTAINER_NAME is not set, fall back to Cursor's built-in remote CLI
 if [ -z "$DEVCONTAINER_NAME" ]; then
@@ -17,20 +18,36 @@ if [ -z "$DEVCONTAINER_NAME" ]; then
     exit 1
 fi
 
-TARGET="${1:-.}"
+# Default to current directory if no arguments
+if [ $# -eq 0 ]; then
+    set -- "."
+fi
 
-if [ ! -e "$TARGET" ]; then
-    echo "Error: $TARGET does not exist" >&2
+# Validate all targets exist and determine if they're files or directories
+IS_FILE=0
+HAS_DIRECTORY=0
+for TARGET in "$@"; do
+    if [ ! -e "$TARGET" ]; then
+        echo "Error: $TARGET does not exist" >&2
+        exit 1
+    fi
+    if [ -d "$TARGET" ]; then
+        HAS_DIRECTORY=1
+    else
+        IS_FILE=1
+    fi
+done
+
+# Can't mix files and directories
+if [ "$HAS_DIRECTORY" -eq 1 ] && [ "$IS_FILE" -eq 1 ]; then
+    echo "Error: Cannot mix files and directories. Use only files or a single directory." >&2
     exit 1
 fi
 
-ABS_PATH=$(realpath "$TARGET")
-
-# Determine if target is a file or directory
-if [ -f "$TARGET" ]; then
-    IS_FILE=1
-else
-    IS_FILE=0
+# Can only open one directory
+if [ "$HAS_DIRECTORY" -eq 1 ] && [ $# -gt 1 ]; then
+    echo "Error: Can only open one directory at a time." >&2
+    exit 1
 fi
 
 # Find and parse devcontainer.json for extensions
@@ -44,8 +61,15 @@ done
 
 PORT="${URL_LISTENER_PORT:-7077}"
 ENCODED_NAME=$(printf '%s' "$DEVCONTAINER_NAME" | jq -sRr @uri)
-ENCODED_PATH=$(printf '%s' "$ABS_PATH" | jq -sRr @uri)
 ENCODED_EXTENSIONS=$(printf '%s' "$EXTENSIONS" | jq -sRr @uri)
 ENCODED_USER=$(printf '%s' "$(whoami)" | jq -sRr @uri)
 
-curl -sf "http://host.docker.internal:${PORT}/cursor?container=${ENCODED_NAME}&path=${ENCODED_PATH}&file=${IS_FILE}&extensions=${ENCODED_EXTENSIONS}&user=${ENCODED_USER}" >/dev/null 2>&1 &
+# Build path parameters for all targets
+PATH_PARAMS=""
+for TARGET in "$@"; do
+    ABS_PATH=$(realpath "$TARGET")
+    ENCODED_PATH=$(printf '%s' "$ABS_PATH" | jq -sRr @uri)
+    PATH_PARAMS="${PATH_PARAMS}&path=${ENCODED_PATH}"
+done
+
+curl -sf "http://host.docker.internal:${PORT}/cursor?container=${ENCODED_NAME}${PATH_PARAMS}&file=${IS_FILE}&extensions=${ENCODED_EXTENSIONS}&user=${ENCODED_USER}" >/dev/null 2>&1 &
