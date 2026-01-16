@@ -1,3 +1,91 @@
+_devc_claude() {
+    local claude_cmd="$1"
+    shift
+    local workspace="${PWD}"
+
+    echo "Starting dev container..."
+
+    local up_opts=()
+    local exec_opts=()
+
+    local gh_token
+    if gh_token=$(gh auth token 2>/dev/null); then
+        up_opts+=(--remote-env "GH_TOKEN=$gh_token")
+        exec_opts+=(--remote-env "GH_TOKEN=$gh_token")
+    fi
+
+    if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        up_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
+        exec_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
+    fi
+
+    if [ -n "${TODOIST_TOKEN:-}" ]; then
+        up_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
+        exec_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
+    fi
+
+    if ! devcontainer up \
+        --workspace-folder "$workspace" \
+        "${up_opts[@]}"; then
+        echo "Failed to start dev container"
+        return 1
+    fi
+
+    local container_id container_name
+    container_id=$(docker ps -q --filter "label=devcontainer.local_folder=$workspace")
+    container_name=$(docker inspect --format '{{.Name}}' "$container_id" 2>/dev/null | sed 's/^\///')
+    if [[ -n "$container_name" ]]; then
+        exec_opts+=(--remote-env "DEVCONTAINER_NAME=$container_name")
+    fi
+    if [[ -n "$container_id" ]]; then
+        if command -v apf &> /dev/null; then
+            echo "Starting automatic port forwarding with watchdog..."
+            ( ~/dotfiles/bin/apf-watchdog "$container_id" &>/dev/null & )
+        fi
+    fi
+
+    local listener_pid
+    listener_pid=$(pgrep -f 'url-listener' 2>/dev/null)
+    if [[ -n "$listener_pid" ]]; then
+        kill "$listener_pid" 2>/dev/null
+    fi
+    ( ~/dotfiles/bin/url-listener &>/dev/null & )
+
+    echo "Setting up dotfiles..."
+    devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
+        if [ -d $HOME/dotfiles ]; then
+            cd $HOME/dotfiles && git pull
+        else
+            git clone https://github.com/tbroadley/dotfiles.git $HOME/dotfiles
+        fi
+        bash $HOME/dotfiles/install.sh
+
+        env_file="$HOME/.devcontainer_env"
+        : > "$env_file"
+        [ -n "${GH_TOKEN:-}" ] && echo "export GH_TOKEN=\"$GH_TOKEN\"" >> "$env_file"
+        [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && echo "export CLAUDE_CODE_OAUTH_TOKEN=\"$CLAUDE_CODE_OAUTH_TOKEN\"" >> "$env_file"
+        [ -n "${TODOIST_TOKEN:-}" ] && echo "export TODOIST_TOKEN=\"$TODOIST_TOKEN\"" >> "$env_file"
+
+        if ! grep -q "devcontainer_env" "$HOME/.bashrc" 2>/dev/null; then
+            echo "[ -f \$HOME/.devcontainer_env ] && . \$HOME/.devcontainer_env" >> "$HOME/.bashrc"
+        fi
+    '
+
+    echo "Running claude in container..."
+    local escaped_args=""
+    for arg in "$@"; do
+        escaped_args="$escaped_args '${arg//\'/\'\\\'\'}'"
+    done
+    devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" bash -c "
+        [ -f ~/.bashrc ] && . ~/.bashrc
+        set -a
+        [ -f .env ] && . .env
+        set +a
+        [ -f /opt/python/bin/activate ] && . /opt/python/bin/activate
+        claude $claude_cmd $escaped_args
+    "
+}
+
 devc() {
     local workspace="${PWD}"
     local rebuild_flag=""

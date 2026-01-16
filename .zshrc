@@ -53,16 +53,29 @@ alias tf=terraform
 alias v=vim
 # Claude wrapper functions that warn if running outside dev container in a dir with devcontainer setup
 unalias cl clc clr 2>/dev/null
-_claude_devcontainer_check() {
+_claude_in_devcontainer() {
+    local claude_cmd="$1"
+    shift
     if [[ ! -f /.dockerenv && ( -d .devcontainer || -f .devcontainer.json ) ]]; then
-        printf "Warning: Running outside dev container in a directory with devcontainer setup.\nAre you sure? [y/N] "
+        printf "Warning: Running outside dev container in a directory with devcontainer setup.\nRun on host anyway? [y/N] "
         read -r reply
-        [[ "$reply" =~ ^[Yy]$ ]] || return 1
+        if [[ "$reply" =~ ^[Yy]$ ]]; then
+            claude $claude_cmd "$@"
+        else
+            printf "Launch dev container and run claude there? [Y/n] "
+            read -r reply2
+            if [[ ! "$reply2" =~ ^[Nn]$ ]]; then
+                source ~/dotfiles/devc.zsh
+                _devc_claude "$claude_cmd" "$@"
+            fi
+        fi
+    else
+        claude $claude_cmd "$@"
     fi
 }
-cl() { _claude_devcontainer_check && claude "$@"; }
-clc() { _claude_devcontainer_check && claude --continue "$@"; }
-clr() { _claude_devcontainer_check && claude --resume "$@"; }
+cl() { _claude_in_devcontainer "" "$@"; }
+clc() { _claude_in_devcontainer "--continue" "$@"; }
+clr() { _claude_in_devcontainer "--resume" "$@"; }
 
 # Completions
 autoload -Uz compinit && compinit
