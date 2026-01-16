@@ -105,7 +105,7 @@ The skills use `gcloud auth application-default print-access-token` to get a fre
 
 **Important:** All Google API requests must include the quota project header:
 ```bash
--H "x-goog-user-project: ${GOOGLE_QUOTA_PROJECT}"
+-H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)"
 ```
 
 ---
@@ -136,37 +136,37 @@ After setup, test each skill:
 ```bash
 # Todoist
 curl -s "https://api.todoist.com/rest/v2/projects" \
-  -H "Authorization: Bearer ${TODOIST_TOKEN}" | jq '.[].name'
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.[].name'
 
 # Linear
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ viewer { name } }"}' | jq '.data.viewer.name'
 
 # Datadog
-curl -s "https://api.${DD_SITE}/api/v1/validate" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}"
+curl -s "https://api.$(printenv DD_SITE)/api/v1/validate" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
 
 # Airtable
 curl -s "https://api.airtable.com/v0/meta/bases" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}" | jq '.bases[].name'
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)" | jq '.bases[].name'
 
 # Google (all three)
 ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
 
 curl -s "https://www.googleapis.com/calendar/v3/users/me/calendarList" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  -H "x-goog-user-project: ${GOOGLE_QUOTA_PROJECT}" | jq '.items[].summary'
+  -H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)" | jq '.items[].summary'
 
 curl -s "https://gmail.googleapis.com/gmail/v1/users/me/profile" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  -H "x-goog-user-project: ${GOOGLE_QUOTA_PROJECT}"
+  -H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)"
 
 curl -s "https://www.googleapis.com/drive/v3/files?pageSize=5" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  -H "x-goog-user-project: ${GOOGLE_QUOTA_PROJECT}" | jq '.files[].name'
+  -H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)" | jq '.files[].name'
 
 # Alfred Clipboard
 sqlite3 ~/Library/Application\ Support/Alfred/Databases/clipboard.alfdb \

@@ -34,15 +34,15 @@ Use this skill when the user:
 
 ## API Endpoints
 
-Base URL: `https://api.${DD_SITE}/api/v1` or `v2`
+Base URL: `https://api.$(printenv DD_SITE)/api/v1` or `v2`
 
 ### Logs
 
 **Search Logs** (POST /api/v2/logs/events/search):
 ```bash
-curl -s -X POST "https://api.${DD_SITE}/api/v2/logs/events/search" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
+curl -s -X POST "https://api.$(printenv DD_SITE)/api/v2/logs/events/search" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)" \
   -H "Content-Type: application/json" \
   -d '{
     "filter": {
@@ -66,69 +66,69 @@ Common log query filters:
 
 **List All Monitors** (GET /api/v1/monitor):
 ```bash
-curl -s "https://api.${DD_SITE}/api/v1/monitor" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}"
+curl -s "https://api.$(printenv DD_SITE)/api/v1/monitor" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
 ```
 
 **Get Monitor by ID** (GET /api/v1/monitor/{id}):
 ```bash
-curl -s "https://api.${DD_SITE}/api/v1/monitor/{MONITOR_ID}" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}"
+curl -s "https://api.$(printenv DD_SITE)/api/v1/monitor/{MONITOR_ID}" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
 ```
 
 **Search Monitors**:
 ```bash
-curl -s "https://api.${DD_SITE}/api/v1/monitor?query=status:Alert" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}"
+curl -s "https://api.$(printenv DD_SITE)/api/v1/monitor?query=status:Alert" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
 ```
 
 ### Metrics
 
 **Query Metrics** (GET /api/v1/query):
 ```bash
-curl -s -G "https://api.${DD_SITE}/api/v1/query" \
+curl -s -G "https://api.$(printenv DD_SITE)/api/v1/query" \
   --data-urlencode "query=avg:system.cpu.user{*}" \
   --data-urlencode "from=$(date -v-1H +%s)" \
   --data-urlencode "to=$(date +%s)" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}"
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
 ```
 
 **List Available Metrics** (GET /api/v1/metrics):
 ```bash
-curl -s "https://api.${DD_SITE}/api/v1/metrics?from=$(date -v-1d +%s)" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}"
+curl -s "https://api.$(printenv DD_SITE)/api/v1/metrics?from=$(date -v-1d +%s)" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
 ```
 
 ### Events
 
 **Query Events** (GET /api/v1/events):
 ```bash
-curl -s "https://api.${DD_SITE}/api/v1/events?start=$(date -v-1d +%s)&end=$(date +%s)" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}"
+curl -s "https://api.$(printenv DD_SITE)/api/v1/events?start=$(date -v-1d +%s)&end=$(date +%s)" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
 ```
 
 ### Dashboards
 
 **List Dashboards** (GET /api/v1/dashboard):
 ```bash
-curl -s "https://api.${DD_SITE}/api/v1/dashboard" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}"
+curl -s "https://api.$(printenv DD_SITE)/api/v1/dashboard" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
 ```
 
 ### Incidents
 
 **List Incidents** (GET /api/v2/incidents):
 ```bash
-curl -s "https://api.${DD_SITE}/api/v2/incidents" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}"
+curl -s "https://api.$(printenv DD_SITE)/api/v2/incidents" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
 ```
 
 ## Common Workflows
@@ -136,9 +136,9 @@ curl -s "https://api.${DD_SITE}/api/v2/incidents" \
 ### Check for Recent Errors
 ```bash
 # Search for error logs in the last hour
-curl -s -X POST "https://api.${DD_SITE}/api/v2/logs/events/search" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
+curl -s -X POST "https://api.$(printenv DD_SITE)/api/v2/logs/events/search" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)" \
   -H "Content-Type: application/json" \
   -d '{
     "filter": {
@@ -153,17 +153,17 @@ curl -s -X POST "https://api.${DD_SITE}/api/v2/logs/events/search" \
 ### Check Alert Status
 ```bash
 # List monitors that are currently alerting
-curl -s "https://api.${DD_SITE}/api/v1/monitor?query=status:Alert" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" | jq '.[] | {name, overall_state, message}'
+curl -s "https://api.$(printenv DD_SITE)/api/v1/monitor?query=status:Alert" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)" | jq '.[] | {name, overall_state, message}'
 ```
 
 ### Investigate a Service
 ```bash
 # Get logs for a specific service
-curl -s -X POST "https://api.${DD_SITE}/api/v2/logs/events/search" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
+curl -s -X POST "https://api.$(printenv DD_SITE)/api/v2/logs/events/search" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)" \
   -H "Content-Type: application/json" \
   -d '{
     "filter": {

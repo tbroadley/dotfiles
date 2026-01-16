@@ -37,7 +37,7 @@ Linear uses GraphQL at: `https://api.linear.app/graphql`
 
 All requests need:
 ```bash
--H "Authorization: ${LINEAR_API_KEY}" \
+-H "Authorization: $(printenv LINEAR_API_KEY)" \
 -H "Content-Type: application/json"
 ```
 
@@ -48,7 +48,7 @@ Note: No "Bearer" prefix for Linear API keys.
 ### List My Issues
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ viewer { assignedIssues(first: 20) { nodes { identifier title state { name } priority } } } }"}' | jq '.data.viewer.assignedIssues.nodes'
 ```
@@ -56,7 +56,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### List All Issues
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ issues(first: 50) { nodes { identifier title state { name } assignee { name } priority } } }"}' | jq '.data.issues.nodes'
 ```
@@ -64,7 +64,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### Get Issue by ID
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ issue(id: \"ISSUE_UUID\") { identifier title description state { name } assignee { name } priority labels { nodes { name } } } }"}'
 ```
@@ -72,7 +72,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### Search Issues by Identifier (e.g., ENG-123)
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ issueSearch(query: \"ENG-123\", first: 5) { nodes { identifier title state { name } } } }"}'
 ```
@@ -80,7 +80,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### List Teams
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ teams { nodes { id name key } } }"}' | jq '.data.teams.nodes'
 ```
@@ -88,7 +88,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### List Projects
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ projects(first: 20) { nodes { id name state progress } } }"}' | jq '.data.projects.nodes'
 ```
@@ -96,7 +96,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### List Workflow States
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ workflowStates { nodes { id name type } } }"}' | jq '.data.workflowStates.nodes'
 ```
@@ -104,7 +104,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### List Labels
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ issueLabels { nodes { id name color } } }"}' | jq '.data.issueLabels.nodes'
 ```
@@ -112,7 +112,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### Get Current User Info
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ viewer { id name email } }"}'
 ```
@@ -120,7 +120,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### List Current Cycle Issues
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ cycles(filter: { isActive: { eq: true } }, first: 1) { nodes { name issues { nodes { identifier title state { name } } } } } }"}'
 ```
@@ -130,7 +130,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### Create Issue
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{
     "query": "mutation CreateIssue($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { identifier title url } } }",
@@ -148,7 +148,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### Add Comment to Issue
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{
     "query": "mutation AddComment($input: CommentCreateInput!) { commentCreate(input: $input) { success comment { id body } } }",
@@ -164,7 +164,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### Update Issue State
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{
     "query": "mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success issue { identifier state { name } } } }",
@@ -182,7 +182,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### Get My Open Issues
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ viewer { assignedIssues(filter: { state: { type: { nin: [\"completed\", \"canceled\"] } } }, first: 50) { nodes { identifier title state { name } priority dueDate } } } }"}' | jq '.data.viewer.assignedIssues.nodes'
 ```
@@ -190,7 +190,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### Get High Priority Issues
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ issues(filter: { priority: { lte: 2 } }, first: 20) { nodes { identifier title priority state { name } assignee { name } } } }"}' | jq '.data.issues.nodes'
 ```
@@ -198,7 +198,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### Get Issues in a Project
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ project(id: \"PROJECT_UUID\") { name issues { nodes { identifier title state { name } } } } }"}'
 ```
@@ -206,7 +206,7 @@ curl -s -X POST "https://api.linear.app/graphql" \
 ### Search Issues
 ```bash
 curl -s -X POST "https://api.linear.app/graphql" \
-  -H "Authorization: ${LINEAR_API_KEY}" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \
   -d '{"query": "{ issueSearch(query: \"search term\", first: 10) { nodes { identifier title description state { name } } } }"}'
 ```

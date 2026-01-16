@@ -35,36 +35,36 @@ Base URL: `https://api.todoist.com/rest/v2`
 
 All requests need:
 ```bash
--H "Authorization: Bearer $TODOIST_TOKEN"
+-H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
-**Important:** Use `$TODOIST_TOKEN` (not `$TODOIST_TOKEN`) to avoid shell quoting issues in Claude Code.
+**Important:** Use `$(printenv TODOIST_TOKEN)` to ensure the token expands correctly in all shell contexts (zsh eval can lose variable values).
 
 ### Tasks
 
 **Get All Tasks**:
 ```bash
 curl -s "https://api.todoist.com/rest/v2/tasks" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Get Tasks by Filter**:
 ```bash
 curl -s -G "https://api.todoist.com/rest/v2/tasks" \
   --data-urlencode "filter=today" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Get Single Task**:
 ```bash
 curl -s "https://api.todoist.com/rest/v2/tasks/{TASK_ID}" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Create Task**:
 ```bash
 curl -s -X POST "https://api.todoist.com/rest/v2/tasks" \
-  -H "Authorization: Bearer $TODOIST_TOKEN" \
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" \
   -H "Content-Type: application/json" \
   -d '{
     "content": "Task name",
@@ -76,7 +76,7 @@ curl -s -X POST "https://api.todoist.com/rest/v2/tasks" \
 **Complete Task**:
 ```bash
 curl -s -X POST "https://api.todoist.com/rest/v2/tasks/{TASK_ID}/close" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 ### Projects
@@ -84,13 +84,13 @@ curl -s -X POST "https://api.todoist.com/rest/v2/tasks/{TASK_ID}/close" \
 **Get All Projects**:
 ```bash
 curl -s "https://api.todoist.com/rest/v2/projects" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Get Project**:
 ```bash
 curl -s "https://api.todoist.com/rest/v2/projects/{PROJECT_ID}" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 ### Sections
@@ -98,13 +98,13 @@ curl -s "https://api.todoist.com/rest/v2/projects/{PROJECT_ID}" \
 **Get Sections**:
 ```bash
 curl -s "https://api.todoist.com/rest/v2/sections" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Get Sections in Project**:
 ```bash
 curl -s "https://api.todoist.com/rest/v2/sections?project_id={PROJECT_ID}" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 ### Labels
@@ -112,7 +112,7 @@ curl -s "https://api.todoist.com/rest/v2/sections?project_id={PROJECT_ID}" \
 **Get All Labels**:
 ```bash
 curl -s "https://api.todoist.com/rest/v2/labels" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 ### Comments
@@ -120,13 +120,13 @@ curl -s "https://api.todoist.com/rest/v2/labels" \
 **Get Comments on Task**:
 ```bash
 curl -s "https://api.todoist.com/rest/v2/comments?task_id={TASK_ID}" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Add Comment**:
 ```bash
 curl -s -X POST "https://api.todoist.com/rest/v2/comments" \
-  -H "Authorization: Bearer $TODOIST_TOKEN" \
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" \
   -H "Content-Type: application/json" \
   -d '{
     "task_id": "TASK_ID",
@@ -159,20 +159,20 @@ The `filter` parameter accepts Todoist filter syntax:
 ```bash
 curl -s -G "https://api.todoist.com/rest/v2/tasks" \
   --data-urlencode "filter=today" \
-  -H "Authorization: Bearer $TODOIST_TOKEN" | jq '.[] | {content, due: .due.string, priority}'
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.[] | {content, due: .due.string, priority}'
 ```
 
 ### Get Overdue Tasks
 ```bash
 curl -s -G "https://api.todoist.com/rest/v2/tasks" \
   --data-urlencode "filter=overdue" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 ### Add a Task for Tomorrow
 ```bash
 curl -s -X POST "https://api.todoist.com/rest/v2/tasks" \
-  -H "Authorization: Bearer $TODOIST_TOKEN" \
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" \
   -H "Content-Type: application/json" \
   -d '{
     "content": "Review the PR",
@@ -185,24 +185,24 @@ curl -s -X POST "https://api.todoist.com/rest/v2/tasks" \
 ```bash
 # First, find project ID
 curl -s "https://api.todoist.com/rest/v2/projects" \
-  -H "Authorization: Bearer $TODOIST_TOKEN" | jq '.[] | {name, id}'
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.[] | {name, id}'
 
 # Then get tasks
 curl -s "https://api.todoist.com/rest/v2/tasks?project_id={PROJECT_ID}" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 ### Get High Priority Tasks
 ```bash
 curl -s -G "https://api.todoist.com/rest/v2/tasks" \
   --data-urlencode "filter=p1 | p2" \
-  -H "Authorization: Bearer $TODOIST_TOKEN"
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 ### List Projects with Task Counts
 ```bash
 curl -s "https://api.todoist.com/rest/v2/projects" \
-  -H "Authorization: Bearer $TODOIST_TOKEN" | jq '.[] | {name, id}'
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.[] | {name, id}'
 ```
 
 ## Task Properties

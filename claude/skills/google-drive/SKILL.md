@@ -25,7 +25,7 @@ ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
 
 **Required header for all requests:**
 ```bash
--H "x-goog-user-project: ${GOOGLE_QUOTA_PROJECT}"
+-H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)"
 ```
 
 ## When to Use
@@ -130,9 +130,9 @@ Combine with `and`/`or`: `name contains 'meeting' and mimeType = 'application/vn
 ### Search for a Document
 ```bash
 ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
-  -d "client_id=${GOOGLE_CLIENT_ID}" \
-  -d "client_secret=${GOOGLE_CLIENT_SECRET}" \
-  -d "refresh_token=${GOOGLE_REFRESH_TOKEN}" \
+  -d "client_id=$(printenv GOOGLE_CLIENT_ID)" \
+  -d "client_secret=$(printenv GOOGLE_CLIENT_SECRET)" \
+  -d "refresh_token=$(printenv GOOGLE_REFRESH_TOKEN)" \
   -d "grant_type=refresh_token" | jq -r '.access_token')
 
 curl -s -G "https://www.googleapis.com/drive/v3/files" \

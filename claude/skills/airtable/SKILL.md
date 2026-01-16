@@ -39,7 +39,7 @@ Base URL: `https://api.airtable.com/v0`
 
 All requests need:
 ```bash
--H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+-H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 ### List Bases
@@ -47,7 +47,7 @@ All requests need:
 **Get All Bases**:
 ```bash
 curl -s "https://api.airtable.com/v0/meta/bases" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}" | jq '.bases[] | {name, id}'
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)" | jq '.bases[] | {name, id}'
 ```
 
 ### Get Base Schema
@@ -55,7 +55,7 @@ curl -s "https://api.airtable.com/v0/meta/bases" \
 **Get Tables and Fields**:
 ```bash
 curl -s "https://api.airtable.com/v0/meta/bases/{BASE_ID}/tables" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 ### List Records
@@ -63,13 +63,13 @@ curl -s "https://api.airtable.com/v0/meta/bases/{BASE_ID}/tables" \
 **Get Records from Table**:
 ```bash
 curl -s "https://api.airtable.com/v0/{BASE_ID}/{TABLE_NAME}" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 **With Pagination**:
 ```bash
 curl -s "https://api.airtable.com/v0/{BASE_ID}/{TABLE_NAME}?pageSize=100" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 ### Filter Records
@@ -78,14 +78,14 @@ curl -s "https://api.airtable.com/v0/{BASE_ID}/{TABLE_NAME}?pageSize=100" \
 ```bash
 curl -s -G "https://api.airtable.com/v0/{BASE_ID}/{TABLE_NAME}" \
   --data-urlencode "filterByFormula={Status}='Active'" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 **Multiple Conditions**:
 ```bash
 curl -s -G "https://api.airtable.com/v0/{BASE_ID}/{TABLE_NAME}" \
   --data-urlencode "filterByFormula=AND({Status}='Active', {Priority}='High')" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 ### Sort Records
@@ -94,7 +94,7 @@ curl -s -G "https://api.airtable.com/v0/{BASE_ID}/{TABLE_NAME}" \
 curl -s -G "https://api.airtable.com/v0/{BASE_ID}/{TABLE_NAME}" \
   --data-urlencode "sort[0][field]=Created" \
   --data-urlencode "sort[0][direction]=desc" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 ### Select Specific Fields
@@ -104,14 +104,14 @@ curl -s -G "https://api.airtable.com/v0/{BASE_ID}/{TABLE_NAME}" \
   --data-urlencode "fields[]=Name" \
   --data-urlencode "fields[]=Status" \
   --data-urlencode "fields[]=Due Date" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 ### Get Single Record
 
 ```bash
 curl -s "https://api.airtable.com/v0/{BASE_ID}/{TABLE_NAME}/{RECORD_ID}" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 ## Formula Syntax
@@ -137,14 +137,14 @@ Airtable formulas for filtering:
 ### List All Bases
 ```bash
 curl -s "https://api.airtable.com/v0/meta/bases" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}" | jq '.bases[] | {name, id}'
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)" | jq '.bases[] | {name, id}'
 ```
 
 ### Explore a Base's Structure
 ```bash
 BASE_ID="appXXXXXXXX"
 curl -s "https://api.airtable.com/v0/meta/bases/${BASE_ID}/tables" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}" | jq '.tables[] | {name, id, fields: [.fields[].name]}'
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)" | jq '.tables[] | {name, id, fields: [.fields[].name]}'
 ```
 
 ### Get Recent Records
@@ -155,7 +155,7 @@ curl -s -G "https://api.airtable.com/v0/${BASE_ID}/${TABLE}" \
   --data-urlencode "sort[0][field]=Created" \
   --data-urlencode "sort[0][direction]=desc" \
   --data-urlencode "pageSize=10" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}" | jq '.records[] | .fields'
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)" | jq '.records[] | .fields'
 ```
 
 ### Search for Records
@@ -164,14 +164,14 @@ BASE_ID="appXXXXXXXX"
 TABLE="Contacts"
 curl -s -G "https://api.airtable.com/v0/${BASE_ID}/${TABLE}" \
   --data-urlencode "filterByFormula=FIND('John', {Name})" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 ### Filter by Status
 ```bash
 curl -s -G "https://api.airtable.com/v0/${BASE_ID}/${TABLE}" \
   --data-urlencode "filterByFormula={Status}='In Progress'" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}" | jq '.records[] | {name: .fields.Name, status: .fields.Status}'
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)" | jq '.records[] | {name: .fields.Name, status: .fields.Status}'
 ```
 
 ## Finding Base and Table IDs
@@ -191,11 +191,11 @@ Responses are paginated (max 100 records per request). Use the `offset` paramete
 ```bash
 # First request
 curl -s "https://api.airtable.com/v0/${BASE_ID}/${TABLE}?pageSize=100" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 
 # If response includes "offset", use it for next page
 curl -s "https://api.airtable.com/v0/${BASE_ID}/${TABLE}?pageSize=100&offset={OFFSET_FROM_RESPONSE}" \
-  -H "Authorization: Bearer ${AIRTABLE_TOKEN}"
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)"
 ```
 
 ## Notes
