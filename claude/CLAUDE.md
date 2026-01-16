@@ -1,7 +1,8 @@
 # Global Rules
 
-## GitHub Comments
+## GitHub
 - Prefix all GitHub comments (PR reviews, issue comments, discussions) with "Claude Code:"
+- Use `gh` CLI to fetch contents of GitHub repos (files, issues, PRs, etc.) instead of WebFetch
 
 ## Environment
 - AWS CLI: explicitly use production or staging profile
