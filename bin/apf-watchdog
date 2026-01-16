@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Watchdog for apf (automatic port forwarding)
+# Monitors apf and restarts it if it dies, with logging
+
+set -u
+
+CONTAINER_ID="$1"
+LOG_DIR="${HOME}/.local/log"
+LOG_FILE="${LOG_DIR}/apf.log"
+PID_FILE="${LOG_DIR}/apf-watchdog.pid"
+CHECK_INTERVAL=5
+
+mkdir -p "$LOG_DIR"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
+}
+
+cleanup() {
+    log "Watchdog shutting down"
+    if [[ -n "${APF_PID:-}" ]] && kill -0 "$APF_PID" 2>/dev/null; then
+        kill "$APF_PID" 2>/dev/null
+    fi
+    rm -f "$PID_FILE"
+    exit 0
+}
+
+trap cleanup SIGTERM SIGINT
+
+# Kill any existing watchdog for this container
+if [[ -f "$PID_FILE" ]]; then
+    old_pid=$(cat "$PID_FILE")
+    if kill -0 "$old_pid" 2>/dev/null; then
+        log "Killing existing watchdog (PID $old_pid)"
+        kill "$old_pid" 2>/dev/null
+        sleep 1
+    fi
+fi
+
+echo $$ > "$PID_FILE"
+log "Watchdog started for container $CONTAINER_ID (PID $$)"
+
+start_apf() {
+    log "Starting apf for container $CONTAINER_ID"
+    apf "$CONTAINER_ID" >> "$LOG_FILE" 2>&1 &
+    APF_PID=$!
+    log "apf started with PID $APF_PID"
+}
+
+start_apf
+
+while true; do
+    sleep "$CHECK_INTERVAL"
+
+    # Check if container is still running
+    if ! docker inspect "$CONTAINER_ID" &>/dev/null; then
+        log "Container $CONTAINER_ID no longer exists, exiting"
+        cleanup
+    fi
+
+    # Check if apf is still running
+    if ! kill -0 "$APF_PID" 2>/dev/null; then
+        log "apf (PID $APF_PID) died, restarting..."
+        start_apf
+    fi
+done

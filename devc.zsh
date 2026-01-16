@@ -50,8 +50,9 @@ devc() {
     fi
     if [[ -n "$container_id" ]]; then
         if command -v apf &> /dev/null; then
-            echo "Starting automatic port forwarding..."
-            ( apf "$container_id" &> /dev/null & )
+            echo "Starting automatic port forwarding with watchdog..."
+            ( ~/dotfiles/bin/apf-watchdog "$container_id" &>/dev/null & )
+            echo "  Logs: ~/.local/log/apf.log"
         else
             echo "ERROR: apf not found. Install apf or ensure ~/.local/bin is in PATH." >&2
             return 1
