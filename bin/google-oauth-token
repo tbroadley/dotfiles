@@ -1,0 +1,57 @@
+#!/bin/bash
+set -euo pipefail
+
+CREDENTIALS_FILE="${HOME}/.config/google-oauth/credentials.json"
+CACHE_FILE="${HOME}/.config/google-oauth/token_cache.json"
+
+if [[ ! -f "$CREDENTIALS_FILE" ]]; then
+    echo "Error: No credentials found at $CREDENTIALS_FILE" >&2
+    echo "Run: google-oauth-setup <path-to-client-secret.json>" >&2
+    exit 1
+fi
+
+if [[ -f "$CACHE_FILE" ]]; then
+    cached_token=$(jq -r '.access_token // empty' "$CACHE_FILE" 2>/dev/null || true)
+    expires_at=$(jq -r '.expires_at // 0' "$CACHE_FILE" 2>/dev/null || echo "0")
+    current_time=$(date +%s)
+
+    if [[ -n "$cached_token" && "$expires_at" -gt "$((current_time + 60))" ]]; then
+        echo "$cached_token"
+        exit 0
+    fi
+fi
+
+client_id=$(jq -r '.client_id' "$CREDENTIALS_FILE")
+client_secret=$(jq -r '.client_secret' "$CREDENTIALS_FILE")
+refresh_token=$(jq -r '.refresh_token' "$CREDENTIALS_FILE")
+
+if [[ -z "$refresh_token" || "$refresh_token" == "null" ]]; then
+    echo "Error: No refresh token in credentials file" >&2
+    echo "Run google-oauth-setup again to re-authorize" >&2
+    exit 1
+fi
+
+response=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+    -d "client_id=${client_id}" \
+    -d "client_secret=${client_secret}" \
+    -d "refresh_token=${refresh_token}" \
+    -d "grant_type=refresh_token")
+
+access_token=$(echo "$response" | jq -r '.access_token // empty')
+expires_in=$(echo "$response" | jq -r '.expires_in // 3600')
+
+if [[ -z "$access_token" ]]; then
+    error=$(echo "$response" | jq -r '.error // "unknown"')
+    error_desc=$(echo "$response" | jq -r '.error_description // "No description"')
+    echo "Error refreshing token: $error - $error_desc" >&2
+    exit 1
+fi
+
+expires_at=$(($(date +%s) + expires_in))
+jq -n \
+    --arg access_token "$access_token" \
+    --argjson expires_at "$expires_at" \
+    '{access_token: $access_token, expires_at: $expires_at}' > "$CACHE_FILE"
+chmod 600 "$CACHE_FILE"
+
+echo "$access_token"

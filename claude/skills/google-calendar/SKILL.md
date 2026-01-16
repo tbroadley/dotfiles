@@ -9,23 +9,23 @@ This skill provides access to Google Calendar via the Google Calendar API.
 
 ## Setup Required
 
-Uses gcloud CLI for authentication (same setup for Calendar, Gmail, Drive).
+Uses OAuth with persistent refresh token (same setup for Calendar, Gmail, Drive).
 
 **One-time setup:**
 ```bash
-brew install google-cloud-sdk
-gcloud auth application-default login --scopes="https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/drive.readonly"
-gcloud auth application-default set-quota-project YOUR_PROJECT_ID
+google-oauth-setup <path-to-client-secret.json>
 ```
+
+See `claude/skills/SETUP.md` for detailed OAuth setup instructions.
 
 **Get Access Token (auto-refreshes):**
 ```bash
-ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
+ACCESS_TOKEN=$(google-oauth-token)
 ```
 
 **Required header for all requests:**
 ```bash
--H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)"
+-H "x-goog-user-project: ${GOOGLE_QUOTA_PROJECT}"
 ```
 
 ## When to Use
@@ -122,11 +122,7 @@ curl -s -X POST "https://www.googleapis.com/calendar/v3/freeBusy" \
 
 ### What's on my calendar today?
 ```bash
-ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
-  -d "client_id=$(printenv GOOGLE_CLIENT_ID)" \
-  -d "client_secret=$(printenv GOOGLE_CLIENT_SECRET)" \
-  -d "refresh_token=$(printenv GOOGLE_REFRESH_TOKEN)" \
-  -d "grant_type=refresh_token" | jq -r '.access_token')
+ACCESS_TOKEN=$(google-oauth-token)
 
 TODAY=$(date -u +"%Y-%m-%dT00:00:00Z")
 TOMORROW=$(date -v+1d -u +"%Y-%m-%dT00:00:00Z")

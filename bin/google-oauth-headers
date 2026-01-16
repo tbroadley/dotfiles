@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euo pipefail
+
+CREDENTIALS_FILE="${HOME}/.config/google-oauth/credentials.json"
+
+access_token=$(google-oauth-token)
+headers="-H 'Authorization: Bearer ${access_token}'"
+
+if [[ -f "$CREDENTIALS_FILE" ]]; then
+    quota_project=$(jq -r '.quota_project // empty' "$CREDENTIALS_FILE" 2>/dev/null || true)
+    if [[ -n "$quota_project" ]]; then
+        headers="${headers} -H 'x-goog-user-project: ${quota_project}'"
+    fi
+fi
+
+echo "$headers"

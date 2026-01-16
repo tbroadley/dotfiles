@@ -1,0 +1,295 @@
+#!/bin/bash
+set -euo pipefail
+
+SCOPES="https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/drive.readonly"
+REDIRECT_URI="http://localhost:8085/callback"
+CREDENTIALS_FILE="${HOME}/.config/google-oauth/credentials.json"
+
+print_usage() {
+    cat << 'EOF'
+Google OAuth Setup for Claude Code Skills
+
+This script sets up OAuth credentials for Gmail, Calendar, and Drive access.
+
+PREREQUISITES:
+1. Create an OAuth 2.0 Client ID in Google Cloud Console:
+   - Go to: https://console.cloud.google.com/apis/credentials
+   - Click "Create Credentials" → "OAuth client ID"
+   - Application type: "Desktop app"
+   - Name: "Claude Code" (or anything you like)
+   - Download the JSON file
+
+2. Enable the required APIs in your project:
+   - Calendar API: https://console.cloud.google.com/apis/library/calendar-json.googleapis.com
+   - Gmail API: https://console.cloud.google.com/apis/library/gmail.googleapis.com
+   - Drive API: https://console.cloud.google.com/apis/library/drive.googleapis.com
+
+USAGE:
+    google-oauth-setup <path-to-client-secret.json>
+    google-oauth-setup --migrate-gcloud
+    google-oauth-setup --status
+    google-oauth-setup --refresh
+
+OPTIONS:
+    --status         Check if credentials are configured and valid
+    --refresh        Force refresh the access token
+    --migrate-gcloud Migrate existing gcloud application-default credentials
+    <json>           Path to downloaded OAuth client secret JSON file
+
+EOF
+}
+
+check_status() {
+    if [[ ! -f "$CREDENTIALS_FILE" ]]; then
+        echo "No credentials found at $CREDENTIALS_FILE"
+        echo "Run: google-oauth-setup <path-to-client-secret.json>"
+        exit 1
+    fi
+
+    if ! command -v jq &>/dev/null; then
+        echo "Error: jq is required. Install with: brew install jq"
+        exit 1
+    fi
+
+    local client_id=$(jq -r '.client_id' "$CREDENTIALS_FILE")
+    local has_refresh=$(jq -r '.refresh_token // empty' "$CREDENTIALS_FILE")
+
+    echo "Credentials file: $CREDENTIALS_FILE"
+    echo "Client ID: ${client_id:0:20}..."
+
+    if [[ -z "$has_refresh" ]]; then
+        echo "Status: Missing refresh token - run setup again"
+        exit 1
+    fi
+
+    echo "Status: Refresh token present"
+
+    local token
+    if token=$(google-oauth-token 2>/dev/null); then
+        echo "Access token: Valid ($(echo "$token" | wc -c | tr -d ' ') chars)"
+    else
+        echo "Access token: Failed to obtain"
+        exit 1
+    fi
+}
+
+do_refresh() {
+    if [[ ! -f "$CREDENTIALS_FILE" ]]; then
+        echo "Error: No credentials found. Run setup first."
+        exit 1
+    fi
+
+    google-oauth-token
+    echo "Token refreshed successfully"
+}
+
+migrate_gcloud() {
+    local gcloud_creds="${HOME}/.config/gcloud/application_default_credentials.json"
+
+    if [[ ! -f "$gcloud_creds" ]]; then
+        echo "Error: No gcloud credentials found at $gcloud_creds"
+        echo "Run: gcloud auth application-default login"
+        exit 1
+    fi
+
+    if ! command -v jq &>/dev/null; then
+        echo "Error: jq is required. Install with: brew install jq"
+        exit 1
+    fi
+
+    local client_id=$(jq -r '.client_id' "$gcloud_creds")
+    local client_secret=$(jq -r '.client_secret' "$gcloud_creds")
+    local refresh_token=$(jq -r '.refresh_token' "$gcloud_creds")
+    local quota_project=$(jq -r '.quota_project_id // empty' "$gcloud_creds")
+
+    if [[ -z "$refresh_token" || "$refresh_token" == "null" ]]; then
+        echo "Error: No refresh token in gcloud credentials"
+        exit 1
+    fi
+
+    mkdir -p "$(dirname "$CREDENTIALS_FILE")"
+
+    jq -n \
+        --arg client_id "$client_id" \
+        --arg client_secret "$client_secret" \
+        --arg refresh_token "$refresh_token" \
+        --arg quota_project "$quota_project" \
+        '{
+            client_id: $client_id,
+            client_secret: $client_secret,
+            refresh_token: $refresh_token,
+            quota_project: $quota_project
+        }' > "$CREDENTIALS_FILE"
+
+    chmod 600 "$CREDENTIALS_FILE"
+
+    echo "Migrated gcloud credentials to: $CREDENTIALS_FILE"
+    if [[ -n "$quota_project" ]]; then
+        echo "Quota project: $quota_project"
+    fi
+    echo ""
+    echo "Testing token refresh..."
+
+    if google-oauth-token > /dev/null 2>&1; then
+        echo "Success! Token refresh working."
+    else
+        echo "Warning: Token refresh failed. You may need to re-authenticate."
+        echo "Run: google-oauth-setup <path-to-client-secret.json>"
+    fi
+}
+
+do_setup() {
+    local client_secret_file="$1"
+
+    if [[ ! -f "$client_secret_file" ]]; then
+        echo "Error: File not found: $client_secret_file"
+        exit 1
+    fi
+
+    if ! command -v jq &>/dev/null; then
+        echo "Error: jq is required. Install with: brew install jq"
+        exit 1
+    fi
+
+    local json_content=$(cat "$client_secret_file")
+    local client_id client_secret
+
+    if echo "$json_content" | jq -e '.installed' &>/dev/null; then
+        client_id=$(echo "$json_content" | jq -r '.installed.client_id')
+        client_secret=$(echo "$json_content" | jq -r '.installed.client_secret')
+    elif echo "$json_content" | jq -e '.web' &>/dev/null; then
+        client_id=$(echo "$json_content" | jq -r '.web.client_id')
+        client_secret=$(echo "$json_content" | jq -r '.web.client_secret')
+    else
+        echo "Error: Invalid client secret JSON format"
+        exit 1
+    fi
+
+    if [[ -z "$client_id" || "$client_id" == "null" ]]; then
+        echo "Error: Could not extract client_id from JSON"
+        exit 1
+    fi
+
+    mkdir -p "$(dirname "$CREDENTIALS_FILE")"
+
+    local encoded_scopes=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$SCOPES'))")
+    local encoded_redirect=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$REDIRECT_URI'))")
+
+    local auth_url="https://accounts.google.com/o/oauth2/v2/auth?client_id=${client_id}&redirect_uri=${encoded_redirect}&response_type=code&scope=${encoded_scopes}&access_type=offline&prompt=consent"
+
+    echo "Opening browser for authorization..."
+    echo ""
+    echo "If browser doesn't open, visit this URL:"
+    echo "$auth_url"
+    echo ""
+
+    open "$auth_url" 2>/dev/null || true
+
+    echo "Starting local server to capture OAuth callback..."
+    echo "Waiting for authorization (listening on port 8085)..."
+
+    local auth_code
+    auth_code=$(python3 << 'PYTHON'
+import http.server
+import urllib.parse
+import sys
+
+class OAuthHandler(http.server.BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+
+        if 'code' in params:
+            code = params['code'][0]
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            self.wfile.write(b'''
+                <html><body style="font-family: system-ui; padding: 40px; text-align: center;">
+                <h1>Authorization Successful!</h1>
+                <p>You can close this window and return to your terminal.</p>
+                </body></html>
+            ''')
+            print(code)
+            sys.exit(0)
+        elif 'error' in params:
+            self.send_response(400)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            error = params.get('error', ['unknown'])[0]
+            self.wfile.write(f'<html><body><h1>Error: {error}</h1></body></html>'.encode())
+            sys.exit(1)
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+server = http.server.HTTPServer(('localhost', 8085), OAuthHandler)
+server.handle_request()
+PYTHON
+)
+
+    if [[ -z "$auth_code" ]]; then
+        echo "Error: Failed to get authorization code"
+        exit 1
+    fi
+
+    echo "Got authorization code, exchanging for tokens..."
+
+    local token_response
+    token_response=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+        -d "client_id=${client_id}" \
+        -d "client_secret=${client_secret}" \
+        -d "code=${auth_code}" \
+        -d "grant_type=authorization_code" \
+        -d "redirect_uri=${REDIRECT_URI}")
+
+    local access_token=$(echo "$token_response" | jq -r '.access_token // empty')
+    local refresh_token=$(echo "$token_response" | jq -r '.refresh_token // empty')
+
+    if [[ -z "$access_token" || -z "$refresh_token" ]]; then
+        echo "Error: Failed to get tokens"
+        echo "Response: $token_response"
+        exit 1
+    fi
+
+    jq -n \
+        --arg client_id "$client_id" \
+        --arg client_secret "$client_secret" \
+        --arg refresh_token "$refresh_token" \
+        '{
+            client_id: $client_id,
+            client_secret: $client_secret,
+            refresh_token: $refresh_token
+        }' > "$CREDENTIALS_FILE"
+
+    chmod 600 "$CREDENTIALS_FILE"
+
+    echo ""
+    echo "Setup complete!"
+    echo "Credentials saved to: $CREDENTIALS_FILE"
+    echo ""
+    echo "The google-oauth-token script will now automatically refresh tokens."
+    echo "Test it with: google-oauth-token"
+}
+
+case "${1:-}" in
+    -h|--help|"")
+        print_usage
+        exit 0
+        ;;
+    --status)
+        check_status
+        ;;
+    --refresh)
+        do_refresh
+        ;;
+    --migrate-gcloud)
+        migrate_gcloud
+        ;;
+    *)
+        do_setup "$1"
+        ;;
+esac

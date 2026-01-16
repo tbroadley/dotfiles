@@ -11,9 +11,9 @@ This document lists all setup steps needed for each Claude Code skill.
 | linear | API key | `LINEAR_API_KEY` |
 | datadog | API + App keys | `DD_API_KEY`, `DD_APP_KEY`, `DD_SITE` |
 | airtable | Personal access token | `AIRTABLE_TOKEN` |
-| google-calendar | gcloud CLI | `GOOGLE_QUOTA_PROJECT` |
-| gmail | gcloud CLI | `GOOGLE_QUOTA_PROJECT` |
-| google-drive | gcloud CLI | `GOOGLE_QUOTA_PROJECT` |
+| google-calendar | OAuth setup | - |
+| gmail | OAuth setup | - |
+| google-drive | OAuth setup | - |
 
 ---
 
@@ -70,42 +70,64 @@ Works immediately - reads from `~/Library/Application Support/Alfred/Databases/c
 
 ## Google Services (Calendar, Gmail, Drive)
 
-All Google skills use gcloud CLI for authentication. One-time setup for all three.
+All Google skills use OAuth with a persistent refresh token. One-time setup for all three.
 
-### Install gcloud CLI
+### Step 1: Create OAuth Client
+
+1. Go to [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials)
+2. Select or create a project
+3. Click **Create Credentials** → **OAuth client ID**
+4. If prompted, configure the OAuth consent screen:
+   - User Type: **External** (or Internal if using Workspace)
+   - App name: "Claude Code" (or anything)
+   - User support email: your email
+   - Developer contact: your email
+   - Scopes: skip for now
+   - Test users: add your email
+5. Back in Credentials, create OAuth client ID:
+   - Application type: **Desktop app**
+   - Name: "Claude Code"
+6. Download the JSON file (click the download icon)
+
+### Step 2: Enable APIs
+
+Enable these APIs in your project:
+- [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
+- [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
+- [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
+
+### Step 3: Run Setup
+
 ```bash
-brew install google-cloud-sdk
+google-oauth-setup ~/Downloads/client_secret_*.json
 ```
 
-### Authenticate with required scopes
-```bash
-gcloud auth application-default login \
-  --scopes="https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/drive.readonly"
-```
-
-### Set quota project
-You need a Google Cloud project with the Calendar, Gmail, and Drive APIs enabled.
-
-```bash
-gcloud auth application-default set-quota-project YOUR_PROJECT_ID
-```
-
-Add the quota project to your shell profile:
-```bash
-export GOOGLE_QUOTA_PROJECT="YOUR_PROJECT_ID"
-```
-
-Enable APIs if needed:
-- https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=YOUR_PROJECT_ID
-- https://console.developers.google.com/apis/api/gmail.googleapis.com/overview?project=YOUR_PROJECT_ID
-- https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=YOUR_PROJECT_ID
+This will:
+1. Open your browser for authorization
+2. Start a local server to capture the OAuth callback
+3. Exchange the authorization code for tokens
+4. Save credentials to `~/.config/google-oauth/credentials.json`
 
 ### How it works
-The skills use `gcloud auth application-default print-access-token` to get a fresh access token. This auto-refreshes using the stored credentials.
 
-**Important:** All Google API requests must include the quota project header:
+The `google-oauth-token` script automatically refreshes access tokens using the stored refresh token. Tokens are cached for their validity period (~1 hour) to avoid unnecessary API calls.
+
 ```bash
--H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)"
+ACCESS_TOKEN=$(google-oauth-token)
+```
+
+The refresh token persists indefinitely unless you revoke it, so you won't need to re-authenticate.
+
+### Troubleshooting
+
+Check status:
+```bash
+google-oauth-setup --status
+```
+
+If you see "Token has been expired or revoked", re-run the setup:
+```bash
+google-oauth-setup ~/Downloads/client_secret_*.json
 ```
 
 ---
@@ -122,8 +144,9 @@ export DD_API_KEY="..."
 export DD_APP_KEY="..."
 export DD_SITE="us3.datadoghq.com"
 export AIRTABLE_TOKEN="..."
-export GOOGLE_QUOTA_PROJECT="your-gcp-project-id"
 ```
+
+Note: Google credentials are stored in `~/.config/google-oauth/credentials.json` (not as environment variables).
 
 Then reload: `source ~/.zshrc`
 
@@ -154,19 +177,16 @@ curl -s "https://api.airtable.com/v0/meta/bases" \
   -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)" | jq '.bases[].name'
 
 # Google (all three)
-ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
+ACCESS_TOKEN=$(google-oauth-token)
 
 curl -s "https://www.googleapis.com/calendar/v3/users/me/calendarList" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  -H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)" | jq '.items[].summary'
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq '.items[].summary'
 
 curl -s "https://gmail.googleapis.com/gmail/v1/users/me/profile" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  -H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)"
+  -H "Authorization: Bearer ${ACCESS_TOKEN}"
 
 curl -s "https://www.googleapis.com/drive/v3/files?pageSize=5" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  -H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)" | jq '.files[].name'
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq '.files[].name'
 
 # Alfred Clipboard
 sqlite3 ~/Library/Application\ Support/Alfred/Databases/clipboard.alfdb \

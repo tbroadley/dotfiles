@@ -9,23 +9,23 @@ This skill provides access to Google Drive and Google Docs/Sheets/Slides via the
 
 ## Setup Required
 
-Uses gcloud CLI for authentication (same setup for Calendar, Gmail, Drive).
+Uses OAuth with persistent refresh token (same setup for Calendar, Gmail, Drive).
 
 **One-time setup:**
 ```bash
-brew install google-cloud-sdk
-gcloud auth application-default login --scopes="https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/drive.readonly"
-gcloud auth application-default set-quota-project YOUR_PROJECT_ID
+google-oauth-setup <path-to-client-secret.json>
 ```
+
+See `claude/skills/SETUP.md` for detailed OAuth setup instructions.
 
 **Get Access Token (auto-refreshes):**
 ```bash
-ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
+ACCESS_TOKEN=$(google-oauth-token)
 ```
 
 **Required header for all requests:**
 ```bash
--H "x-goog-user-project: $(printenv GOOGLE_QUOTA_PROJECT)"
+-H "x-goog-user-project: ${GOOGLE_QUOTA_PROJECT}"
 ```
 
 ## When to Use
@@ -129,11 +129,7 @@ Combine with `and`/`or`: `name contains 'meeting' and mimeType = 'application/vn
 
 ### Search for a Document
 ```bash
-ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
-  -d "client_id=$(printenv GOOGLE_CLIENT_ID)" \
-  -d "client_secret=$(printenv GOOGLE_CLIENT_SECRET)" \
-  -d "refresh_token=$(printenv GOOGLE_REFRESH_TOKEN)" \
-  -d "grant_type=refresh_token" | jq -r '.access_token')
+ACCESS_TOKEN=$(google-oauth-token)
 
 curl -s -G "https://www.googleapis.com/drive/v3/files" \
   --data-urlencode "q=name contains 'project plan' and mimeType = 'application/vnd.google-apps.document'" \
