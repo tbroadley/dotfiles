@@ -52,6 +52,7 @@ alias t='pnpm -w typecheck'
 alias tf=terraform
 alias v=vim
 # Claude wrapper functions that warn if running outside dev container in a dir with devcontainer setup
+unalias cl clc clr 2>/dev/null
 _claude_devcontainer_check() {
     if [[ ! -f /.dockerenv && ( -d .devcontainer || -f .devcontainer.json ) ]]; then
         printf "Warning: Running outside dev container in a directory with devcontainer setup.\nAre you sure? [y/N] "
