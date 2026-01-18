@@ -56,18 +56,16 @@ If creating a new branch:
 git worktree add -b <new-branch-name> "$REPO_ROOT/.worktrees/<new-branch-name>"
 ```
 
-### 4. Copy Project Root .md Files
+### 4. Copy .env File
 
-Copy `.md` files from the project root (like `CLAUDE.md`, `AGENTS.md`) to the worktree so Claude Code sessions in the worktree have access to project-specific instructions:
+Copy `.env` from the project root to the worktree so environment variables are available:
 
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 WORKTREE_PATH="$REPO_ROOT/.worktrees/<branch-name>"
 
-# Copy root-level .md files (non-recursive)
-for f in "$REPO_ROOT"/*.md; do
-    [ -f "$f" ] && cp "$f" "$WORKTREE_PATH/"
-done
+# Copy .env if it exists
+[ -f "$REPO_ROOT/.env" ] && cp "$REPO_ROOT/.env" "$WORKTREE_PATH/"
 ```
 
 ### 5. Handle DVC Configuration (if applicable)
@@ -112,10 +110,8 @@ WORKTREE_DIR="$REPO_ROOT/.worktrees/$BRANCH_NAME"
 mkdir -p "$REPO_ROOT/.worktrees"
 git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
 
-# Copy root-level .md files
-for f in "$REPO_ROOT"/*.md; do
-    [ -f "$f" ] && cp "$f" "$WORKTREE_DIR/"
-done
+# Copy .env if it exists
+[ -f "$REPO_ROOT/.env" ] && cp "$REPO_ROOT/.env" "$WORKTREE_DIR/"
 
 if [ -f "$REPO_ROOT/.dvc/config.local" ]; then
     mkdir -p "$WORKTREE_DIR/.dvc"
