@@ -26,6 +26,7 @@
 - Prefer functions over classes for simple data containers or when a class would only have `__init__`
 - Imports: place at top of file (except for lazy loading)
 - Type checking: use inline `# pyright: ignore[...]` comments on specific lines, not file-level suppression
+- Use `pydantic.TypeAdapter` for type-safe validation of data structures that aren't Pydantic BaseModels (e.g., unions of models, lists of typed dicts)
 
 ### Import Rules (Google Style Guide)
 - Import packages/modules, not individual types/classes/functions
@@ -44,6 +45,7 @@
 - Leverage: @pytest.mark.parametrize, pytest.raises, tmp_path, mocker
 - Don't be defensive in test assertions: use direct access (`result["value"]`) instead of `.get()` with defaults—if it fails, the test should fail
 - Don't add comments to tests—the test name and assertions should be self-explanatory
+- When exact counts are expected, use exact assertions (`assert len(items) == 1`) not loose ones (`assert len(items) >= 1`)
 
 ## DVC (Data Version Control)
 - Track large generated/processed data files with DVC (`dvc add`), not git
