@@ -36,3 +36,7 @@
 - Use `assert_called_once_with()` over `call_count` + `assert_any_call()`
 - Use tuple of strings for @pytest.mark.parametrize, not comma-delimited string
 - Leverage: @pytest.mark.parametrize, pytest.raises, tmp_path, mocker
+
+## DVC (Data Version Control)
+- Track large generated/processed data files with DVC (`dvc add`), not git
+- Run `dvc push` after adding files to ensure data is stored in remote
