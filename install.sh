@@ -79,6 +79,7 @@ add_to_rc "alias dotfiles=" "alias dotfiles='git -C ~/dotfiles pull && ~/dotfile
 add_to_rc "alias dpl=" "alias dpl='dvc pull'"
 add_to_rc "alias dps=" "alias dps='dvc push'"
 add_to_rc "alias dr=" "alias dr='dvc repro'"
+add_to_rc "alias dco=" "alias dco='dvc checkout'"
 add_to_rc "alias g=git" "alias g=git"
 add_to_rc "alias pla=" 'alias pla="git pull && dvc pull"'
 add_to_rc "alias psa=" 'alias psa="dvc push && git push"'
