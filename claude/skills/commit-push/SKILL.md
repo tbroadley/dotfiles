@@ -115,6 +115,17 @@ gh pr view --json number,url,state,isDraft 2>/dev/null
   ```bash
   gh pr create --draft --base $base_branch --title "..." --body "..."
   ```
+- Assign the PR to Thomas Broadley:
+  ```bash
+  gh pr edit --add-assignee tbroadley
+  ```
+- Add an OKR label (choose the most relevant from available labels starting with `OKR-`):
+  ```bash
+  # List available OKR labels
+  gh label list --search "OKR-"
+  # Add the appropriate label
+  gh pr edit --add-label "OKR-..."
+  ```
 
 **If PR exists but is not a draft:**
 - Continue with the existing PR
