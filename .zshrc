@@ -105,33 +105,83 @@ der() {
     de "$(docker ps -aq --filter=label=runId=$1)"
 }
 
-# Run install.sh in all dev containers
+# Run install.sh in all dev containers (parallel)
 dotfiles-sync() {
-    local containers=$(docker ps --format '{{.Names}}' | grep -i dev)
-    if [[ -z "$containers" ]]; then
+    local containers=("${(@f)$(docker ps --format '{{.Names}}' | grep -i dev)}")
+    if [[ ${#containers[@]} -eq 0 || -z "${containers[1]}" ]]; then
         echo "No running dev containers found"
         return 1
     fi
 
-    echo "$containers" | while read -r container; do
-        echo "=== $container ==="
-        # Find non-root user (UID >= 1000)
-        local user=$(docker exec "$container" awk -F: '$3 >= 1000 && $3 < 65534 { print $1; exit }' /etc/passwd)
-        if [[ -z "$user" ]]; then
-            echo "  No non-root user found, skipping"
-            continue
-        fi
-        echo "  User: $user"
-        # Check if dotfiles repo exists
-        if ! docker exec "$container" test -f "/home/$user/dotfiles/install.sh"; then
-            echo "  No ~/dotfiles/install.sh found, skipping"
-            continue
-        fi
-        docker exec -u "$user" -w "/home/$user/dotfiles" "$container" git pull
-        # Run install.sh
-        docker exec -u "$user" -w "/home/$user/dotfiles" "$container" ./install.sh
-        echo "  Done"
+    local tmpdir=$(mktemp -d)
+    trap "rm -rf $tmpdir" EXIT
+
+    # Sync a single container (runs in subshell, writes to log file)
+    # Exit code is written to .exit file
+    _sync_one() {
+        local container=$1
+        local logfile="$tmpdir/$container.log"
+        local exitfile="$tmpdir/$container.exit"
+        (
+            echo "=== $container ==="
+            # Find non-root user (UID >= 1000)
+            local user=$(docker exec "$container" awk -F: '$3 >= 1000 && $3 < 65534 { print $1; exit }' /etc/passwd)
+            if [[ -z "$user" ]]; then
+                echo "  No non-root user found, skipping"
+                exit 0
+            fi
+            echo "  User: $user"
+            # Check if dotfiles repo exists
+            if ! docker exec "$container" test -f "/home/$user/dotfiles/install.sh"; then
+                echo "  No ~/dotfiles/install.sh found, skipping"
+                exit 0
+            fi
+            if ! docker exec -u "$user" -w "/home/$user/dotfiles" "$container" git pull 2>&1; then
+                echo "  git pull failed"
+                exit 1
+            fi
+            if ! docker exec -u "$user" -w "/home/$user/dotfiles" "$container" ./install.sh 2>&1; then
+                echo "  install.sh failed"
+                exit 1
+            fi
+            echo "  Done"
+        ) > "$logfile" 2>&1
+        echo $? > "$exitfile"
+    }
+
+    echo "Syncing ${#containers[@]} containers in parallel..."
+    echo ""
+
+    # Launch all syncs in parallel
+    for container in "${containers[@]}"; do
+        _sync_one "$container" &
     done
+
+    # Wait for all background jobs
+    wait
+
+    # Collect results and print output
+    local errors=()
+    for container in "${containers[@]}"; do
+        cat "$tmpdir/$container.log"
+        local exit_code=$(cat "$tmpdir/$container.exit" 2>/dev/null || echo 1)
+        if [[ "$exit_code" -ne 0 ]]; then
+            errors+=("$container")
+        fi
+    done
+
+    # Print error summary if any
+    if [[ ${#errors[@]} -gt 0 ]]; then
+        echo ""
+        echo "=== ERROR SUMMARY ==="
+        for err in "${errors[@]}"; do
+            echo "  FAILED: $err"
+        done
+        return 1
+    fi
+
+    echo ""
+    echo "All containers synced successfully"
 }
 
 # Dev container functions (auto-reload from devc.zsh before running)
