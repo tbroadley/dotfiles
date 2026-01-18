@@ -56,7 +56,21 @@ If creating a new branch:
 git worktree add -b <new-branch-name> "$REPO_ROOT/.worktrees/<new-branch-name>"
 ```
 
-### 4. Handle DVC Configuration (if applicable)
+### 4. Copy Project Root .md Files
+
+Copy `.md` files from the project root (like `CLAUDE.md`, `AGENTS.md`) to the worktree so Claude Code sessions in the worktree have access to project-specific instructions:
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORKTREE_PATH="$REPO_ROOT/.worktrees/<branch-name>"
+
+# Copy root-level .md files (non-recursive)
+for f in "$REPO_ROOT"/*.md; do
+    [ -f "$f" ] && cp "$f" "$WORKTREE_PATH/"
+done
+```
+
+### 5. Handle DVC Configuration (if applicable)
 
 Check if the repository uses DVC by looking for `.dvc/` directory:
 ```bash
@@ -97,6 +111,11 @@ WORKTREE_DIR="$REPO_ROOT/.worktrees/$BRANCH_NAME"
 
 mkdir -p "$REPO_ROOT/.worktrees"
 git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
+
+# Copy root-level .md files
+for f in "$REPO_ROOT"/*.md; do
+    [ -f "$f" ] && cp "$f" "$WORKTREE_DIR/"
+done
 
 if [ -f "$REPO_ROOT/.dvc/config.local" ]; then
     mkdir -p "$WORKTREE_DIR/.dvc"
