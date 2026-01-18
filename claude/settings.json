@@ -69,7 +69,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "cat >/dev/null; git config --get remote.origin.url 2>/dev/null | sed -E 's|^(https?://)?github\\.com[/:]||; s|\\.git$||' || echo '(no git remote)'"
+    "command": "cat >/dev/null; R=$(git config --get remote.origin.url 2>/dev/null | sed -E 's|^(https?://)?github\\.com[/:]||; s|\\.git$||'); P=$(git rev-parse --show-prefix 2>/dev/null | sed 's|/$||'); [ -z \"$P\" ] && P='.'; [ -n \"$R\" ] && echo \"$R $P\" || echo \"(no git remote)\""
   },
   "enabledPlugins": {
     "warehouse-query@metr-eval-execution": true
