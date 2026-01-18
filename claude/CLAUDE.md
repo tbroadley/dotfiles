@@ -1,5 +1,8 @@
 # Global Rules
 
+## Git
+- When working in a git worktree, change to the worktree directory rather than running commands from the main repo—this avoids confusion about which files are being modified
+
 ## GitHub
 - Prefix all GitHub comments (PR reviews, issue comments, discussions) with "Claude Code:"
 - Use `gh` CLI to fetch contents of GitHub repos (files, issues, PRs, etc.) instead of WebFetch
