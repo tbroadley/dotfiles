@@ -36,8 +36,3 @@
 - Use `assert_called_once_with()` over `call_count` + `assert_any_call()`
 - Use tuple of strings for @pytest.mark.parametrize, not comma-delimited string
 - Leverage: @pytest.mark.parametrize, pytest.raises, tmp_path, mocker
-
-## Final Steps (before finishing any task)
-- Remove try-except blocks that suppress errors. Code should fail early rather than log a warning and potentially behave incorrectly. Exception: when aggregating results from multiple operations to report at the end.
-- Remove comments and docstrings you added
-- Move imports to top of file

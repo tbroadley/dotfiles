@@ -10,7 +10,15 @@ Commit changes, run local validation, push to remote, open a draft PR if needed,
 
 ## Workflow
 
-### 1. Run Local Validation
+### 1. Pre-Commit Cleanup
+
+Before running validation, clean up your changes:
+
+- Remove comments and docstrings you added (user instructions take precedence if they want docstrings)
+- Remove try-except blocks that suppress errors—code should fail early rather than log warnings and potentially behave incorrectly. Exception: when aggregating results from multiple operations to report at the end.
+- Move imports to top of file
+
+### 2. Run Local Validation
 
 Before committing, run all local checks:
 
@@ -31,14 +39,14 @@ Before committing, run all local checks:
   pytest -n auto path/to/slow_test1.py path/to/slow_test2.py  # affected slow tests in parallel
   ```
 
-### 2. DVC (Data Version Control)
+### 3. DVC (Data Version Control)
 
 If this is a DVC-tracked repository (has `.dvc` files or `dvc.yaml`):
 - Run `dvc repro` to reproduce any affected pipelines
 - Run `dvc push` to push data artifacts to remote storage
 - This prevents `check-dvc` CI failures
 
-### 3. Commit and Push
+### 4. Commit and Push
 
 Once local validation passes:
 
@@ -51,7 +59,7 @@ Once local validation passes:
    ```
 5. Push to remote with `git push`
 
-### 4. Check if on Main Branch
+### 5. Check if on Main Branch
 
 Determine if you're pushing directly to the main branch:
 
@@ -60,16 +68,16 @@ current_branch=$(git branch --show-current)
 main_branch=$(git remote show origin | grep 'HEAD branch' | cut -d: -f2 | xargs)
 
 if [ "$current_branch" = "$main_branch" ]; then
-  # Pushing directly to main - skip PR creation, go to step 9
+  # Pushing directly to main - skip PR creation, go to step 10
   echo "On main branch, skipping PR workflow"
 fi
 ```
 
-**If on main/master:** Skip steps 5-8 and go directly to step 9 (Wait for CI on Direct Push).
+**If on main/master:** Skip steps 6-9 and go directly to step 10 (Wait for CI on Direct Push).
 
-**If on a feature branch:** Continue with step 5.
+**If on a feature branch:** Continue with step 6.
 
-### 5. Determine PR Base Branch (Feature Branches Only)
+### 6. Determine PR Base Branch (Feature Branches Only)
 
 Before creating a PR, determine the correct base branch:
 
@@ -94,7 +102,7 @@ fi
 
 Use `$base_branch` as the PR base instead of always using main/master.
 
-### 6. Open or Update Draft PR (Feature Branches Only)
+### 7. Open or Update Draft PR (Feature Branches Only)
 
 Check if the current branch has an open PR:
 
@@ -111,7 +119,7 @@ gh pr view --json number,url,state,isDraft 2>/dev/null
 **If PR exists but is not a draft:**
 - Continue with the existing PR
 
-### 7. Wait for CI and Ensure It Passes (Feature Branches Only)
+### 8. Wait for CI and Ensure It Passes (Feature Branches Only)
 
 After pushing, monitor CI status:
 
@@ -129,7 +137,7 @@ gh pr checks --watch
    git add .
    git rebase --continue
    ```
-3. Run local validation again (step 1)
+3. Run local validation again (steps 1-2)
 4. Force push: `git push --force-with-lease`
 5. Wait for CI again
 
@@ -137,11 +145,11 @@ gh pr checks --watch
 1. Check which jobs failed: `gh pr checks`
 2. Get failure details: `gh run view <run_id> --log-failed`
 3. Fix the failing tests/checks locally
-4. Run local validation again (step 1)
+4. Run local validation again (steps 1-2)
 5. Commit the fixes and push
 6. Repeat until CI passes
 
-### 8. Respond to PR Comments (Feature Branches Only)
+### 9. Respond to PR Comments (Feature Branches Only)
 
 If there are existing PR review comments, check if pushed changes address them.
 
@@ -194,7 +202,7 @@ gh api graphql -f query='
 '
 ```
 
-### 9. Wait for CI on Direct Push (Main Branch Only)
+### 10. Wait for CI on Direct Push (Main Branch Only)
 
 When pushing directly to main/master (no PR), monitor CI using the workflow run:
 
@@ -206,15 +214,15 @@ gh run watch
 **If CI fails:**
 1. Check which jobs failed: `gh run view --log-failed`
 2. Fix the failing tests/checks locally
-3. Run local validation again (step 1)
+3. Run local validation again (steps 1-2)
 4. Commit the fixes and push
 5. Repeat until CI passes
 
 ## Notes
 
 - Always run local validation before pushing to catch issues early
-- Steps 5-8 only apply to feature branches (not main/master)
-- Step 9 only applies when pushing directly to main/master
+- Steps 6-9 only apply to feature branches (not main/master)
+- Step 10 only applies when pushing directly to main/master
 - Only respond to PR comments that were actually addressed by the changes
 - Prefix all GitHub comments with "Claude Code: "
 - If CI keeps failing after multiple attempts, report the issue to the user
