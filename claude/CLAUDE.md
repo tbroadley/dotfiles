@@ -17,9 +17,12 @@
 ## Python Style
 - Use json.dumps for JSON literals, not string concatenation. This ensures JSON strings are valid.
 - Prefer list comprehensions over for loop / accumulator, except with complex control flow or when intermediate variables improve readability. Walrus operator (`if (a := b(c))`) can sometimes help.
+- Prefer dict comprehensions over loops that build dicts
 - Prefer ternary expressions (`return x if condition else y`) over if-else blocks for simple conditional returns.
 - Fail early: prefer code that fails immediately over code that logs a warning and potentially behaves incorrectly later.
+- Prefer functions over classes for simple data containers or when a class would only have `__init__`
 - Imports: place at top of file (except for lazy loading)
+- Type checking: use inline `# pyright: ignore[...]` comments on specific lines, not file-level suppression
 
 ### Import Rules (Google Style Guide)
 - Import packages/modules, not individual types/classes/functions
