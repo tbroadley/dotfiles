@@ -1,9 +1,5 @@
 # Global Rules
 
-## DVC (Data Version Control)
-- After modifying `dvc.yaml`, run `dvc repro` to update `dvc.lock`
-- Run `dvc push` after `dvc repro` to upload artifacts before committing
-
 ## GitHub
 - Prefix all GitHub comments (PR reviews, issue comments, discussions) with "Claude Code:"
 - Use `gh` CLI to fetch contents of GitHub repos (files, issues, PRs, etc.) instead of WebFetch
@@ -24,7 +20,6 @@
 - Prefer ternary expressions (`return x if condition else y`) over if-else blocks for simple conditional returns.
 - Fail early: prefer code that fails immediately over code that logs a warning and potentially behaves incorrectly later.
 - Imports: place at top of file (except for lazy loading)
-- Use consistent ordering in tuples/data structures throughout a function (e.g., if you use `(benchmark, context, type)` in one place, don't use `(benchmark, type, context)` elsewhere)
 
 ### Import Rules (Google Style Guide)
 - Import packages/modules, not individual types/classes/functions
@@ -44,4 +39,5 @@
 
 ## DVC (Data Version Control)
 - Track large generated/processed data files with DVC (`dvc add`), not git
-- Run `dvc push` after adding files to ensure data is stored in remote
+- After modifying `dvc.yaml`, run `dvc repro` to update `dvc.lock`
+- Run `dvc push` after `dvc repro` to upload artifacts before committing
