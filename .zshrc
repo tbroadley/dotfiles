@@ -105,6 +105,34 @@ der() {
     de "$(docker ps -aq --filter=label=runId=$1)"
 }
 
+# Run install.sh in all dev containers
+dotfiles-sync() {
+    local containers=$(docker ps --format '{{.Names}}' | grep -i dev)
+    if [[ -z "$containers" ]]; then
+        echo "No running dev containers found"
+        return 1
+    fi
+
+    echo "$containers" | while read -r container; do
+        echo "=== $container ==="
+        # Find non-root user (UID >= 1000)
+        local user=$(docker exec "$container" awk -F: '$3 >= 1000 && $3 < 65534 { print $1; exit }' /etc/passwd)
+        if [[ -z "$user" ]]; then
+            echo "  No non-root user found, skipping"
+            continue
+        fi
+        echo "  User: $user"
+        # Check if dotfiles repo exists
+        if ! docker exec "$container" test -f "/home/$user/.dotfiles/install.sh"; then
+            echo "  No ~/.dotfiles/install.sh found, skipping"
+            continue
+        fi
+        # Run install.sh
+        docker exec -u "$user" -w "/home/$user/.dotfiles" "$container" ./install.sh
+        echo "  Done"
+    done
+}
+
 # Dev container functions (auto-reload from devc.zsh before running)
 source ~/dotfiles/devc.zsh
 unalias dc dcr 2>/dev/null
