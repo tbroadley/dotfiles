@@ -123,12 +123,13 @@ dotfiles-sync() {
         fi
         echo "  User: $user"
         # Check if dotfiles repo exists
-        if ! docker exec "$container" test -f "/home/$user/.dotfiles/install.sh"; then
-            echo "  No ~/.dotfiles/install.sh found, skipping"
+        if ! docker exec "$container" test -f "/home/$user/dotfiles/install.sh"; then
+            echo "  No ~/dotfiles/install.sh found, skipping"
             continue
         fi
+        docker exec -u "$user" -w "/home/$user/dotfiles" "$container" git pull
         # Run install.sh
-        docker exec -u "$user" -w "/home/$user/.dotfiles" "$container" ./install.sh
+        docker exec -u "$user" -w "/home/$user/dotfiles" "$container" ./install.sh
         echo "  Done"
     done
 }
