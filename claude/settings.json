@@ -1,10 +1,14 @@
 {
   "cleanupPeriodDays": 999999,
   "permissions": {
+    "additionalDirectories": ["~/dotfiles"],
     "allow": [
       "Bash",
       "Edit",
       "Write",
+      "Read(~/dotfiles/**)",
+      "Edit(~/dotfiles/**)",
+      "Write(~/dotfiles/**)",
       "NotebookEdit",
       "mcp__linear__list_*",
       "mcp__linear__get_*",
