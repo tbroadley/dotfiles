@@ -51,7 +51,25 @@ Once local validation passes:
    ```
 5. Push to remote with `git push`
 
-### 4. Determine PR Base Branch
+### 4. Check if on Main Branch
+
+Determine if you're pushing directly to the main branch:
+
+```bash
+current_branch=$(git branch --show-current)
+main_branch=$(git remote show origin | grep 'HEAD branch' | cut -d: -f2 | xargs)
+
+if [ "$current_branch" = "$main_branch" ]; then
+  # Pushing directly to main - skip PR creation, go to step 9
+  echo "On main branch, skipping PR workflow"
+fi
+```
+
+**If on main/master:** Skip steps 5-8 and go directly to step 9 (Wait for CI on Direct Push).
+
+**If on a feature branch:** Continue with step 5.
+
+### 5. Determine PR Base Branch (Feature Branches Only)
 
 Before creating a PR, determine the correct base branch:
 
@@ -76,7 +94,7 @@ fi
 
 Use `$base_branch` as the PR base instead of always using main/master.
 
-### 5. Open or Update Draft PR
+### 6. Open or Update Draft PR (Feature Branches Only)
 
 Check if the current branch has an open PR:
 
@@ -93,7 +111,7 @@ gh pr view --json number,url,state,isDraft 2>/dev/null
 **If PR exists but is not a draft:**
 - Continue with the existing PR
 
-### 6. Wait for CI and Ensure It Passes
+### 7. Wait for CI and Ensure It Passes (Feature Branches Only)
 
 After pushing, monitor CI status:
 
@@ -123,7 +141,7 @@ gh pr checks --watch
 5. Commit the fixes and push
 6. Repeat until CI passes
 
-### 7. Respond to PR Comments (if applicable)
+### 8. Respond to PR Comments (Feature Branches Only)
 
 If there are existing PR review comments, check if pushed changes address them.
 
@@ -176,10 +194,28 @@ gh api graphql -f query='
 '
 ```
 
+### 9. Wait for CI on Direct Push (Main Branch Only)
+
+When pushing directly to main/master (no PR), monitor CI using the workflow run:
+
+```bash
+# Watch the CI run for the latest commit
+gh run watch
+```
+
+**If CI fails:**
+1. Check which jobs failed: `gh run view --log-failed`
+2. Fix the failing tests/checks locally
+3. Run local validation again (step 1)
+4. Commit the fixes and push
+5. Repeat until CI passes
+
 ## Notes
 
 - Always run local validation before pushing to catch issues early
+- Steps 5-8 only apply to feature branches (not main/master)
+- Step 9 only applies when pushing directly to main/master
 - Only respond to PR comments that were actually addressed by the changes
 - Prefix all GitHub comments with "Claude Code: "
 - If CI keeps failing after multiple attempts, report the issue to the user
-- The goal is a green CI on a draft PR before considering the task complete
+- The goal is green CI before considering the task complete (on a draft PR for feature branches, or on the commit for direct pushes to main)
