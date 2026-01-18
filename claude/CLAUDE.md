@@ -47,5 +47,4 @@
 
 ## DVC (Data Version Control)
 - Track large generated/processed data files with DVC (`dvc add`), not git
-- After modifying `dvc.yaml`, run `dvc repro` to update `dvc.lock`
-- Run `dvc push` after `dvc repro` to upload artifacts before committing
+- After modifying `dvc.yaml`: `dvc repro` then `dvc push` before committing
