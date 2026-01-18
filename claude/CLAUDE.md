@@ -42,6 +42,8 @@
 - Use `assert_called_once_with()` over `call_count` + `assert_any_call()`
 - Use tuple of strings for @pytest.mark.parametrize, not comma-delimited string
 - Leverage: @pytest.mark.parametrize, pytest.raises, tmp_path, mocker
+- Don't be defensive in test assertions: use direct access (`result["value"]`) instead of `.get()` with defaults—if it fails, the test should fail
+- Don't add comments to tests—the test name and assertions should be self-explanatory
 
 ## DVC (Data Version Control)
 - Track large generated/processed data files with DVC (`dvc add`), not git
