@@ -1,8 +1,110 @@
-# Rebase Stacked Diff After Base Merges
+# Rebase Stacked Diffs
 
-Use this skill when a branch was based on another feature branch (stacked diff), and that base branch has now been merged to main. The current branch needs to be rebased onto main, skipping commits that were already merged.
+Use this skill when working with stacked diffs (Branch B based on Branch A, which is based on main).
 
-## When to Use
+## Scenarios
+
+This skill covers two scenarios:
+
+1. **Base branch updated**: Branch A got new commits (e.g., from PR review feedback), and Branch B needs to incorporate those changes
+2. **Base branch merged**: Branch A was merged to main, and Branch B needs to be rebased onto main
+
+---
+
+## Scenario 1: Rebase onto Updated Base Branch
+
+Use when Branch A (the base) has new commits and Branch B needs to be updated to include them.
+
+### When to Use
+
+- Branch A has new commits (PR feedback, fixes, etc.)
+- Branch B was based on an older version of Branch A
+- You want Branch B to include Branch A's latest changes
+- Branch A has NOT been merged to main yet
+
+### Workflow
+
+#### 1. Identify the Branches
+
+```bash
+# You should be on Branch B
+git branch --show-current
+
+# Fetch latest
+git fetch origin
+
+# See Branch A's recent commits
+git log --oneline origin/branch-a -10
+```
+
+#### 2. Find the Original Base Point
+
+Find where Branch B originally diverged from Branch A:
+
+```bash
+# This shows the commit where Branch B was created from Branch A
+git merge-base HEAD origin/branch-a
+```
+
+#### 3. Rebase Using --onto
+
+The `--onto` flag lets you transplant Branch B's unique commits onto the updated Branch A:
+
+```bash
+# Syntax: git rebase --onto <new-base> <old-base> <branch>
+git rebase --onto origin/branch-a $(git merge-base HEAD origin/branch-a) HEAD
+```
+
+Or if you know the old base commit:
+
+```bash
+git rebase --onto origin/branch-a <old-base-commit> HEAD
+```
+
+#### 4. Resolve Any Conflicts
+
+If Branch A's changes conflict with Branch B's changes:
+
+1. Resolve the conflicts in the affected files
+2. Stage: `git add <files>`
+3. Continue: `git rebase --continue`
+
+#### 5. Force Push
+
+```bash
+git push --force-with-lease origin branch-b
+```
+
+### Example
+
+```bash
+# On branch-b, which was based on branch-a at commit abc123
+# branch-a now has new commits
+
+$ git fetch origin
+$ git rebase --onto origin/branch-a abc123 HEAD
+Successfully rebased and updated refs/heads/branch-b.
+
+$ git push --force-with-lease origin branch-b
+```
+
+### Alternative: Simple Rebase
+
+If Branch B hasn't diverged much and you're okay with a linear history:
+
+```bash
+git rebase origin/branch-a
+```
+
+This works well when Branch A only added commits (no force-pushes or rebases).
+
+---
+
+## Scenario 2: Rebase onto Main After Base Merges
+
+Use when Branch A has been merged to main, and Branch B needs to be rebased onto main (removing the now-redundant Branch A commits).
+
+### When to Use
 
 - Branch B was created from Branch A (not main)
 - Branch A has been merged to main
@@ -10,9 +112,9 @@ Use this skill when a branch was based on another feature branch (stacked diff),
 - PR for Branch B shows merge conflicts or "CONFLICTING" status
 - `git log` shows commits from Branch A in Branch B's history
 
-## Workflow
+### Workflow
 
-### 1. Verify the Situation
+#### 1. Verify the Situation
 
 ```bash
 # Check current branch status
@@ -27,16 +129,16 @@ gh pr view --json mergeable,mergeStateStatus
 
 If you see `"mergeStateStatus": "DIRTY"` or `"mergeable": "CONFLICTING"`, proceed.
 
-### 2. Fetch Latest and Start Rebase
+#### 2. Fetch Latest and Start Rebase
 
 ```bash
 git fetch origin main
 
-# Start interactive rebase onto main
+# Start rebase onto main
 git rebase origin/main
 ```
 
-### 3. Handle Already-Merged Commits
+#### 3. Handle Already-Merged Commits
 
 When git tries to apply commits that are already in main (via the merged base branch), you'll see conflicts. These commits should be **skipped**, not resolved.
 
@@ -58,7 +160,7 @@ dropping abc123 Some commit message -- patch contents already upstream
 
 This is expected and correct.
 
-### 4. Resolve Genuine Conflicts
+#### 4. Resolve Genuine Conflicts
 
 If you encounter a conflict in code that is genuinely new to this branch:
 
@@ -67,17 +169,13 @@ If you encounter a conflict in code that is genuinely new to this branch:
 3. Stage the resolution: `git add <files>`
 4. Continue: `git rebase --continue`
 
-### 5. Force Push the Rebased Branch
-
-After the rebase completes:
+#### 5. Force Push the Rebased Branch
 
 ```bash
 git push --force-with-lease origin <branch-name>
 ```
 
-Use `--force-with-lease` (not `--force`) for safety.
-
-### 6. Verify PR Status
+#### 6. Verify PR Status
 
 ```bash
 gh pr view --json mergeable,mergeStateStatus
@@ -88,7 +186,7 @@ The PR should now show:
 - `"mergeable": "MERGEABLE"`
 - `"mergeStateStatus": "BLOCKED"` (waiting for CI) or `"CLEAN"` (ready to merge)
 
-## Example Session
+### Example
 
 ```
 $ git rebase origin/main
@@ -108,10 +206,12 @@ Successfully rebased and updated refs/heads/my-branch.
 $ git push --force-with-lease origin my-branch
 ```
 
+---
+
 ## Troubleshooting
 
 ### "Would make commit empty"
-The commit's changes are already in main. Skip it:
+The commit's changes are already in the target branch. Skip it:
 ```bash
 git rebase --skip
 ```
@@ -121,11 +221,11 @@ If you resolved a conflict that should have been skipped:
 ```bash
 git rebase --abort
 # Start over
-git rebase origin/main
+git rebase origin/main  # or origin/branch-a
 ```
 
 ### Not sure if commit should be skipped
-Check if the commit exists in main:
+Check if the commit exists in the target:
 ```bash
 # Get the commit message from the conflict
 git log --oneline -1 REBASE_HEAD
@@ -134,19 +234,26 @@ git log --oneline -1 REBASE_HEAD
 git log --oneline origin/main | grep "<keywords from commit>"
 ```
 
-### Too many commits to skip manually
-If there are many commits from the base branch, consider:
+### Lost track of the old base commit
+If you don't know where Branch B originally diverged from Branch A:
 ```bash
-# Find where your branch diverged from the base branch
-git merge-base HEAD origin/main
+# Look at the reflog to find when you created the branch
+git reflog show branch-b | tail -5
 
-# Interactive rebase to select only your commits
-git rebase -i origin/main
-# In the editor, delete lines for commits that came from the base branch
+# Or find common ancestors
+git merge-base branch-b origin/branch-a
+```
+
+### Rebase got messy, start over
+```bash
+git rebase --abort
+git reset --hard origin/branch-b  # Reset to remote state
+# Try again
 ```
 
 ## Notes
 
-- Always verify which commits are yours vs from the base branch before rebasing
-- The number of commits after rebase should be fewer than before (base branch commits removed)
-- CI should pass after rebasing if it passed before the base branch merged
+- Always use `--force-with-lease` instead of `--force` when pushing
+- The `--onto` flag is powerful for transplanting commits between branches
+- After rebasing onto main (Scenario 2), Branch B should have fewer commits than before
+- Consider using `git rebase -i` (interactive) if you need fine-grained control over which commits to keep
