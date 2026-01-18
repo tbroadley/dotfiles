@@ -24,7 +24,7 @@ Before committing, run all local checks:
 
 **Linting, Typechecking, and Formatting:**
 - Run the project's linter (e.g., `ruff check`, `eslint`, `golangci-lint`)
-- Run the typechecker (e.g., `pyright`, `mypy`, `tsc --noEmit`)
+- Run the typechecker (e.g., `basedpyright`, `mypy`, `tsc --noEmit`)
 - Run the formatter (e.g., `ruff format --check`, `prettier --check`, `gofmt`)
 - Fix any issues found before proceeding
 
