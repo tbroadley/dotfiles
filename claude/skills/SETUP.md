@@ -7,6 +7,7 @@ This document lists all setup steps needed for each Claude Code skill.
 | Skill | Setup Required | Env Var(s) |
 |-------|---------------|------------|
 | alfred-clipboard | None | - |
+| learn | None | - |
 | todoist | API token | `TODOIST_TOKEN` |
 | linear | API key | `LINEAR_API_KEY` |
 | datadog | API + App keys | `DD_API_KEY`, `DD_APP_KEY`, `DD_SITE` |
@@ -21,6 +22,9 @@ This document lists all setup steps needed for each Claude Code skill.
 
 ### alfred-clipboard
 Works immediately - reads from `~/Library/Application Support/Alfred/Databases/clipboard.alfdb`
+
+### learn
+Works immediately - extracts learnings from conversations and updates ~/dotfiles/claude/CLAUDE.md
 
 ---
 
