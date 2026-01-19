@@ -80,6 +80,8 @@ add_to_rc "alias dpl=" "alias dpl='dvc pull'"
 add_to_rc "alias dps=" "alias dps='dvc push'"
 add_to_rc "alias dr=" "alias dr='dvc repro'"
 add_to_rc "alias dco=" "alias dco='dvc checkout'"
+add_to_rc "alias dcof=" "alias dcof='dvc checkout --force'"
+add_to_rc "alias dplf=" "alias dplf='dvc pull --force'"
 add_to_rc "alias g=git" "alias g=git"
 add_to_rc "alias pla=" 'alias pla="git pull && dvc pull"'
 add_to_rc "alias psa=" 'alias psa="dvc push && git push"'
