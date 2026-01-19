@@ -15,6 +15,8 @@ This document lists all setup steps needed for each Claude Code skill.
 | google-calendar | OAuth setup | - |
 | gmail | OAuth setup | - |
 | google-drive | OAuth setup | - |
+| read-inspect-eval | Python package | `pip install inspect-ai` |
+| download-inspect-eval | AWS CLI + profile | `AWS_PROFILE=production` |
 
 ---
 
@@ -25,6 +27,22 @@ Works immediately - reads from `~/Library/Application Support/Alfred/Databases/c
 
 ### learn
 Works immediately - extracts learnings from conversations and updates ~/dotfiles/claude/CLAUDE.md
+
+---
+
+## Minimal Setup
+
+### read-inspect-eval
+Requires the `inspect-ai` Python package:
+```bash
+pip install inspect-ai
+```
+
+### download-inspect-eval
+Requires AWS CLI with access to the production profile:
+```bash
+AWS_PROFILE=production aws s3 ls s3://production-metr-inspect-data/
+```
 
 ---
 
