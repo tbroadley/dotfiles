@@ -96,6 +96,9 @@ add_to_rc "export EDITOR=vim" "export EDITOR=vim"
 add_to_rc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
 add_to_rc 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi' 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi'
 
+# Set PYTHONPATH to git root (updates on directory change, useful for worktrees)
+add_to_rc 'PYTHONPATH.*git rev-parse' 'PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }export PYTHONPATH=\"\$(git rev-parse --show-toplevel 2>/dev/null || echo \$PYTHONPATH)\""' true false
+
 # Bash-specific completions
 add_to_rc "source /etc/bash_completion.d/git-prompt" "source /etc/bash_completion.d/git-prompt 2>/dev/null" true false
 add_to_rc "source /usr/share/bash-completion/completions/git" "source /usr/share/bash-completion/completions/git 2>/dev/null" true false
