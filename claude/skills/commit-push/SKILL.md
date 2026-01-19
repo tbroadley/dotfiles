@@ -162,6 +162,8 @@ gh pr checks --watch
 
 ### 9. Respond to PR Comments (Feature Branches Only)
 
+**IMPORTANT:** Never leave top-level comments on the PR (via `gh pr comment` or the issues comments API). Only reply directly within review comment threads using the replies API. Top-level comments like "Addressed review feedback" clutter the PR.
+
 If there are existing PR review comments, check if pushed changes address them.
 
 Fetch review comments:
@@ -211,6 +213,16 @@ gh api graphql -f query='
     }
   }
 '
+```
+
+**Re-request review:** After addressing all comments from a reviewer, request their re-review:
+```bash
+gh pr edit --add-reviewer <reviewer-username>
+```
+
+To find reviewers who left comments:
+```bash
+gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '.[].user.login' | sort -u
 ```
 
 ### 10. Wait for CI on Direct Push (Main Branch Only)

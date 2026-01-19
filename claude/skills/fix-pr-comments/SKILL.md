@@ -20,6 +20,10 @@ For each PR comment, choose one of these responses:
 
 When leaving comments on PRs, always prefix with "Claude Code: " to make it clear the comment came from Claude.
 
+## Comment Guidelines
+
+**Never leave top-level comments on the PR** (via `gh pr comment` or the issues comments API). Only reply directly within review comment threads using the replies API. Top-level comments like "Addressed all feedback" are not helpful and clutter the PR.
+
 ## Workflow
 
 1. Read all PR comments to understand the feedback
@@ -27,4 +31,17 @@ When leaving comments on PRs, always prefix with "Claude Code: " to make it clea
 3. Make code changes where needed
 4. Push all changes
 5. Resolve threads that have been addressed
-6. Leave explanatory comments or clarification questions as needed
+6. Request re-review from reviewers whose comments have all been addressed
+7. Leave explanatory comments or clarification questions as needed
+
+## Re-requesting Review
+
+After addressing all comments from a reviewer, request their re-review:
+```bash
+gh pr edit --add-reviewer <reviewer-username>
+```
+
+To find reviewers who left comments:
+```bash
+gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '.[].user.login' | sort -u
+```
