@@ -1,25 +1,25 @@
 ---
 name: cleanup
-description: This skill should be used when the user asks to "clean up the code", "remove AI comments", "simplify docstrings", "parameterize tests", or wants to review and clean up AI-generated code artifacts.
+description: This skill should be used when the user asks to "clean up the code", "remove unnecessary comments", "simplify docstrings", "parameterize tests", or wants to review and clean up code.
 user-invocable: true
 ---
 
-# Cleanup AI-Generated Code
+# Cleanup Code
 
-Review and clean up code that was generated or modified by AI, removing unnecessary artifacts and improving test coverage patterns.
+Review and clean up code, removing unwanted patterns and improving test structure.
 
 ## What This Skill Does
 
-1. Removes unnecessary comments added by AI
-2. Simplifies or removes AI-inflated docstrings
+1. Removes unnecessary comments
+2. Simplifies or removes verbose docstrings
 3. Consolidates tests using parameterization
-4. Removes other AI-generated bloat
+4. Removes other unwanted patterns
 
 ## Cleanup Tasks
 
 ### 1. Remove Unnecessary Comments
 
-AI often adds explanatory comments that state the obvious or describe what code does line-by-line. Remove comments that:
+Remove explanatory comments that state the obvious or describe what code does line-by-line. Remove comments that:
 
 - Restate what the code already clearly expresses
 - Explain standard library functions or well-known patterns
@@ -55,7 +55,7 @@ return user.email
 
 ### 2. Simplify Docstrings
 
-AI tends to add verbose docstrings that repeat parameter names and types already visible in type annotations, or describe obvious behavior. Clean up docstrings by:
+Remove verbose docstrings that repeat parameter names and types already visible in type annotations, or describe obvious behavior. Clean up docstrings by:
 
 - Removing docstrings from simple, self-explanatory functions
 - Removing Args/Returns sections when types are annotated and obvious
@@ -107,7 +107,7 @@ def get_user_email(user_id: int) -> str:
 
 ### 3. Parameterize Tests
 
-AI often writes separate test functions for cases that should be parameterized. Look for:
+Consolidate separate test functions that should be parameterized. Look for:
 
 - Multiple test functions with nearly identical structure
 - Tests that differ only in input values and expected outputs
@@ -154,7 +154,7 @@ def test_validate_email(email: str, expected: bool):
 - Tests that check different aspects of behavior (not just input/output variations)
 - Tests where parameterization would obscure the intent
 
-### 4. Other AI Bloat to Remove
+### 4. Other Patterns to Remove
 
 - Unnecessary type: ignore comments (fix the actual type issue instead)
 - Defensive `.get()` calls with defaults that hide bugs
@@ -167,7 +167,7 @@ def test_validate_email(email: str, expected: bool):
 
 1. **Identify files to clean**: Look at recently modified files or files the user specifies
 2. **Review systematically**: Go through each cleanup category above
-3. **Make changes**: Edit files to remove bloat
+3. **Make changes**: Edit files to remove unwanted patterns
 4. **Run tests**: Ensure changes don't break anything
 5. **Summarize**: Tell the user what was cleaned up
 
