@@ -50,11 +50,13 @@ if [ "$HAS_DIRECTORY" -eq 1 ] && [ $# -gt 1 ]; then
     exit 1
 fi
 
-# Find and parse devcontainer.json for extensions
+# Find and parse devcontainer.json for extensions and settings
 EXTENSIONS=""
+SETTINGS=""
 for devcontainer_path in ".devcontainer/devcontainer.json" ".devcontainer.json"; do
     if [ -f "$devcontainer_path" ]; then
         EXTENSIONS=$(jq -r '.customizations.vscode.extensions // [] | join(",")' "$devcontainer_path" 2>/dev/null)
+        SETTINGS=$(jq -c '.customizations.vscode.settings // {}' "$devcontainer_path" 2>/dev/null)
         break
     fi
 done
@@ -62,6 +64,7 @@ done
 PORT="${URL_LISTENER_PORT:-7077}"
 ENCODED_NAME=$(printf '%s' "$DEVCONTAINER_NAME" | jq -sRr @uri)
 ENCODED_EXTENSIONS=$(printf '%s' "$EXTENSIONS" | jq -sRr @uri)
+ENCODED_SETTINGS=$(printf '%s' "$SETTINGS" | jq -sRr @uri)
 ENCODED_USER=$(printf '%s' "$(whoami)" | jq -sRr @uri)
 
 # Build path parameters for all targets
@@ -72,4 +75,4 @@ for TARGET in "$@"; do
     PATH_PARAMS="${PATH_PARAMS}&path=${ENCODED_PATH}"
 done
 
-curl -sf "http://host.docker.internal:${PORT}/cursor?container=${ENCODED_NAME}${PATH_PARAMS}&file=${IS_FILE}&extensions=${ENCODED_EXTENSIONS}&user=${ENCODED_USER}" >/dev/null 2>&1 &
+curl -sf "http://host.docker.internal:${PORT}/cursor?container=${ENCODED_NAME}${PATH_PARAMS}&file=${IS_FILE}&extensions=${ENCODED_EXTENSIONS}&settings=${ENCODED_SETTINGS}&user=${ENCODED_USER}" >/dev/null 2>&1 &
