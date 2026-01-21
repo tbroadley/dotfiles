@@ -97,7 +97,10 @@ add_to_rc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:
 add_to_rc 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi' 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi'
 
 # Set PYTHONPATH to git root (updates on directory change, useful for worktrees)
-add_to_rc 'PYTHONPATH.*git rev-parse' 'PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }export PYTHONPATH=\"\$(git rev-parse --show-toplevel 2>/dev/null || echo \$PYTHONPATH)\""' true false
+# Use a function to avoid PROMPT_COMMAND semicolon issues with zoxide/alias-suggest
+# Strip trailing semicolon before appending to handle inconsistent PROMPT_COMMAND formats
+add_to_rc '__set_pythonpath_to_git_root()' '__set_pythonpath_to_git_root() { export PYTHONPATH="$(git rev-parse --show-toplevel 2>/dev/null || echo $PYTHONPATH)"; }
+PROMPT_COMMAND="${PROMPT_COMMAND%;}"; PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND;}__set_pythonpath_to_git_root"' true false
 
 # Bash-specific completions
 add_to_rc "source /etc/bash_completion.d/git-prompt" "source /etc/bash_completion.d/git-prompt 2>/dev/null" true false
