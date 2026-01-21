@@ -17,6 +17,8 @@ This document lists all setup steps needed for each Claude Code skill.
 | google-drive | OAuth setup | - |
 | read-inspect-eval | Python package | `pip install inspect-ai` |
 | download-inspect-eval | AWS CLI + profile | `AWS_PROFILE=production` |
+| hawk-monitoring | hawk CLI | `pip install hawk-cli` |
+| hawk-view-results | hawk CLI | `pip install hawk-cli` |
 
 ---
 
@@ -42,6 +44,12 @@ pip install inspect-ai
 Requires AWS CLI with access to the production profile:
 ```bash
 AWS_PROFILE=production aws s3 ls s3://production-metr-inspect-data/
+```
+
+### hawk-monitoring / hawk-view-results
+Requires the `hawk` CLI:
+```bash
+pip install hawk-cli
 ```
 
 ---
