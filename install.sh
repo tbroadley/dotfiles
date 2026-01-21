@@ -93,6 +93,8 @@ add_to_rc "alias clc=" "alias clc='claude --continue'"
 add_to_rc "alias clr=" "alias clr='claude --resume'"
 add_to_rc "export ANTHROPIC_MODEL=opus" "export ANTHROPIC_MODEL=opus"
 add_to_rc "export EDITOR=vim" "export EDITOR=vim"
+add_to_rc "export LANG=en_US.UTF-8" "export LANG=en_US.UTF-8"
+add_to_rc "export LC_ALL=en_US.UTF-8" "export LC_ALL=en_US.UTF-8"
 add_to_rc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
 add_to_rc 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi' 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi'
 
