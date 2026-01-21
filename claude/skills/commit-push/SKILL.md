@@ -132,7 +132,19 @@ gh pr view --json number,url,state,isDraft 2>/dev/null
 
 ### 8. Wait for CI and Ensure It Passes (Feature Branches Only)
 
-After pushing, monitor CI status:
+**First, check if the repo has GitHub Actions workflows:**
+
+```bash
+# Check for workflow files
+if ! ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null | head -1 > /dev/null; then
+  echo "No GitHub Actions workflows found, skipping CI wait"
+  # Skip to step 9
+fi
+```
+
+If no workflows exist, skip waiting for CI and proceed to step 9.
+
+**If workflows exist**, monitor CI status:
 
 ```bash
 gh pr checks --watch
@@ -227,7 +239,19 @@ gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '.[].user.login' | so
 
 ### 10. Wait for CI on Direct Push (Main Branch Only)
 
-When pushing directly to main/master (no PR), monitor CI using the workflow run:
+**First, check if the repo has GitHub Actions workflows:**
+
+```bash
+# Check for workflow files
+if ! ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null | head -1 > /dev/null; then
+  echo "No GitHub Actions workflows found, skipping CI wait"
+  # Task complete - no CI to wait for
+fi
+```
+
+If no workflows exist, the task is complete.
+
+**If workflows exist**, monitor CI using the workflow run:
 
 ```bash
 # Watch the CI run for the latest commit
