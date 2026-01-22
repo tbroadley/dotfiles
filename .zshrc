@@ -198,6 +198,9 @@ dcr() {
     devc --rebuild "$@"
 }
 
+# wt - git worktree helper with completion
+source ~/dotfiles/bin/wt.bash
+
 # Local config (secrets, machine-specific settings)
 [ -f ~/.zshrc.local ] && source ~/.zshrc.local
 

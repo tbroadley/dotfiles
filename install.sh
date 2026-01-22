@@ -139,9 +139,15 @@ add_to_rc "source /etc/bash_completion.d/git-prompt" "source /etc/bash_completio
 add_to_rc "source /usr/share/bash-completion/completions/git" "source /usr/share/bash-completion/completions/git 2>/dev/null" true false
 add_to_rc "__git_complete g __git_main" "__git_complete g __git_main 2>/dev/null" true false
 
+# wt - git worktree helper with completion
+add_to_rc "source ~/dotfiles/bin/wt.bash" "source ~/dotfiles/bin/wt.bash" true false
+
 # Zsh-specific setup
 add_to_rc "autoload -Uz compinit && compinit" "autoload -Uz compinit && compinit" false true
 add_to_rc "autoload -Uz vcs_info" "autoload -Uz vcs_info" false true
+
+# wt - git worktree helper with completion (zsh)
+add_to_rc "source ~/dotfiles/bin/wt.bash" "source ~/dotfiles/bin/wt.bash" false true
 
 # Zoxide shell initialization (enables 'z' command for smart directory jumping)
 add_to_rc 'eval "$(zoxide init bash)"' 'command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init bash)"' true false
