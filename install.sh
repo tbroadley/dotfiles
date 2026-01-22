@@ -7,6 +7,36 @@ set -euo pipefail
 
 echo "Setting up devcontainer dotfiles..."
 
+# Track failed background jobs
+declare -A FAILED_JOBS=()
+declare -A JOB_PIDS=()
+declare -A JOB_OUTPUT_FILES=()
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
+# Report any failures at the end
+report_failures() {
+  if [ ${#FAILED_JOBS[@]} -gt 0 ]; then
+    echo ""
+    echo "========================================"
+    echo "FAILED INSTALLATIONS:"
+    echo "========================================"
+    for name in "${!FAILED_JOBS[@]}"; do
+      local output_file="${FAILED_JOBS[$name]}"
+      echo ""
+      echo "--- $name ---"
+      if [ -f "$output_file" ]; then
+        cat "$output_file"
+      else
+        echo "(no output captured)"
+      fi
+    done
+    echo "========================================"
+    return 1
+  fi
+  return 0
+}
+
 # Checksum verification function
 verify_checksum() {
   local file="$1"
@@ -123,159 +153,238 @@ echo "shell rc configured"
 mkdir -p "$HOME/.local/bin"
 export PATH="$HOME/.local/bin:$PATH"
 
-# Install ripgrep to ~/.local/bin (Linux only, macOS uses brew)
-if [ "$(uname -s)" = "Linux" ]; then
+# Define installation functions for parallel execution
+install_ripgrep() {
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "Skipping ripgrep (not Linux)"
+    return 0
+  fi
   if command -v rg >/dev/null 2>&1; then
     echo "ripgrep is already installed: $(rg --version | head -1)"
-  else
-    echo "Installing ripgrep..."
-    ARCH=$(uname -m)
-    case $ARCH in
-      x86_64)
-        RG_ARCH="x86_64-unknown-linux-musl"
-        RG_CHECKSUM="4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e"
-        ;;
-      aarch64|arm64)
-        RG_ARCH="aarch64-unknown-linux-gnu"
-        RG_CHECKSUM="c827481c4ff4ea10c9dc7a4022c8de5db34a5737cb74484d62eb94a95841ab2f"
-        ;;
-      *) echo "Unsupported architecture for ripgrep: $ARCH"; exit 1 ;;
-    esac
-
-    RG_VERSION="14.1.1"
-    wget -O /tmp/rg.tar.gz "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/ripgrep-${RG_VERSION}-${RG_ARCH}.tar.gz"
-    verify_checksum /tmp/rg.tar.gz "$RG_CHECKSUM"
-    mkdir -p /tmp/rg
-    tar -xzf /tmp/rg.tar.gz -C /tmp/rg --strip-components=1
-    mv /tmp/rg/rg "$HOME/.local/bin/"
-    rm -rf /tmp/rg.tar.gz /tmp/rg
-    chmod +x "$HOME/.local/bin/rg"
-    echo "ripgrep installation completed"
+    return 0
   fi
-fi
 
-# Install jq to ~/.local/bin (Linux only, macOS uses brew)
-if [ "$(uname -s)" = "Linux" ]; then
+  echo "Installing ripgrep..."
+  ARCH=$(uname -m)
+  case $ARCH in
+    x86_64)
+      RG_ARCH="x86_64-unknown-linux-musl"
+      RG_CHECKSUM="4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e"
+      ;;
+    aarch64|arm64)
+      RG_ARCH="aarch64-unknown-linux-gnu"
+      RG_CHECKSUM="c827481c4ff4ea10c9dc7a4022c8de5db34a5737cb74484d62eb94a95841ab2f"
+      ;;
+    *) echo "Unsupported architecture for ripgrep: $ARCH"; return 1 ;;
+  esac
+
+  RG_VERSION="14.1.1"
+  local tmp_file="/tmp/rg-$$.tar.gz"
+  local tmp_dir="/tmp/rg-$$"
+  wget -q -O "$tmp_file" "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/ripgrep-${RG_VERSION}-${RG_ARCH}.tar.gz"
+  verify_checksum "$tmp_file" "$RG_CHECKSUM"
+  mkdir -p "$tmp_dir"
+  tar -xzf "$tmp_file" -C "$tmp_dir" --strip-components=1
+  mv "$tmp_dir/rg" "$HOME/.local/bin/"
+  rm -rf "$tmp_file" "$tmp_dir"
+  chmod +x "$HOME/.local/bin/rg"
+  echo "ripgrep installation completed"
+}
+
+install_jq() {
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "Skipping jq (not Linux)"
+    return 0
+  fi
   if command -v jq >/dev/null 2>&1; then
     echo "jq is already installed: $(jq --version)"
-  else
-    echo "Installing jq..."
-    ARCH=$(uname -m)
-    case $ARCH in
-      x86_64)
-        JQ_ARCH="amd64"
-        JQ_CHECKSUM="5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5"
-        ;;
-      aarch64|arm64)
-        JQ_ARCH="arm64"
-        JQ_CHECKSUM="4dd2d8a0661df0b22f1bb9a1f9830f06b6f3b8f7d91211a1ef5d7c4f06a8b4a5"
-        ;;
-      *) echo "Unsupported architecture for jq: $ARCH"; exit 1 ;;
-    esac
-
-    JQ_VERSION="1.7.1"
-    wget -O /tmp/jq "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-${JQ_ARCH}"
-    verify_checksum /tmp/jq "$JQ_CHECKSUM"
-    mv /tmp/jq "$HOME/.local/bin/jq"
-    chmod +x "$HOME/.local/bin/jq"
-    echo "jq installation completed"
+    return 0
   fi
-fi
 
-# Install gh CLI to ~/.local/bin (Linux only, macOS uses brew)
-if [ "$(uname -s)" = "Linux" ]; then
+  echo "Installing jq..."
+  ARCH=$(uname -m)
+  case $ARCH in
+    x86_64)
+      JQ_ARCH="amd64"
+      JQ_CHECKSUM="5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5"
+      ;;
+    aarch64|arm64)
+      JQ_ARCH="arm64"
+      JQ_CHECKSUM="4dd2d8a0661df0b22f1bb9a1f9830f06b6f3b8f7d91211a1ef5d7c4f06a8b4a5"
+      ;;
+    *) echo "Unsupported architecture for jq: $ARCH"; return 1 ;;
+  esac
+
+  JQ_VERSION="1.7.1"
+  local tmp_file="/tmp/jq-$$"
+  wget -q -O "$tmp_file" "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-${JQ_ARCH}"
+  verify_checksum "$tmp_file" "$JQ_CHECKSUM"
+  mv "$tmp_file" "$HOME/.local/bin/jq"
+  chmod +x "$HOME/.local/bin/jq"
+  echo "jq installation completed"
+}
+
+install_gh() {
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "Skipping gh CLI (not Linux)"
+    return 0
+  fi
   if command -v gh >/dev/null 2>&1; then
     echo "gh CLI is already installed: $(gh --version | head -1)"
-  else
-    echo "Installing gh CLI..."
-    ARCH=$(uname -m)
-    case $ARCH in
-      x86_64)
-        GH_ARCH="linux_amd64"
-        GH_CHECKSUM="ca6e7641214fbd0e21429cec4b64a7ba626fd946d8f9d6d191467545b092015e"
-        ;;
-      aarch64|arm64)
-        GH_ARCH="linux_arm64"
-        GH_CHECKSUM="b1a0c0a0fcf18524e36996caddc92a062355ed014defc836203fe20fba75a38e"
-        ;;
-      *) echo "Unsupported architecture for gh: $ARCH"; exit 1 ;;
-    esac
-
-    GH_VERSION="2.83.2"
-    wget -O /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_${GH_ARCH}.tar.gz"
-    verify_checksum /tmp/gh.tar.gz "$GH_CHECKSUM"
-    mkdir -p /tmp/gh
-    tar -xzf /tmp/gh.tar.gz -C /tmp/gh --strip-components=1
-    mv /tmp/gh/bin/gh "$HOME/.local/bin/"
-    rm -rf /tmp/gh.tar.gz /tmp/gh
-    chmod +x "$HOME/.local/bin/gh"
-    echo "gh CLI installation completed"
+    return 0
   fi
-fi
 
-# Install zoxide to ~/.local/bin (Linux only, macOS uses brew)
-if [ "$(uname -s)" = "Linux" ]; then
+  echo "Installing gh CLI..."
+  ARCH=$(uname -m)
+  case $ARCH in
+    x86_64)
+      GH_ARCH="linux_amd64"
+      GH_CHECKSUM="ca6e7641214fbd0e21429cec4b64a7ba626fd946d8f9d6d191467545b092015e"
+      ;;
+    aarch64|arm64)
+      GH_ARCH="linux_arm64"
+      GH_CHECKSUM="b1a0c0a0fcf18524e36996caddc92a062355ed014defc836203fe20fba75a38e"
+      ;;
+    *) echo "Unsupported architecture for gh: $ARCH"; return 1 ;;
+  esac
+
+  GH_VERSION="2.83.2"
+  local tmp_file="/tmp/gh-$$.tar.gz"
+  local tmp_dir="/tmp/gh-$$"
+  wget -q -O "$tmp_file" "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_${GH_ARCH}.tar.gz"
+  verify_checksum "$tmp_file" "$GH_CHECKSUM"
+  mkdir -p "$tmp_dir"
+  tar -xzf "$tmp_file" -C "$tmp_dir" --strip-components=1
+  mv "$tmp_dir/bin/gh" "$HOME/.local/bin/"
+  rm -rf "$tmp_file" "$tmp_dir"
+  chmod +x "$HOME/.local/bin/gh"
+  echo "gh CLI installation completed"
+}
+
+install_zoxide() {
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "Skipping zoxide (not Linux)"
+    return 0
+  fi
   if command -v zoxide >/dev/null 2>&1; then
     echo "zoxide is already installed: $(zoxide --version)"
-  else
-    echo "Installing zoxide..."
-    ARCH=$(uname -m)
-    case $ARCH in
-      x86_64)
-        ZOXIDE_ARCH="x86_64-unknown-linux-musl"
-        ZOXIDE_CHECKSUM="4092ee38aa1efde42e4efb2f9c872df5388198aacae7f1a74e5eb5c3cc7f531c"
-        ;;
-      aarch64|arm64)
-        ZOXIDE_ARCH="aarch64-unknown-linux-musl"
-        ZOXIDE_CHECKSUM="078cc9cc8cedb6c45edb84c0f5bad53518c610859c73bdb3009a52b89652c103"
-        ;;
-      *) echo "Unsupported architecture for zoxide: $ARCH"; exit 1 ;;
-    esac
-
-    ZOXIDE_VERSION="0.9.8"
-    wget -O /tmp/zoxide.tar.gz "https://github.com/ajeetdsouza/zoxide/releases/download/v${ZOXIDE_VERSION}/zoxide-${ZOXIDE_VERSION}-${ZOXIDE_ARCH}.tar.gz"
-    verify_checksum /tmp/zoxide.tar.gz "$ZOXIDE_CHECKSUM"
-    mkdir -p /tmp/zoxide
-    tar -xzf /tmp/zoxide.tar.gz -C /tmp/zoxide
-    mv /tmp/zoxide/zoxide "$HOME/.local/bin/"
-    rm -rf /tmp/zoxide.tar.gz /tmp/zoxide
-    chmod +x "$HOME/.local/bin/zoxide"
-    echo "zoxide installation completed"
+    return 0
   fi
-fi
 
-# Install nvm and Node.js
-# Check common nvm locations (devcontainer images often have it pre-installed elsewhere)
+  echo "Installing zoxide..."
+  ARCH=$(uname -m)
+  case $ARCH in
+    x86_64)
+      ZOXIDE_ARCH="x86_64-unknown-linux-musl"
+      ZOXIDE_CHECKSUM="4092ee38aa1efde42e4efb2f9c872df5388198aacae7f1a74e5eb5c3cc7f531c"
+      ;;
+    aarch64|arm64)
+      ZOXIDE_ARCH="aarch64-unknown-linux-musl"
+      ZOXIDE_CHECKSUM="078cc9cc8cedb6c45edb84c0f5bad53518c610859c73bdb3009a52b89652c103"
+      ;;
+    *) echo "Unsupported architecture for zoxide: $ARCH"; return 1 ;;
+  esac
+
+  ZOXIDE_VERSION="0.9.8"
+  local tmp_file="/tmp/zoxide-$$.tar.gz"
+  local tmp_dir="/tmp/zoxide-$$"
+  wget -q -O "$tmp_file" "https://github.com/ajeetdsouza/zoxide/releases/download/v${ZOXIDE_VERSION}/zoxide-${ZOXIDE_VERSION}-${ZOXIDE_ARCH}.tar.gz"
+  verify_checksum "$tmp_file" "$ZOXIDE_CHECKSUM"
+  mkdir -p "$tmp_dir"
+  tar -xzf "$tmp_file" -C "$tmp_dir"
+  mv "$tmp_dir/zoxide" "$HOME/.local/bin/"
+  rm -rf "$tmp_file" "$tmp_dir"
+  chmod +x "$HOME/.local/bin/zoxide"
+  echo "zoxide installation completed"
+}
+
+install_nvm_and_node() {
+  # Check common nvm locations (devcontainer images often have it pre-installed elsewhere)
+  if [ -s "/usr/local/share/nvm/nvm.sh" ]; then
+    export NVM_DIR="/usr/local/share/nvm"
+  else
+    export NVM_DIR="$HOME/.nvm"
+  fi
+
+  if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+    echo "Installing nvm..."
+    NVM_VERSION="0.40.1"
+    NVM_CHECKSUM="abdb525ee9f5b48b34d8ed9fc67c6013fb0f659712e401ecd88ab989b3af8f53"
+    local tmp_file="/tmp/nvm-install-$$.sh"
+    curl -fsSL -o "$tmp_file" "https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh"
+    verify_checksum "$tmp_file" "$NVM_CHECKSUM"
+    bash "$tmp_file"
+    rm -f "$tmp_file"
+  fi
+
+  # nvm scripts have unbound variables, so temporarily disable -u
+  set +u
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+  if ! nvm current >/dev/null 2>&1 || [ "$(nvm current)" = "none" ] || [ "$(nvm current)" = "system" ]; then
+    echo "Installing LTS version of Node.js via nvm..."
+    nvm install --lts
+    nvm use --lts
+    nvm alias default lts/*
+  else
+    echo "Node.js is already installed via nvm: $(nvm current) ($(node --version))"
+  fi
+  set -u
+}
+
+# Export functions and variables for subshells
+export -f verify_checksum
+export -f install_ripgrep install_jq install_gh install_zoxide install_nvm_and_node
+export HOME SCRIPT_DIR
+
+# Run independent installations in parallel
+echo "Starting parallel installations..."
+
+# Start background jobs and track PIDs
+for job_name in ripgrep jq gh zoxide nvm; do
+  output_file="$TEMP_DIR/${job_name}.out"
+  JOB_OUTPUT_FILES["$job_name"]="$output_file"
+  case "$job_name" in
+    ripgrep) install_ripgrep > "$output_file" 2>&1 & ;;
+    jq)      install_jq > "$output_file" 2>&1 & ;;
+    gh)      install_gh > "$output_file" 2>&1 & ;;
+    zoxide)  install_zoxide > "$output_file" 2>&1 & ;;
+    nvm)     install_nvm_and_node > "$output_file" 2>&1 & ;;
+  esac
+  JOB_PIDS["$job_name"]=$!
+done
+
+# Wait for all parallel jobs and collect failures
+for job_name in "${!JOB_PIDS[@]}"; do
+  pid="${JOB_PIDS[$job_name]}"
+  output_file="${JOB_OUTPUT_FILES[$job_name]}"
+  if ! wait "$pid"; then
+    FAILED_JOBS["$job_name"]="$output_file"
+  fi
+done
+
+# Print output from successful jobs
+for job_name in ripgrep jq gh zoxide nvm; do
+  output_file="${JOB_OUTPUT_FILES[$job_name]}"
+  # Check if job_name exists in FAILED_JOBS array
+  if [ -f "$output_file" ] && ! [[ -v "FAILED_JOBS[$job_name]" ]]; then
+    cat "$output_file"
+  fi
+done
+
+echo "Parallel installations completed"
+
+# Re-source nvm after parallel install (needed for npm commands)
 if [ -s "/usr/local/share/nvm/nvm.sh" ]; then
   export NVM_DIR="/usr/local/share/nvm"
 else
   export NVM_DIR="$HOME/.nvm"
 fi
-
-if [ ! -s "$NVM_DIR/nvm.sh" ]; then
-  echo "Installing nvm..."
-  NVM_VERSION="0.40.1"
-  NVM_CHECKSUM="abdb525ee9f5b48b34d8ed9fc67c6013fb0f659712e401ecd88ab989b3af8f53"
-  curl -fsSL -o /tmp/nvm-install.sh "https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh"
-  verify_checksum /tmp/nvm-install.sh "$NVM_CHECKSUM"
-  bash /tmp/nvm-install.sh
-  rm -f /tmp/nvm-install.sh
-fi
-
-# nvm scripts have unbound variables, so temporarily disable -u
 set +u
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
-if ! nvm current >/dev/null 2>&1 || [ "$(nvm current)" = "none" ] || [ "$(nvm current)" = "system" ]; then
-  echo "Installing LTS version of Node.js via nvm..."
-  nvm install --lts
-  nvm use --lts
-  nvm alias default lts/*
-else
-  echo "Node.js is already installed via nvm: $(nvm current) ($(node --version))"
-fi
 set -u
 
+# Sequential installations that depend on nvm/npm
 # Install @openai/codex
 if npm list -g @openai/codex >/dev/null 2>&1; then
   echo "@openai/codex is already installed globally"
@@ -381,6 +490,13 @@ if [ -n "${GH_TOKEN:-}" ]; then
     claude plugin install warehouse-query 2>/dev/null || true
     echo "Claude Code plugins installed"
   fi
+fi
+
+# Report any failures from parallel installations
+if ! report_failures; then
+  echo ""
+  echo "Some installations failed. See errors above."
+  exit 1
 fi
 
 echo "Devcontainer configuration completed"
