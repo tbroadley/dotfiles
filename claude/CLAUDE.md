@@ -50,3 +50,19 @@
 ## DVC (Data Version Control)
 - Track large generated/processed data files with DVC (`dvc add`), not git
 - After modifying `dvc.yaml`: `dvc repro` then `dvc push` before committing
+
+## Research Engineering
+
+### Validate Before Scaling
+- ALWAYS run on a tiny sample first (N=5-10) and inspect the outputs yourself before scaling up
+- If a script will take >30 seconds, first run a 5-second version and verify results look reasonable
+- Add `--limit N` or `--dry-run` flags to scripts that process large datasets
+- Check sample outputs for obvious problems: repeated text, empty values, wrong format, garbled content
+- Only proceed to full-scale runs after confirming the small sample looks correct
+
+### Be Skeptical (Null Hypothesis: Your Code Is Wrong)
+- Assume generated data is garbage until you've inspected samples and confirmed otherwise
+- When results look "too good" or "too clean", investigate—they're probably wrong
+- Print descriptive statistics (min, max, mean, distribution) and check for anomalies
+- Before reporting results, actively try to find bugs that would invalidate them
+- Don't trust that code works just because it runs without errors—verify the outputs make sense
