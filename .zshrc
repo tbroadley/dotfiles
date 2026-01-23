@@ -107,10 +107,17 @@ der() {
 
 # Run install.sh in all dev containers (parallel)
 dotfiles-sync() {
+    # Restart url-listener to pick up any changes
+    echo "Restarting url-listener..."
+    pkill -f "url-listener" 2>/dev/null
+    nohup ~/dotfiles/bin/url-listener >/dev/null 2>&1 &
+    echo "url-listener restarted (PID $!)"
+    echo ""
+
     local containers=("${(@f)$(docker ps --format '{{.Names}}' | grep -i dev)}")
     if [[ ${#containers[@]} -eq 0 || -z "${containers[1]}" ]]; then
         echo "No running dev containers found"
-        return 1
+        return 0
     fi
 
     local tmpdir=$(mktemp -d)
