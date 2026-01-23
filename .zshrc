@@ -111,6 +111,7 @@ dotfiles-sync() {
     echo "Restarting url-listener..."
     pkill -f "url-listener" 2>/dev/null
     nohup ~/dotfiles/bin/url-listener >/dev/null 2>&1 &
+    disown
     echo "url-listener restarted (PID $!)"
     echo ""
 
