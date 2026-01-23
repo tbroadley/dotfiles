@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""Add entries to the Wispr Flow dictionary.
+
+Usage:
+    wispr-add-dictionary "phrase"
+    wispr-add-dictionary "phrase" "replacement"
+    wispr-add-dictionary --snippet "trigger" "expansion text"
+"""
+
+import argparse
+import sqlite3
+import subprocess
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+
+DB_PATH = Path.home() / "Library/Application Support/Wispr Flow/flow.sqlite"
+PERSONAL_TEAM_ID = "00000000-0000-0000-0000-000000000000"
+
+
+def add_dictionary_entry(phrase: str, replacement: str | None = None, is_snippet: bool = False) -> None:
+    """Add a dictionary entry to the Wispr Flow database."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    entry_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " +00:00"
+
+    cursor.execute(
+        """
+        INSERT INTO Dictionary (
+            id, phrase, replacement, teamDictionaryId, lastUsed,
+            frequencyUsed, remoteFrequencyUsed, manualEntry,
+            createdAt, modifiedAt, isDeleted, source, isSnippet, observedSource
+        ) VALUES (?, ?, ?, ?, NULL, 0, 0, 1, ?, ?, 0, 'manual', ?, NULL)
+        """,
+        (entry_id, phrase, replacement, PERSONAL_TEAM_ID, now, now, 1 if is_snippet else 0),
+    )
+
+    conn.commit()
+    conn.close()
+
+    print(f"Added: '{phrase}'" + (f" -> '{replacement}'" if replacement else ""))
+
+
+def refresh_dictionary() -> None:
+    """Switch to Dictionary tab and click refresh in Wispr Flow."""
+    script = """
+    tell application "System Events"
+        tell process "Wispr Flow"
+            tell window "Hub"
+                set allElems to entire contents
+
+                -- First, switch to Dictionary tab
+                repeat with elem in allElems
+                    try
+                        if role of elem is "AXButton" and title of elem is "Dictionary" then
+                            perform action "AXPress" of elem
+                            exit repeat
+                        end if
+                    end try
+                end repeat
+
+                delay 0.2
+
+                -- Then click refresh button (3rd untitled button: after search and sort)
+                set allElems to entire contents
+                set btnIndex to 0
+                repeat with elem in allElems
+                    try
+                        if role of elem is "AXButton" then
+                            set t to title of elem
+                            if t is "" or t is missing value then
+                                set btnIndex to btnIndex + 1
+                                if btnIndex is 3 then
+                                    perform action "AXPress" of elem
+                                    return "Refreshed"
+                                end if
+                            end if
+                        end if
+                    end try
+                end repeat
+            end tell
+        end tell
+    end tell
+    """
+    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    if result.returncode == 0 and "Refreshed" in result.stdout:
+        print("Refreshed Wispr Flow dictionary")
+    else:
+        print(f"Warning: Could not refresh: {result.stderr}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Add entries to Wispr Flow dictionary")
+    parser.add_argument("phrase", help="The phrase to add (what you say)")
+    parser.add_argument("replacement", nargs="?", help="Optional replacement text")
+    parser.add_argument("--snippet", "-s", action="store_true", help="Add as a snippet/text expansion")
+    parser.add_argument("--no-refresh", action="store_true", help="Don't click the refresh button")
+
+    args = parser.parse_args()
+
+    add_dictionary_entry(args.phrase, args.replacement, args.snippet)
+
+    if not args.no_refresh:
+        refresh_dictionary()
+
+
+if __name__ == "__main__":
+    main()
