@@ -450,6 +450,11 @@ cp "$SCRIPT_DIR/bin/pbpaste" "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/pbcopy" "$HOME/.local/bin/pbpaste"
 echo "Clipboard forwarding scripts installed"
 
+# Install wispr-add-dictionary for Wispr Flow dictionary forwarding to host
+cp "$SCRIPT_DIR/bin/wispr-add-dictionary-remote" "$HOME/.local/bin/wispr-add-dictionary"
+chmod +x "$HOME/.local/bin/wispr-add-dictionary"
+echo "Wispr Flow dictionary script installed"
+
 # Install improve script (Todoist watcher for Claude Code)
 cp "$SCRIPT_DIR/bin/improve" "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/improve"

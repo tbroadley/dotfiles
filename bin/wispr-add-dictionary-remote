@@ -1,0 +1,60 @@
+#!/bin/bash
+# Adds a word to the Wispr Flow dictionary on the host machine.
+# Used from dev containers to forward requests to the host's url-listener.
+#
+# Usage:
+#   wispr-add-dictionary-remote "phrase"
+#   wispr-add-dictionary-remote "phrase" "replacement"
+#   wispr-add-dictionary-remote -s "trigger" "expansion"
+#   wispr-add-dictionary-remote --no-refresh "phrase"
+
+set -e
+
+# Parse arguments
+SNIPPET=0
+NO_REFRESH=0
+PHRASE=""
+REPLACEMENT=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -s|--snippet)
+            SNIPPET=1
+            shift
+            ;;
+        --no-refresh)
+            NO_REFRESH=1
+            shift
+            ;;
+        *)
+            if [ -z "$PHRASE" ]; then
+                PHRASE="$1"
+            elif [ -z "$REPLACEMENT" ]; then
+                REPLACEMENT="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$PHRASE" ]; then
+    echo "Usage: wispr-add-dictionary-remote [--snippet|-s] [--no-refresh] phrase [replacement]" >&2
+    exit 1
+fi
+
+PORT="${URL_LISTENER_PORT:-7077}"
+ENCODED_PHRASE=$(printf '%s' "$PHRASE" | jq -sRr @uri)
+
+URL="http://host.docker.internal:${PORT}/wispr-dictionary?phrase=${ENCODED_PHRASE}&snippet=${SNIPPET}&no_refresh=${NO_REFRESH}"
+
+if [ -n "$REPLACEMENT" ]; then
+    ENCODED_REPLACEMENT=$(printf '%s' "$REPLACEMENT" | jq -sRr @uri)
+    URL="${URL}&replacement=${ENCODED_REPLACEMENT}"
+fi
+
+RESPONSE=$(curl -sf "$URL" 2>&1) || {
+    echo "Error: Failed to connect to url-listener on host. Is it running?" >&2
+    exit 1
+}
+
+echo "$RESPONSE"

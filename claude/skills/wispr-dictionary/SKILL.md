@@ -32,9 +32,14 @@ wispr-add-dictionary --no-refresh "word"
 
 ## Requirements
 
+**On host (macOS):**
 - Wispr Flow must be running
 - The Hub window must be open (will error if closed)
 - Accessibility permissions for Terminal/shell to control System Events
+
+**From dev containers:**
+- The `url-listener` must be running on the host
+- Uses `host.docker.internal` to forward requests to the host
 
 ## Entry Types
 
