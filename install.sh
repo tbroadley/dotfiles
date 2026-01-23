@@ -483,11 +483,6 @@ if [ -n "${GH_TOKEN:-}" ]; then
     echo "Authenticating GitHub CLI with GH_TOKEN..."
     echo "$GH_TOKEN" | gh auth login --with-token
   fi
-  gh auth setup-git
-  # Rewrite SSH URLs to HTTPS so gh handles auth (OrbStack doesn't forward SSH agent)
-  git config --global url."https://github.com/".insteadOf "git@github.com:"
-  git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
-  echo "GitHub CLI authentication configured"
 
   # Install Claude Code plugins (requires GitHub auth for private repos)
   if command -v claude >/dev/null 2>&1; then
@@ -496,6 +491,16 @@ if [ -n "${GH_TOKEN:-}" ]; then
     claude plugin install warehouse-query 2>/dev/null || true
     echo "Claude Code plugins installed"
   fi
+fi
+
+# Configure git credential helper if gh is authenticated (may have been set up by
+# GH_TOKEN above, or by dev container features forwarding host credentials)
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  gh auth setup-git
+  # Rewrite SSH URLs to HTTPS so gh handles auth (OrbStack doesn't forward SSH agent)
+  git config --global url."https://github.com/".insteadOf "git@github.com:"
+  git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
+  echo "GitHub CLI git credential helper configured"
 fi
 
 # Report any failures from parallel installations
