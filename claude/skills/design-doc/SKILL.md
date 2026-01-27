@@ -97,8 +97,18 @@ EOF
 
 After writing the file:
 - Tell the user the file path
-- Remind them to copy the contents and paste into Google Docs
 - Mention any `[TODO]` sections that need to be filled in
+- Remind them how to paste into Google Docs with formatting:
+
+**Pasting into Google Docs:**
+
+Standard pasting (Ctrl+V or Cmd+V) will only paste plain text. To convert the Markdown into formatted Google Docs content:
+
+1. Copy the Markdown content to your clipboard from the file
+2. In your Google Docs document, right-click where you want to paste
+3. From the context menu, select **"Paste from Markdown"**
+
+The Markdown will be converted to rich text (headings, bold text, lists, tables) and inserted with the correct formatting.
 
 ## Example Output
 
