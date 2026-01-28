@@ -5,15 +5,25 @@ _devc_claude() {
 
     echo "Starting dev container..."
 
+    # Start URL listener restart immediately (host-side, independent of container)
+    {
+        local listener_pid
+        listener_pid=$(pgrep -f 'url-listener' 2>/dev/null)
+        [[ -n "$listener_pid" ]] && kill "$listener_pid" 2>/dev/null
+        ~/dotfiles/bin/url-listener &>/dev/null &
+        disown
+    } &
+    local url_listener_pid=$!
+
+    # Get GitHub token in background (gh CLI may take a moment)
+    local gh_token_file=$(mktemp)
+    gh auth token > "$gh_token_file" 2>/dev/null &
+    local gh_token_pid=$!
+
     local up_opts=()
     local exec_opts=()
 
-    local gh_token
-    if gh_token=$(gh auth token 2>/dev/null); then
-        up_opts+=(--remote-env "GH_TOKEN=$gh_token")
-        exec_opts+=(--remote-env "GH_TOKEN=$gh_token")
-    fi
-
+    # Check local env vars (instant) while gh token is fetching
     if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
         up_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
         exec_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
@@ -24,6 +34,15 @@ _devc_claude() {
         exec_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
     fi
 
+    # Wait for gh token and add if present
+    wait $gh_token_pid 2>/dev/null
+    local gh_token=$(cat "$gh_token_file" 2>/dev/null)
+    rm -f "$gh_token_file"
+    if [[ -n "$gh_token" ]]; then
+        up_opts+=(--remote-env "GH_TOKEN=$gh_token")
+        exec_opts+=(--remote-env "GH_TOKEN=$gh_token")
+    fi
+
     if ! devcontainer up \
         --workspace-folder "$workspace" \
         "${up_opts[@]}"; then
@@ -31,25 +50,21 @@ _devc_claude() {
         return 1
     fi
 
+    # Wait for URL listener setup to complete
+    wait $url_listener_pid 2>/dev/null
+
+    # Get container info with combined query
     local container_id container_name
     container_id=$(docker ps -q --filter "label=devcontainer.local_folder=$workspace")
-    container_name=$(docker inspect --format '{{.Name}}' "$container_id" 2>/dev/null | sed 's/^\///')
-    if [[ -n "$container_name" ]]; then
-        exec_opts+=(--remote-env "DEVCONTAINER_NAME=$container_name")
-    fi
     if [[ -n "$container_id" ]]; then
+        container_name=$(docker inspect --format '{{.Name}}' "$container_id" 2>/dev/null | sed 's/^\///')
+        [[ -n "$container_name" ]] && exec_opts+=(--remote-env "DEVCONTAINER_NAME=$container_name")
+
         if command -v apf &> /dev/null; then
             echo "Starting automatic port forwarding with watchdog..."
             ( ~/dotfiles/bin/apf-watchdog "$container_id" &>/dev/null & )
         fi
     fi
-
-    local listener_pid
-    listener_pid=$(pgrep -f 'url-listener' 2>/dev/null)
-    if [[ -n "$listener_pid" ]]; then
-        kill "$listener_pid" 2>/dev/null
-    fi
-    ( ~/dotfiles/bin/url-listener &>/dev/null & )
 
     echo "Setting up dotfiles..."
     devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
@@ -97,28 +112,48 @@ devc() {
         echo "Starting dev container..."
     fi
 
+    # Start URL listener restart immediately (host-side, runs parallel with devcontainer up)
+    {
+        local listener_pid
+        listener_pid=$(pgrep -f 'url-listener' 2>/dev/null)
+        if [[ -n "$listener_pid" ]]; then
+            echo "Restarting URL listener..."
+            kill "$listener_pid" 2>/dev/null
+        else
+            echo "Starting URL listener..."
+        fi
+        ~/dotfiles/bin/url-listener &>/dev/null &
+        disown
+    } &
+    local url_listener_pid=$!
+
+    # Get GitHub token in background (gh CLI may take a moment)
+    local gh_token_file=$(mktemp)
+    gh auth token > "$gh_token_file" 2>/dev/null &
+    local gh_token_pid=$!
+
     # Build auth forwarding options
     local up_opts=()    # for devcontainer up (supports --mount)
     local exec_opts=()  # for devcontainer exec (only --remote-env)
 
-    # GitHub CLI token forwarding (if gh is authenticated)
-    # install.sh configures git to rewrite SSH URLs to HTTPS
-    local gh_token
-    if gh_token=$(gh auth token 2>/dev/null); then
-        up_opts+=(--remote-env "GH_TOKEN=$gh_token")
-        exec_opts+=(--remote-env "GH_TOKEN=$gh_token")
-    fi
-
-    # Claude Code token forwarding
+    # Check local env vars (instant) while gh token is fetching
     if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
         up_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
         exec_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
     fi
 
-    # Todoist token forwarding
     if [ -n "${TODOIST_TOKEN:-}" ]; then
         up_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
         exec_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
+    fi
+
+    # Wait for gh token and add if present
+    wait $gh_token_pid 2>/dev/null
+    local gh_token=$(cat "$gh_token_file" 2>/dev/null)
+    rm -f "$gh_token_file"
+    if [[ -n "$gh_token" ]]; then
+        up_opts+=(--remote-env "GH_TOKEN=$gh_token")
+        exec_opts+=(--remote-env "GH_TOKEN=$gh_token")
     fi
 
     if ! devcontainer up \
@@ -129,14 +164,16 @@ devc() {
         return 1
     fi
 
+    # Wait for URL listener setup to complete
+    wait $url_listener_pid 2>/dev/null
+
     # Get container ID and name for port forwarding and Cursor integration
     local container_id container_name
     container_id=$(docker ps -q --filter "label=devcontainer.local_folder=$workspace")
-    container_name=$(docker inspect --format '{{.Name}}' "$container_id" 2>/dev/null | sed 's/^\///')
-    if [[ -n "$container_name" ]]; then
-        exec_opts+=(--remote-env "DEVCONTAINER_NAME=$container_name")
-    fi
     if [[ -n "$container_id" ]]; then
+        container_name=$(docker inspect --format '{{.Name}}' "$container_id" 2>/dev/null | sed 's/^\///')
+        [[ -n "$container_name" ]] && exec_opts+=(--remote-env "DEVCONTAINER_NAME=$container_name")
+
         if command -v apf &> /dev/null; then
             echo "Starting automatic port forwarding with watchdog..."
             ( ~/dotfiles/bin/apf-watchdog "$container_id" &>/dev/null & )
@@ -146,17 +183,6 @@ devc() {
             return 1
         fi
     fi
-
-    # Restart URL listener to pick up any code changes
-    local listener_pid
-    listener_pid=$(pgrep -f 'url-listener' 2>/dev/null)
-    if [[ -n "$listener_pid" ]]; then
-        echo "Restarting URL listener..."
-        kill "$listener_pid" 2>/dev/null
-    else
-        echo "Starting URL listener..."
-    fi
-    ( ~/dotfiles/bin/url-listener &>/dev/null & )
 
     echo "Setting up dotfiles..."
     devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
