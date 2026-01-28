@@ -338,24 +338,67 @@ install_nvm_and_node() {
   set -u
 }
 
+install_claude_code() {
+  if command -v claude >/dev/null 2>&1; then
+    echo "Claude Code is already installed: $(claude --version)"
+    return 0
+  fi
+
+  echo "Installing Claude Code..."
+  # Note: Update this checksum when Claude Code releases new versions
+  # Verify at: curl -fsSL https://claude.ai/install.sh | sha256sum
+  CLAUDE_INSTALL_CHECKSUM="363382bed8849f78692bd2f15167a1020e1f23e7da1476ab8808903b6bebae05"
+  local tmp_file="/tmp/claude-install-$$.sh"
+  curl -fsSL -o "$tmp_file" https://claude.ai/install.sh
+  verify_checksum "$tmp_file" "$CLAUDE_INSTALL_CHECKSUM"
+  bash "$tmp_file"
+  rm -f "$tmp_file"
+  echo "Claude Code installation completed"
+}
+
+install_shell_alias_suggestions() {
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "uv not found, skipping shell-alias-suggestions installation"
+    return 0
+  fi
+
+  echo "Installing/upgrading shell-alias-suggestions..."
+  uv tool install --upgrade git+https://github.com/tbroadley/shell-alias-suggestions.git
+
+  if [ -f "$HOME/.bashrc" ] && ! grep -q "alias-suggest" "$HOME/.bashrc" 2>/dev/null; then
+    echo "Installing shell-alias-suggestions hooks for bash..."
+    alias-suggest install --bash
+  fi
+
+  if [ -f "$HOME/.zshrc" ] && ! grep -q "alias-suggest" "$HOME/.zshrc" 2>/dev/null; then
+    echo "Installing shell-alias-suggestions hooks for zsh..."
+    alias-suggest install --zsh
+  fi
+
+  echo "shell-alias-suggestions installation completed"
+}
+
 # Export functions and variables for subshells
 export -f verify_checksum
 export -f install_ripgrep install_jq install_gh install_zoxide install_nvm_and_node
+export -f install_claude_code install_shell_alias_suggestions
 export HOME SCRIPT_DIR
 
-# Run independent installations in parallel
-echo "Starting parallel installations..."
+# Phase 1: Run independent installations in parallel
+echo "Starting Phase 1 installations (parallel)..."
 
 # Start background jobs and track PIDs
-for job_name in ripgrep jq gh zoxide nvm; do
+for job_name in ripgrep jq gh zoxide nvm claude-code shell-alias-suggestions; do
   output_file="$TEMP_DIR/${job_name}.out"
   JOB_OUTPUT_FILES["$job_name"]="$output_file"
   case "$job_name" in
-    ripgrep) install_ripgrep > "$output_file" 2>&1 & ;;
-    jq)      install_jq > "$output_file" 2>&1 & ;;
-    gh)      install_gh > "$output_file" 2>&1 & ;;
-    zoxide)  install_zoxide > "$output_file" 2>&1 & ;;
-    nvm)     install_nvm_and_node > "$output_file" 2>&1 & ;;
+    ripgrep)                 install_ripgrep > "$output_file" 2>&1 & ;;
+    jq)                      install_jq > "$output_file" 2>&1 & ;;
+    gh)                      install_gh > "$output_file" 2>&1 & ;;
+    zoxide)                  install_zoxide > "$output_file" 2>&1 & ;;
+    nvm)                     install_nvm_and_node > "$output_file" 2>&1 & ;;
+    claude-code)             install_claude_code > "$output_file" 2>&1 & ;;
+    shell-alias-suggestions) install_shell_alias_suggestions > "$output_file" 2>&1 & ;;
   esac
   JOB_PIDS["$job_name"]=$!
 done
@@ -370,7 +413,7 @@ for job_name in "${!JOB_PIDS[@]}"; do
 done
 
 # Print output from successful jobs
-for job_name in ripgrep jq gh zoxide nvm; do
+for job_name in ripgrep jq gh zoxide nvm claude-code shell-alias-suggestions; do
   output_file="${JOB_OUTPUT_FILES[$job_name]}"
   # Check if job_name exists in FAILED_JOBS array
   if [ -f "$output_file" ] && ! [[ -v "FAILED_JOBS[$job_name]" ]]; then
@@ -378,7 +421,7 @@ for job_name in ripgrep jq gh zoxide nvm; do
   fi
 done
 
-echo "Parallel installations completed"
+echo "Phase 1 installations completed"
 
 # Re-source nvm after parallel install (needed for npm commands)
 if [ -s "/usr/local/share/nvm/nvm.sh" ]; then
@@ -390,34 +433,22 @@ set +u
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 set -u
 
-# Sequential installations that depend on nvm/npm
-# Install @openai/codex
-if npm list -g @openai/codex >/dev/null 2>&1; then
-  echo "@openai/codex is already installed globally"
-else
-  echo "Installing @openai/codex globally..."
-  npm install -g @openai/codex
-fi
+# Install local bin scripts (fast, do immediately)
+cp "$SCRIPT_DIR/bin/open-url-on-host" "$HOME/.local/bin/"
+cp "$SCRIPT_DIR/bin/cursor-in-container" "$HOME/.local/bin/cursor"
+cp "$SCRIPT_DIR/bin/pbcopy" "$HOME/.local/bin/"
+cp "$SCRIPT_DIR/bin/pbpaste" "$HOME/.local/bin/"
+cp "$SCRIPT_DIR/bin/wispr-add-dictionary-remote" "$HOME/.local/bin/wispr-add-dictionary"
+cp "$SCRIPT_DIR/bin/improve" "$HOME/.local/bin/"
+chmod +x "$HOME/.local/bin/open-url-on-host" "$HOME/.local/bin/cursor" \
+         "$HOME/.local/bin/pbcopy" "$HOME/.local/bin/pbpaste" \
+         "$HOME/.local/bin/wispr-add-dictionary" "$HOME/.local/bin/improve"
+add_to_rc 'export BROWSER=open-url-on-host' 'export BROWSER=open-url-on-host'
+echo "Local bin scripts installed (URL forwarding, cursor, clipboard, wispr, improve)"
 
-# Install Claude Code
-if command -v claude >/dev/null 2>&1; then
-  echo "Claude Code is already installed: $(claude --version)"
-else
-  echo "Installing Claude Code..."
-  # Note: Update this checksum when Claude Code releases new versions
-  # Verify at: curl -fsSL https://claude.ai/install.sh | sha256sum
-  CLAUDE_INSTALL_CHECKSUM="363382bed8849f78692bd2f15167a1020e1f23e7da1476ab8808903b6bebae05"
-  curl -fsSL -o /tmp/claude-install.sh https://claude.ai/install.sh
-  verify_checksum /tmp/claude-install.sh "$CLAUDE_INSTALL_CHECKSUM"
-  bash /tmp/claude-install.sh
-  rm -f /tmp/claude-install.sh
-  echo "Claude Code installation completed"
-fi
-
-# Configure Claude Code settings, hooks, and skills
+# Configure Claude Code settings, hooks, and skills (fast, do immediately)
 CLAUDE_DIR="$HOME/.claude"
 mkdir -p "$CLAUDE_DIR"
-
 cp -r "$SCRIPT_DIR/claude/"* "$CLAUDE_DIR/"
 chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 echo "Claude Code settings, hooks, and skills installed"
@@ -425,7 +456,6 @@ echo "Claude Code settings, hooks, and skills installed"
 # Configure Claude Code authentication if token is available
 if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
   if [ -f "$HOME/.claude.json" ]; then
-    # Merge hasCompletedOnboarding into existing file to preserve trust state
     jq '. + {"hasCompletedOnboarding": true}' "$HOME/.claude.json" > "$HOME/.claude.json.tmp" && mv "$HOME/.claude.json.tmp" "$HOME/.claude.json"
   else
     echo '{"hasCompletedOnboarding": true}' > "$HOME/.claude.json"
@@ -433,79 +463,86 @@ if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
   echo "Claude Code onboarding bypass configured"
 fi
 
-# Install open-url-on-host script for URL forwarding to host browser
-cp "$SCRIPT_DIR/bin/open-url-on-host" "$HOME/.local/bin/"
-chmod +x "$HOME/.local/bin/open-url-on-host"
-add_to_rc 'export BROWSER=open-url-on-host' 'export BROWSER=open-url-on-host'
-echo "URL forwarding script installed"
+# Define Phase 2 installation functions (depend on Phase 1)
+install_codex() {
+  # Re-source nvm (needed in subshell)
+  if [ -s "/usr/local/share/nvm/nvm.sh" ]; then
+    export NVM_DIR="/usr/local/share/nvm"
+  else
+    export NVM_DIR="$HOME/.nvm"
+  fi
+  set +u
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  set -u
 
-# Install cursor script for opening files in Cursor on host
-cp "$SCRIPT_DIR/bin/cursor-in-container" "$HOME/.local/bin/cursor"
-chmod +x "$HOME/.local/bin/cursor"
-echo "Cursor forwarding script installed"
+  if npm list -g @openai/codex >/dev/null 2>&1; then
+    echo "@openai/codex is already installed globally"
+  else
+    echo "Installing @openai/codex globally..."
+    npm install -g @openai/codex
+  fi
+}
 
-# Install pbcopy/pbpaste for clipboard forwarding to host
-cp "$SCRIPT_DIR/bin/pbcopy" "$HOME/.local/bin/"
-cp "$SCRIPT_DIR/bin/pbpaste" "$HOME/.local/bin/"
-chmod +x "$HOME/.local/bin/pbcopy" "$HOME/.local/bin/pbpaste"
-echo "Clipboard forwarding scripts installed"
-
-# Install wispr-add-dictionary for Wispr Flow dictionary forwarding to host
-cp "$SCRIPT_DIR/bin/wispr-add-dictionary-remote" "$HOME/.local/bin/wispr-add-dictionary"
-chmod +x "$HOME/.local/bin/wispr-add-dictionary"
-echo "Wispr Flow dictionary script installed"
-
-# Install improve script (Todoist watcher for Claude Code)
-cp "$SCRIPT_DIR/bin/improve" "$HOME/.local/bin/"
-chmod +x "$HOME/.local/bin/improve"
-echo "Improve script installed"
-
-# Install shell-alias-suggestions
-if command -v uv >/dev/null 2>&1; then
-  echo "Installing/upgrading shell-alias-suggestions..."
-  uv tool install --upgrade git+https://github.com/tbroadley/shell-alias-suggestions.git
-
-  # Install for bash if .bashrc exists
-  if [ -f "$HOME/.bashrc" ] && ! grep -q "alias-suggest" "$HOME/.bashrc" 2>/dev/null; then
-    echo "Installing shell-alias-suggestions hooks for bash..."
-    alias-suggest install --bash
+setup_gh_auth() {
+  if [ -z "${GH_TOKEN:-}" ]; then
+    echo "GH_TOKEN not set, skipping GitHub CLI authentication"
+    return 0
   fi
 
-  # Install for zsh if .zshrc exists
-  if [ -f "$HOME/.zshrc" ] && ! grep -q "alias-suggest" "$HOME/.zshrc" 2>/dev/null; then
-    echo "Installing shell-alias-suggestions hooks for zsh..."
-    alias-suggest install --zsh
-  fi
-
-  echo "shell-alias-suggestions installation completed"
-else
-  echo "uv not found, skipping shell-alias-suggestions installation"
-fi
-
-# Configure GitHub CLI authentication if GH_TOKEN is available
-if [ -n "${GH_TOKEN:-}" ]; then
   if ! gh auth status >/dev/null 2>&1; then
     echo "Authenticating GitHub CLI with GH_TOKEN..."
     echo "$GH_TOKEN" | gh auth login --with-token
   fi
 
-  # Install Claude Code plugins (requires GitHub auth for private repos)
-  if command -v claude >/dev/null 2>&1; then
-    echo "Installing Claude Code plugins..."
-    GITHUB_TOKEN="$GH_TOKEN" claude plugin marketplace add METR/eval-execution-claude 2>/dev/null || true
-    claude plugin install warehouse-query 2>/dev/null || true
-    echo "Claude Code plugins installed"
-  fi
-fi
-
-# Configure git credential helper if gh is authenticated (may have been set up by
-# GH_TOKEN above, or by dev container features forwarding host credentials)
-if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   gh auth setup-git
-  # Rewrite SSH URLs to HTTPS so gh handles auth (OrbStack doesn't forward SSH agent)
   git config --global url."https://github.com/".insteadOf "git@github.com:"
   git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
   echo "GitHub CLI git credential helper configured"
+}
+
+export -f install_codex setup_gh_auth
+
+# Phase 2: Run npm-dependent and gh-auth in parallel
+echo "Starting Phase 2 installations (parallel)..."
+
+declare -A PHASE2_PIDS=()
+declare -A PHASE2_OUTPUT=()
+
+for job_name in codex gh-auth; do
+  output_file="$TEMP_DIR/${job_name}.out"
+  PHASE2_OUTPUT["$job_name"]="$output_file"
+  case "$job_name" in
+    codex)   install_codex > "$output_file" 2>&1 & ;;
+    gh-auth) setup_gh_auth > "$output_file" 2>&1 & ;;
+  esac
+  PHASE2_PIDS["$job_name"]=$!
+done
+
+# Wait for Phase 2 and collect failures
+for job_name in "${!PHASE2_PIDS[@]}"; do
+  pid="${PHASE2_PIDS[$job_name]}"
+  output_file="${PHASE2_OUTPUT[$job_name]}"
+  if ! wait "$pid"; then
+    FAILED_JOBS["$job_name"]="$output_file"
+  fi
+done
+
+# Print output from Phase 2 jobs
+for job_name in codex gh-auth; do
+  output_file="${PHASE2_OUTPUT[$job_name]}"
+  if [ -f "$output_file" ] && ! [[ -v "FAILED_JOBS[$job_name]" ]]; then
+    cat "$output_file"
+  fi
+done
+
+echo "Phase 2 installations completed"
+
+# Phase 3: Install Claude Code plugins (requires both gh auth and claude)
+if [ -n "${GH_TOKEN:-}" ] && command -v claude >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  echo "Installing Claude Code plugins..."
+  GITHUB_TOKEN="$GH_TOKEN" claude plugin marketplace add METR/eval-execution-claude 2>/dev/null || true
+  claude plugin install warehouse-query 2>/dev/null || true
+  echo "Claude Code plugins installed"
 fi
 
 # Report any failures from parallel installations
