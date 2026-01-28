@@ -36,12 +36,14 @@ When leaving comments on PRs, always prefix with "Claude Code: " to make it clea
 
 ## Re-requesting Review
 
-After addressing all comments from a reviewer, request their re-review:
+Only request re-review from reviewers who have **not** already approved the PR. If a reviewer has approved, their approval still stands even after addressing their comments.
+
+To check review states before requesting re-review:
 ```bash
-gh pr edit --add-reviewer <reviewer-username>
+gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '.[] | "\(.user.login): \(.state)"' | sort -u
 ```
 
-To find reviewers who left comments:
+To request re-review (only for reviewers with CHANGES_REQUESTED or COMMENTED state, not APPROVED):
 ```bash
-gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '.[].user.login' | sort -u
+gh pr edit --add-reviewer <reviewer-username>
 ```
