@@ -8,6 +8,12 @@ user-invocable: true
 
 Review and clean up code, removing unwanted patterns and improving test structure.
 
+## Scope
+
+**By default, only clean up code that was changed on the current branch** (i.e., changes not yet on `main`). Use `git diff main...HEAD` to identify which files and lines were modified.
+
+Do NOT clean up anti-patterns in code that was already on `main` unless the user explicitly requests a broader cleanup scope.
+
 ## What This Skill Does
 
 1. Removes unnecessary comments
@@ -165,9 +171,9 @@ def test_validate_email(email: str, expected: bool):
 
 ## Workflow
 
-1. **Identify files to clean**: Look at recently modified files or files the user specifies
-2. **Review systematically**: Go through each cleanup category above
-3. **Make changes**: Edit files to remove unwanted patterns
+1. **Identify files to clean**: Run `git diff main...HEAD --name-only` to find files changed on this branch, then focus cleanup on only the changed portions of those files (not pre-existing code)
+2. **Review systematically**: Go through each cleanup category above, but only for code introduced on this branch
+3. **Make changes**: Edit files to remove unwanted patterns in the new/changed code
 4. **Run tests**: Ensure changes don't break anything
 5. **Summarize**: Tell the user what was cleaned up
 
