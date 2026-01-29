@@ -127,6 +127,7 @@ add_to_rc "alias g=git" "alias g=git"
 add_to_rc "alias ppl=" "alias ppl='pivot pull'"
 add_to_rc "alias pps=" "alias pps='pivot push'"
 add_to_rc "alias pco=" "alias pco='pivot checkout'"
+add_to_rc "alias pr=" "alias pr='pivot run'"
 # pla/psa: detect pivot vs dvc and use the appropriate tool
 # Remove old alias versions that conflict with the function definitions
 remove_from_rc 'alias pla=' 'alias psa='
