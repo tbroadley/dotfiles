@@ -1,7 +1,7 @@
 # wt - create or enter git worktree
 # Usage: wt [branch-name | -]
 #
-# wt           - cd to the main repo root (not in .worktrees)
+# wt           - list all worktrees
 # wt -         - cd to the previously selected worktree (like cd -)
 # wt <branch>  - if worktree exists, cd into it; otherwise create it
 #
@@ -22,11 +22,9 @@ wt() {
     # --git-common-dir returns the .git directory, strip it
     repo_root="${repo_root%/.git}"
 
-    # wt with no args: switch to repo root
+    # wt with no args: list worktrees
     if [ -z "$branch" ]; then
-        local old_dir="$PWD"
-        cd "$repo_root" || return 1
-        _WT_PREVIOUS_DIR="$old_dir"
+        git worktree list
         return 0
     fi
 
