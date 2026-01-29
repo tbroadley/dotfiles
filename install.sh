@@ -113,8 +113,12 @@ add_to_rc "alias dco=" "alias dco='dvc checkout'"
 add_to_rc "alias dcof=" "alias dcof='dvc checkout --force'"
 add_to_rc "alias dplf=" "alias dplf='dvc pull --force'"
 add_to_rc "alias g=git" "alias g=git"
-add_to_rc "alias pla=" 'alias pla="git pull && dvc pull"'
-add_to_rc "alias psa=" 'alias psa="dvc push && git push"'
+add_to_rc "alias ppl=" "alias ppl='pivot pull'"
+add_to_rc "alias pps=" "alias pps='pivot push'"
+add_to_rc "alias pco=" "alias pco='pivot checkout'"
+# pla/psa: detect pivot vs dvc and use the appropriate tool
+add_to_rc "pla()" 'pla() { git pull && if command -v pivot &>/dev/null; then pivot pull; elif command -v dvc &>/dev/null; then dvc pull; fi; }'
+add_to_rc "psa()" 'psa() { if command -v pivot &>/dev/null; then pivot push; elif command -v dvc &>/dev/null; then dvc push; fi && git push; }'
 add_to_rc "alias pt=pytest" "alias pt=pytest"
 add_to_rc "alias r=ruff" "alias r=ruff"
 add_to_rc "alias v=vim" "alias v=vim"
