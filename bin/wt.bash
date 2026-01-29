@@ -40,7 +40,9 @@ wt() {
         return 0
     fi
 
-    local worktree_dir="$repo_root/.worktrees/$branch"
+    # Replace forward slashes with dashes for directory name (e.g., user/feature -> user-feature)
+    local dir_name="${branch//\//-}"
+    local worktree_dir="$repo_root/.worktrees/$dir_name"
 
     # If worktree already exists in .worktrees/, cd into it
     if [ -d "$worktree_dir" ]; then
@@ -161,7 +163,9 @@ wtd() {
             return 1
         fi
     else
-        worktree_dir="$repo_root/.worktrees/$branch"
+        # Replace forward slashes with dashes for directory name (e.g., user/feature -> user-feature)
+        local dir_name="${branch//\//-}"
+        worktree_dir="$repo_root/.worktrees/$dir_name"
     fi
 
     if [ ! -d "$worktree_dir" ]; then
