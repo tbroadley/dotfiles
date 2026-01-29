@@ -47,6 +47,9 @@
 - Don't add comments to tests—the test name and assertions should be self-explanatory
 - When exact counts are expected, use exact assertions (`assert len(items) == 1`) not loose ones (`assert len(items) >= 1`)
 
+## Bash
+- An alias and function with the same name will cause a syntax error—bash expands the alias before parsing `funcname() { ... }`, resulting in "syntax error near unexpected token `('"
+
 ## DVC (Data Version Control)
 - Track large generated/processed data files with DVC (`dvc add`), not git
 - After modifying `dvc.yaml`: `dvc repro` then `dvc push` before committing
