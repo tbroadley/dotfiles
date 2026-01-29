@@ -51,6 +51,10 @@
 - Track large generated/processed data files with DVC (`dvc add`), not git
 - After modifying `dvc.yaml`: `dvc repro` then `dvc push` before committing
 
+## Pivot (Pipeline Management)
+- Similar to DVC but with programmatic stage registration via `pipeline.py`
+- After modifying pipeline stages or data: `pivot run` then `pivot push` before committing
+
 ## Research Engineering
 
 ### Validate Before Scaling

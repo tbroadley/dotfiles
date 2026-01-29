@@ -46,6 +46,25 @@ If this is a DVC-tracked repository (has `.dvc` files or `dvc.yaml`):
 - Run `dvc push` to push data artifacts to remote storage
 - This prevents `check-dvc` CI failures
 
+**Fixing `check-dvc` CI failures:**
+1. Run `dvc status --remote` to see which files are missing
+2. Run `dvc push` to upload missing files to the remote
+3. Commit any updated `.dvc` files if they changed
+
+### 3b. Pivot (Pipeline Management)
+
+If this is a Pivot-tracked repository (has `.pvt` files or `pipeline.py`):
+- Run `pivot run` to execute any outdated pipeline stages
+- Run `pivot push` to push outputs to S3
+- Commit any updated `.pvt` or `.pivot/stages/*.lock` files
+- This prevents `check-pivot` CI failures
+
+**Fixing `check-pivot` CI failures:**
+1. Run `pivot status` to see which stages need to run
+2. Run `pivot run` to execute outdated stages (or `pivot run stage_name@variant` for specific stages)
+3. Run `pivot push` to upload outputs to S3
+4. Commit any updated `.pvt` or `.pivot/stages/*.lock` files
+
 ### 4. Commit and Push
 
 Once local validation passes:
