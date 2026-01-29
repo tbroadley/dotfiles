@@ -154,7 +154,20 @@ wtd() {
         cd "$repo_root" || return 1
     fi
 
-    git worktree remove "$worktree_dir" && echo "Worktree removed: $worktree_dir"
+    # Try normal remove first, then force if needed (e.g., uncommitted changes)
+    # If git doesn't recognize it as a worktree, clean up the directory manually
+    if git worktree remove "$worktree_dir" 2>/dev/null; then
+        echo "Worktree removed: $worktree_dir"
+    elif git worktree remove --force "$worktree_dir" 2>/dev/null; then
+        echo "Worktree removed (forced): $worktree_dir"
+    else
+        # Git doesn't recognize it as a worktree - could be orphaned directory
+        # or worktree tracking got out of sync. Clean up manually.
+        echo "Warning: git doesn't recognize this as a worktree, removing directory manually"
+        rm -rf "$worktree_dir" && echo "Directory removed: $worktree_dir"
+        # Also prune any stale worktree entries
+        git worktree prune 2>/dev/null
+    fi
 }
 
 # Helper to get main repo root (works from inside worktrees)
