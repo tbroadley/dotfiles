@@ -2,3 +2,4 @@
 .cursorindexingignore
 .specstory
 .worktrees
+.pivot_restore_lock_*
