@@ -101,6 +101,17 @@ add_to_rc() {
   fi
 }
 
+# Remove lines matching patterns from shell rc files
+remove_from_rc() {
+  for pattern in "$@"; do
+    for rc_file in "$HOME/.bashrc" "$HOME/.zshrc"; do
+      if [ -f "$rc_file" ] && grep -qF "$pattern" "$rc_file" 2>/dev/null; then
+        grep -vF "$pattern" "$rc_file" > "$rc_file.tmp" && mv "$rc_file.tmp" "$rc_file"
+      fi
+    done
+  done
+}
+
 # Aliases (work in both shells)
 add_to_rc "alias b=basedpyright" "alias b=basedpyright"
 add_to_rc "claude()" 'claude() { ANTHROPIC_API_KEY= ANTHROPIC_BASE_URL= command claude "$@"; }'
@@ -117,6 +128,8 @@ add_to_rc "alias ppl=" "alias ppl='pivot pull'"
 add_to_rc "alias pps=" "alias pps='pivot push'"
 add_to_rc "alias pco=" "alias pco='pivot checkout'"
 # pla/psa: detect pivot vs dvc and use the appropriate tool
+# Remove old alias versions that conflict with the function definitions
+remove_from_rc 'alias pla=' 'alias psa='
 add_to_rc "pla()" 'pla() { git pull && if command -v pivot &>/dev/null; then pivot pull; elif command -v dvc &>/dev/null; then dvc pull; fi; }'
 add_to_rc "psa()" 'psa() { if command -v pivot &>/dev/null; then pivot push; elif command -v dvc &>/dev/null; then dvc push; fi && git push; }'
 add_to_rc "alias pt=pytest" "alias pt=pytest"
