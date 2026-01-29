@@ -1,32 +1,54 @@
 # wt - create or enter git worktree
-# Usage: wt <branch-name>
+# Usage: wt [branch-name | -]
 #
-# If a worktree for the branch already exists, cd into it.
-# Otherwise, create the worktree with proper setup (.env, DVC cache) and cd into it.
+# wt           - cd to the main repo root (not in .worktrees)
+# wt -         - cd to the previously selected worktree (like cd -)
+# wt <branch>  - if worktree exists, cd into it; otherwise create it
 #
 # Supports bash and zsh with tab completion for branch names.
 
+# Track the previous worktree directory for "wt -"
+_WT_PREVIOUS_DIR=""
+
 wt() {
     local branch="$1"
-    if [ -z "$branch" ]; then
-        echo "Usage: wt <branch-name>"
-        echo ""
-        echo "Existing worktrees:"
-        git worktree list 2>/dev/null || echo "  (not in a git repository)"
-        return 1
-    fi
 
+    # Get the main repo root (not worktree root)
     local repo_root
-    repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+    repo_root="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || {
         echo "Error: not in a git repository"
         return 1
     }
+    # --git-common-dir returns the .git directory, strip it
+    repo_root="${repo_root%/.git}"
+
+    # wt with no args: switch to repo root
+    if [ -z "$branch" ]; then
+        local old_dir="$PWD"
+        cd "$repo_root" || return 1
+        _WT_PREVIOUS_DIR="$old_dir"
+        return 0
+    fi
+
+    # wt -: switch to previous worktree
+    if [ "$branch" = "-" ]; then
+        if [ -z "$_WT_PREVIOUS_DIR" ]; then
+            echo "Error: no previous worktree directory"
+            return 1
+        fi
+        local old_dir="$PWD"
+        cd "$_WT_PREVIOUS_DIR" || return 1
+        _WT_PREVIOUS_DIR="$old_dir"
+        return 0
+    fi
 
     local worktree_dir="$repo_root/.worktrees/$branch"
 
     # If worktree already exists in .worktrees/, cd into it
     if [ -d "$worktree_dir" ]; then
-        cd "$worktree_dir"
+        local old_dir="$PWD"
+        cd "$worktree_dir" || return 1
+        _WT_PREVIOUS_DIR="$old_dir"
         return 0
     fi
 
@@ -35,7 +57,9 @@ wt() {
     existing_worktree=$(git worktree list --porcelain 2>/dev/null | \
         awk -v branch="refs/heads/$branch" '/^worktree /{path=$2} /^branch /{if ($2 == branch) print path}')
     if [ -n "$existing_worktree" ]; then
-        cd "$existing_worktree"
+        local old_dir="$PWD"
+        cd "$existing_worktree" || return 1
+        _WT_PREVIOUS_DIR="$old_dir"
         return 0
     fi
 
@@ -77,28 +101,50 @@ EOF
     fi
 
     echo "Worktree created: $worktree_dir"
-    cd "$worktree_dir"
+    local old_dir="$PWD"
+    cd "$worktree_dir" || return 1
+    _WT_PREVIOUS_DIR="$old_dir"
 }
 
 # wtd - delete a git worktree
-# Usage: wtd <branch-name>
+# Usage: wtd [branch-name]
+#
+# wtd          - delete the current worktree (if inside .worktrees/)
+# wtd <branch> - delete the worktree for <branch>
 wtd() {
     local branch="$1"
-    if [ -z "$branch" ]; then
-        echo "Usage: wtd <branch-name>"
-        echo ""
-        echo "Existing worktrees:"
-        git worktree list 2>/dev/null || echo "  (not in a git repository)"
-        return 1
-    fi
 
+    # Get the main repo root (not worktree root)
     local repo_root
-    repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+    repo_root="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || {
         echo "Error: not in a git repository"
         return 1
     }
+    # --git-common-dir returns the .git directory, strip it
+    repo_root="${repo_root%/.git}"
 
-    local worktree_dir="$repo_root/.worktrees/$branch"
+    local worktree_dir
+
+    # If no branch specified, try to delete current worktree
+    if [ -z "$branch" ]; then
+        # Check if we're inside .worktrees/
+        if [[ "$PWD" == "$repo_root/.worktrees/"* ]]; then
+            # Extract the worktree name from the path
+            local rel_path="${PWD#$repo_root/.worktrees/}"
+            branch="${rel_path%%/*}"
+            worktree_dir="$repo_root/.worktrees/$branch"
+        else
+            echo "Error: not inside a worktree (must be in .worktrees/ to delete current)"
+            echo ""
+            echo "Usage: wtd [branch-name]"
+            echo ""
+            echo "Existing worktrees:"
+            git worktree list 2>/dev/null
+            return 1
+        fi
+    else
+        worktree_dir="$repo_root/.worktrees/$branch"
+    fi
 
     if [ ! -d "$worktree_dir" ]; then
         echo "Error: worktree does not exist: $worktree_dir"
@@ -107,16 +153,23 @@ wtd() {
 
     # If we're inside the worktree being deleted, cd to repo root first
     if [[ "$PWD" == "$worktree_dir"* ]]; then
-        cd "$repo_root"
+        cd "$repo_root" || return 1
     fi
 
     git worktree remove "$worktree_dir" && echo "Worktree removed: $worktree_dir"
 }
 
+# Helper to get main repo root (works from inside worktrees)
+_wt_repo_root() {
+    local repo_root
+    repo_root="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+    echo "${repo_root%/.git}"
+}
+
 # Helper to get branch list for completion
 _wt_branches() {
     local repo_root branches worktree_names
-    repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return
+    repo_root="$(_wt_repo_root)" || return
 
     # Get all branches: local refs and remote refs (strip origin/ prefix), deduplicated
     branches=$(git for-each-ref --format='%(refname:short)' refs/heads refs/remotes/origin 2>/dev/null | \
@@ -136,7 +189,7 @@ _wt_branches() {
 # Helper to get existing worktree names for wtd completion
 _wtd_worktrees() {
     local repo_root
-    repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return
+    repo_root="$(_wt_repo_root)" || return
 
     if [ -d "$repo_root/.worktrees" ]; then
         ls -1 "$repo_root/.worktrees" 2>/dev/null
