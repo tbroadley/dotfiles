@@ -68,7 +68,28 @@ WORKTREE_PATH="$REPO_ROOT/.worktrees/<branch-name>"
 [ -f "$REPO_ROOT/.env" ] && cp "$REPO_ROOT/.env" "$WORKTREE_PATH/"
 ```
 
-### 5. Handle DVC Configuration (if applicable)
+### 5. Set Up VS Code/Cursor Python Interpreter (if applicable)
+
+If the repository uses Python (has `pyproject.toml` or `setup.py`), create `.vscode/settings.json` to point to the worktree's venv:
+
+```bash
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORKTREE_PATH="$REPO_ROOT/.worktrees/<branch-name>"
+
+if [ -f "$REPO_ROOT/pyproject.toml" ] || [ -f "$REPO_ROOT/setup.py" ]; then
+    mkdir -p "$WORKTREE_PATH/.vscode"
+    cat > "$WORKTREE_PATH/.vscode/settings.json" << 'EOF'
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.analysis.extraPaths": ["${workspaceFolder}"]
+}
+EOF
+fi
+```
+
+This ensures "Go to Definition" and other IDE features resolve to the worktree's files instead of the main repo.
+
+### 6. Handle DVC Configuration (if applicable)
 
 Check if the repository uses DVC by looking for `.dvc/` directory:
 ```bash
@@ -113,6 +134,18 @@ git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
 # Copy .env if it exists
 [ -f "$REPO_ROOT/.env" ] && cp "$REPO_ROOT/.env" "$WORKTREE_DIR/"
 
+# Set up VS Code/Cursor Python interpreter
+if [ -f "$REPO_ROOT/pyproject.toml" ] || [ -f "$REPO_ROOT/setup.py" ]; then
+    mkdir -p "$WORKTREE_DIR/.vscode"
+    cat > "$WORKTREE_DIR/.vscode/settings.json" << 'EOF'
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.analysis.extraPaths": ["${workspaceFolder}"]
+}
+EOF
+fi
+
+# Set up DVC cache sharing
 if [ -f "$REPO_ROOT/.dvc/config.local" ]; then
     mkdir -p "$WORKTREE_DIR/.dvc"
     cat > "$WORKTREE_DIR/.dvc/config.local" << EOF

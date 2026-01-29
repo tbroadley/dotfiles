@@ -98,6 +98,17 @@ wt() {
 EOF
     fi
 
+    # Set up VS Code/Cursor settings to use worktree's venv for Python
+    if [ -f "$repo_root/pyproject.toml" ] || [ -f "$repo_root/setup.py" ]; then
+        mkdir -p "$worktree_dir/.vscode"
+        cat > "$worktree_dir/.vscode/settings.json" << 'EOF'
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.analysis.extraPaths": ["${workspaceFolder}"]
+}
+EOF
+    fi
+
     echo "Worktree created: $worktree_dir"
     local old_dir="$PWD"
     cd "$worktree_dir" || return 1
