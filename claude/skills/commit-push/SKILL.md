@@ -142,8 +142,8 @@ gh pr view --json number,url,state,isDraft 2>/dev/null
   ```bash
   # List available OKR labels
   gh label list --search "OKR-"
-  # Add the appropriate label
-  gh pr edit --add-label "OKR-..."
+  # Add the appropriate label using the API (gh pr edit --add-label can fail due to deprecated Projects classic)
+  gh api repos/{owner}/{repo}/issues/{pr_number}/labels -f "labels[]=okr-..."
   ```
 
 **If PR exists but is not a draft:**
