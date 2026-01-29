@@ -87,3 +87,7 @@ docker stop dotfiles-test-container
 ```
 
 The script should complete without errors and all tools should be accessible.
+
+## Gotchas
+
+- An alias and function with the same name will cause a syntax error—bash expands the alias before parsing `funcname() { ... }`, resulting in "syntax error near unexpected token `('". The `install.sh` script uses `remove_from_rc` to clean up old aliases before defining functions.
