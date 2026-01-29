@@ -98,6 +98,15 @@ wt() {
 EOF
     fi
 
+    # Set up Pivot cache sharing if Pivot is used
+    if [ -d "$repo_root/.pivot" ]; then
+        mkdir -p "$worktree_dir/.pivot"
+        # Copy existing config from root repo
+        [ -f "$repo_root/.pivot/config.yaml" ] && cp "$repo_root/.pivot/config.yaml" "$worktree_dir/.pivot/"
+        # Set cache dir to point to root repo's cache
+        (cd "$worktree_dir" && pivot config set cache.dir "$repo_root/.pivot/cache") 2>/dev/null || true
+    fi
+
     # Set up VS Code/Cursor settings to use worktree's venv for Python
     if [ -f "$repo_root/pyproject.toml" ] || [ -f "$repo_root/setup.py" ]; then
         mkdir -p "$worktree_dir/.vscode"
