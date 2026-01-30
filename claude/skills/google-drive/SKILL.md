@@ -23,6 +23,21 @@ See `claude/skills/SETUP.md` for detailed OAuth setup instructions.
 ACCESS_TOKEN=$(google-oauth-token)
 ```
 
+## Re-authentication
+
+If you get `invalid_grant` or `reauth related error`, the OAuth token has expired. Re-authenticate using gcloud:
+
+```bash
+# Re-authenticate with required scopes
+gcloud auth application-default login \
+  --scopes="https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/cloud-platform"
+
+# Migrate the new credentials
+google-oauth-setup --migrate-gcloud
+```
+
+This will open a browser for authentication, then migrate the credentials to the google-oauth config.
+
 **Required header for all requests:**
 ```bash
 -H "x-goog-user-project: ${GOOGLE_QUOTA_PROJECT}"
@@ -189,6 +204,37 @@ Google Drive URLs:
 - Drive: `https://drive.google.com/file/d/{FILE_ID}/view`
 
 The FILE_ID is the long alphanumeric string between `/d/` and the next `/`.
+
+## Google Docs Revision History
+
+To access historical revisions of a Google Doc:
+
+**Get revision list:**
+```bash
+curl -s "https://www.googleapis.com/drive/v3/files/${DOC_ID}/revisions?fields=revisions(id,modifiedTime,exportLinks,lastModifyingUser(displayName))" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "x-goog-user-project: ${GOOGLE_QUOTA_PROJECT}"
+```
+
+**Export a specific revision (use exportLinks, NOT the export endpoint):**
+```bash
+# IMPORTANT: The Drive export endpoint ignores the revision parameter for Google Docs!
+# You MUST use the exportLinks from the revision metadata instead.
+
+# Get the exportLink for a specific revision
+EXPORT_URL=$(curl -s "https://www.googleapis.com/drive/v3/files/${DOC_ID}/revisions/${REV_ID}?fields=exportLinks" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq -r '.exportLinks["text/plain"]')
+
+# Download using that link
+curl -sL "$EXPORT_URL" -H "Authorization: Bearer ${ACCESS_TOKEN}"
+```
+
+**IMPORTANT CAVEATS:**
+- The `revision` parameter on `/export` is IGNORED for Google Docs - it always returns current content
+- You MUST use the `exportLinks` URLs from the revisions API to get historical content
+- Rate limiting is aggressive - add 2-3 second delays between revision downloads
+- Documents with multiple tabs: the text export only includes the main tab
+- Deleted tabs: revisions may reference content from tabs that no longer exist
 
 ## Notes
 
