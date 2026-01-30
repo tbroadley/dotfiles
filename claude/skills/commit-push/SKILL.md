@@ -163,7 +163,20 @@ fi
 
 If no workflows exist, skip waiting for CI and proceed to step 9.
 
-**If workflows exist**, monitor CI status:
+**Before waiting for CI, check for merge conflicts:**
+
+Merge conflicts prevent CI from running. Check immediately after pushing:
+
+```bash
+gh pr view --json mergeable,mergeStateStatus
+```
+
+- If `mergeable` is `false` or `mergeStateStatus` is `DIRTY`, there are merge conflicts
+- If `mergeable` is `UNKNOWN`, wait a few seconds and check again (GitHub is still computing)
+
+**If merge conflicts exist**, resolve them before waiting for CI (see "If CI cannot run" below).
+
+**If no conflicts**, monitor CI status:
 
 ```bash
 gh pr checks --watch
