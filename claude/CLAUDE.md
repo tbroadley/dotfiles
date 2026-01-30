@@ -2,6 +2,7 @@
 
 ## Git
 - When working in a git worktree, change to the worktree directory rather than running commands from the main repo—this avoids confusion about which files are being modified
+- When you need to clone a repo, create a `.clones` directory under the current working directory and clone into it (e.g., `.clones/some-repo`)
 
 ## GitHub
 - Prefix all GitHub comments (PR reviews, issue comments, discussions) with "Claude Code:"
