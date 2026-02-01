@@ -471,6 +471,14 @@ cp -r "$SCRIPT_DIR/claude/"* "$CLAUDE_DIR/"
 chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 echo "Claude Code settings, hooks, and skills installed"
 
+# Configure Gemini CLI settings
+GEMINI_DIR="$HOME/.gemini"
+mkdir -p "$GEMINI_DIR"
+if [ -d "$SCRIPT_DIR/gemini" ]; then
+  ln -sf "$SCRIPT_DIR/gemini/settings.json" "$GEMINI_DIR/settings.json"
+  echo "Gemini CLI settings installed"
+fi
+
 # Configure Claude Code authentication if token is available
 if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
   if [ -f "$HOME/.claude.json" ]; then

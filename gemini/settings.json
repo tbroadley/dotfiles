@@ -1,0 +1,20 @@
+{
+  "security": {
+    "auth": {
+      "selectedType": "oauth-personal"
+    },
+    "enablePermanentToolApproval": true,
+    "folderTrust": {
+      "enabled": true
+    }
+  },
+  "general": {
+    "previewFeatures": true
+  },
+  "ui": {
+    "theme": "Default"
+  },
+  "tools": {
+    "autoAccept": true
+  }
+}
