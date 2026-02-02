@@ -469,6 +469,36 @@ CLAUDE_DIR="$HOME/.claude"
 mkdir -p "$CLAUDE_DIR"
 cp -r "$SCRIPT_DIR/claude/"* "$CLAUDE_DIR/"
 chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
+
+# Install external skills from GitHub repos
+install_external_skills() {
+  local skills_dir="$CLAUDE_DIR/skills"
+  mkdir -p "$skills_dir"
+
+  # List of external skills: "repo:skill_path:local_name"
+  local external_skills=(
+    "sjawhar/pivot:skills/writing-pivot-stages:writing-pivot-stages"
+  )
+
+  for spec in "${external_skills[@]}"; do
+    IFS=':' read -r repo skill_path local_name <<< "$spec"
+    local target_dir="$skills_dir/$local_name"
+    mkdir -p "$target_dir"
+
+    if gh api "repos/$repo/contents/$skill_path/SKILL.md" 2>/dev/null | jq -r '.content' | base64 -d > "$target_dir/SKILL.md" 2>/dev/null; then
+      echo "Installed skill: $local_name (from $repo)"
+    else
+      echo "Warning: Failed to install skill $local_name from $repo"
+    fi
+  done
+}
+
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  install_external_skills
+else
+  echo "Skipping external skills (gh CLI not authenticated)"
+fi
+
 echo "Claude Code settings, hooks, and skills installed"
 
 # Configure Gemini CLI settings
