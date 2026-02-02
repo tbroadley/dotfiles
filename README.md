@@ -40,3 +40,48 @@ The `devc` function automatically forwards `CLAUDE_CODE_OAUTH_TOKEN` to containe
 ### Refreshing the token
 
 When the token expires (after ~1 year), run `claude setup-token` again and update your `~/.zshrc`.
+
+## URL Listener Service
+
+The `url-listener` is an HTTP server (port 7077) that enables dev containers to interact with the host machine:
+
+- **Open URLs** in the host's default browser
+- **Open files/directories** in Cursor attached to the container
+- **Clipboard forwarding** (pbcopy/pbpaste) between container and host
+- **Wispr dictionary** additions from within containers
+
+### Setup
+
+The service is managed by launchd and starts automatically on login:
+
+```bash
+# Install the LaunchAgent (one-time setup)
+cp ~/dotfiles/launchd/com.thomas.url-listener.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.thomas.url-listener.plist
+```
+
+### Managing the service
+
+```bash
+# Check status
+launchctl list | grep url-listener
+
+# View logs
+tail -f ~/Library/Logs/url-listener.log
+
+# Restart the service
+launchctl kickstart -k gui/$(id -u)/com.thomas.url-listener
+
+# Stop the service
+launchctl unload ~/Library/LaunchAgents/com.thomas.url-listener.plist
+
+# Start the service
+launchctl load ~/Library/LaunchAgents/com.thomas.url-listener.plist
+```
+
+### Health check
+
+```bash
+curl http://localhost:7077/health
+# Returns "OK" if running
+```

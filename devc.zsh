@@ -5,14 +5,8 @@ _devc_claude() {
 
     echo "Starting dev container..."
 
-    # Start URL listener restart immediately (host-side, independent of container)
-    {
-        local listener_pid
-        listener_pid=$(pgrep -f 'url-listener' 2>/dev/null)
-        [[ -n "$listener_pid" ]] && kill "$listener_pid" 2>/dev/null
-        ~/dotfiles/bin/url-listener &>/dev/null &
-        disown
-    } &
+    # Restart URL listener via launchd (host-side, independent of container)
+    launchctl kickstart -k gui/$(id -u)/com.thomas.url-listener &>/dev/null &
     local url_listener_pid=$!
 
     # Get GitHub token in background (gh CLI may take a moment)
@@ -112,19 +106,9 @@ devc() {
         echo "Starting dev container..."
     fi
 
-    # Start URL listener restart immediately (host-side, runs parallel with devcontainer up)
-    {
-        local listener_pid
-        listener_pid=$(pgrep -f 'url-listener' 2>/dev/null)
-        if [[ -n "$listener_pid" ]]; then
-            echo "Restarting URL listener..."
-            kill "$listener_pid" 2>/dev/null
-        else
-            echo "Starting URL listener..."
-        fi
-        ~/dotfiles/bin/url-listener &>/dev/null &
-        disown
-    } &
+    # Restart URL listener via launchd (host-side, runs parallel with devcontainer up)
+    echo "Restarting URL listener..."
+    launchctl kickstart -k gui/$(id -u)/com.thomas.url-listener &>/dev/null &
     local url_listener_pid=$!
 
     # Get GitHub token in background (gh CLI may take a moment)
