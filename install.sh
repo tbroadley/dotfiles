@@ -567,7 +567,9 @@ echo "Phase 2 installations completed"
 if [ -n "${GH_TOKEN:-}" ] && command -v claude >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   echo "Installing Claude Code plugins..."
   GITHUB_TOKEN="$GH_TOKEN" claude plugin marketplace add METR/eval-execution-claude 2>/dev/null || true
+  GITHUB_TOKEN="$GH_TOKEN" claude plugin marketplace add obra/superpowers-marketplace 2>/dev/null || true
   claude plugin install warehouse-query 2>/dev/null || true
+  claude plugin install superpowers@superpowers-marketplace 2>/dev/null || true
   echo "Claude Code plugins installed"
 fi
 
