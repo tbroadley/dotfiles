@@ -12,8 +12,6 @@ Summarize the user's GitHub activity for today (or a specified date), including 
 
 **GitHub Username:** tbroadley
 
-**Organizations/Owners to Check:** tbroadley, METR-org
-
 **Timezone:** PST (UTC-8)
 
 ## Workflow
@@ -62,14 +60,10 @@ gh api "repos/<owner>/<repo>/commits/<sha>" --jq '{additions: .stats.additions, 
 
 Find commits by the user that were pushed directly to the default branch (not via PR).
 
-**Step 1: Search for recent commits by the user in each organization:**
+**Step 1: Search for recent commits by the user across all of GitHub:**
 
 ```bash
-# Search commits by user in tbroadley repos
-gh search commits --author=tbroadley --author-date=">=$TARGET_DATE" --owner=tbroadley --json repository,sha,commit --limit 100
-
-# Search commits by user in METR-org repos
-gh search commits --author=tbroadley --author-date=">=$TARGET_DATE" --owner=METR-org --json repository,sha,commit --limit 100
+gh search commits --author=tbroadley --author-date=">=$TARGET_DATE" --json repository,sha,commit --limit 100
 ```
 
 **Step 2: For each commit, check if it's on the default branch and not from a PR:**
@@ -134,4 +128,3 @@ If the user asks for a summary of what the changes did (not just line counts), p
 - Handle pagination for repos/PRs with many commits
 - Large line counts on older PRs may indicate rebases/merges - note this in the output
 - If a repo doesn't exist or user doesn't have access, skip it gracefully
-- The user may ask to add additional organizations to check - update the Configuration section accordingly
