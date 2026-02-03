@@ -12,10 +12,7 @@ Summarize the user's GitHub activity for today (or a specified date), including 
 
 **GitHub Username:** tbroadley
 
-**Personal Repos to Check for Direct Commits:**
-- tbroadley/dotfiles
-- tbroadley/status-dashboard
-- tbroadley/experience-sampling
+**Organizations/Owners to Check:** tbroadley, METR-org
 
 **Timezone:** PST (UTC-8)
 
@@ -61,19 +58,48 @@ Then for each commit SHA:
 gh api "repos/<owner>/<repo>/commits/<sha>" --jq '{additions: .stats.additions, deletions: .stats.deletions}'
 ```
 
-### 3. Find Direct Commits
+### 3. Find Direct Commits to Main
 
-For each personal repo in the configuration, check for commits pushed today:
+Find commits by the user that were pushed directly to the default branch (not via PR).
+
+**Step 1: Search for recent commits by the user in each organization:**
 
 ```bash
-gh api "repos/<owner>/<repo>/commits?author=tbroadley&since=$START_UTC&until=$END_UTC" \
-  --jq '.[] | {sha: .sha[0:7], date: .commit.author.date, message: .commit.message | split("\n")[0]}'
+# Search commits by user in tbroadley repos
+gh search commits --author=tbroadley --author-date=">=$TARGET_DATE" --owner=tbroadley --json repository,sha,commit --limit 100
+
+# Search commits by user in METR-org repos
+gh search commits --author=tbroadley --author-date=">=$TARGET_DATE" --owner=METR-org --json repository,sha,commit --limit 100
 ```
 
-For each commit found, get line stats:
+**Step 2: For each commit, check if it's on the default branch and not from a PR:**
+
+```bash
+# Get the repo's default branch
+DEFAULT_BRANCH=$(gh api "repos/<owner>/<repo>" --jq '.default_branch')
+
+# Check if commit is on the default branch
+gh api "repos/<owner>/<repo>/commits/$DEFAULT_BRANCH" --jq '.sha' | grep -q "^${COMMIT_SHA:0:7}" && echo "on default branch"
+
+# Or check branches containing this commit
+gh api "repos/<owner>/<repo>/commits/<sha>/branches-where-head" --jq '.[].name' | grep -q "^$DEFAULT_BRANCH$"
+```
+
+**Step 3: Check if commit came from a merged PR (exclude these):**
+
+```bash
+# Search for PRs that contain this commit
+gh api "repos/<owner>/<repo>/commits/<sha>/pulls" --jq 'length'
+# If length > 0, this commit was part of a PR - exclude it
+```
+
+**Step 4: For qualifying direct commits, get line stats:**
+
 ```bash
 gh api "repos/<owner>/<repo>/commits/<sha>" --jq '{additions: .stats.additions, deletions: .stats.deletions}'
 ```
+
+Group results by repository for the summary.
 
 ### 4. Generate Summary
 
@@ -86,7 +112,7 @@ Present the results in a structured format:
 
 Note: For PRs spanning multiple days, indicate whether the +/- is for today's commits only or the total PR.
 
-**Direct Commits by Repo:**
+**Direct Commits to Main (by Repo):**
 | Repo | Commits | +/- |
 |------|---------|-----|
 | owner/repo | N | +X/-Y |
@@ -108,4 +134,4 @@ If the user asks for a summary of what the changes did (not just line counts), p
 - Handle pagination for repos/PRs with many commits
 - Large line counts on older PRs may indicate rebases/merges - note this in the output
 - If a repo doesn't exist or user doesn't have access, skip it gracefully
-- The user may ask to add additional repos to check - update the configuration accordingly
+- The user may ask to add additional organizations to check - update the Configuration section accordingly
