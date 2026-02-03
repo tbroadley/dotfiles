@@ -6,6 +6,7 @@
       "Bash",
       "Edit",
       "Write",
+      "Read(/opt/python/**)",
       "Read(~/dotfiles/**)",
       "Edit(~/dotfiles/**)",
       "Write(~/dotfiles/**)",
