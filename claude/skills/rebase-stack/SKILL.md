@@ -1,3 +1,9 @@
+---
+name: rebase-stack
+description: Use when working with stacked diffs (branch B based on branch A, which is based on main).
+user-invocable: true
+---
+
 # Rebase Stacked Diffs
 
 Use this skill when working with stacked diffs (Branch B based on Branch A, which is based on main).

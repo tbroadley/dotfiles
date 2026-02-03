@@ -41,6 +41,32 @@ The `devc` function automatically forwards `CLAUDE_CODE_OAUTH_TOKEN` to containe
 
 When the token expires (after ~1 year), run `claude setup-token` again and update your `~/.zshrc`.
 
+## Codex Configuration in Dev Containers
+
+The `install.sh` script configures Codex inside dev containers:
+
+- Installs a default config from `codex/config.toml` to `~/.codex/config.toml` (no approval prompts, workspace-write sandbox, network enabled).
+- Syncs Claude skills from `claude/skills` into `~/.codex/skills` via symlinks.
+
+Codex does not support Claude Code plugins. If you want plugin-like integrations, add MCP servers to `codex/config.toml` instead.
+On the host, running `install.sh` will also link `~/.codex/config.toml` to `~/dotfiles/codex/config.toml`.
+
+### Codex Auth Forwarding
+
+Codex can store auth in `~/.codex/auth.json` when `cli_auth_credentials_store = "file"` is set. The `devc` functions forward that file into containers if it exists on the host, so Codex works without re-auth prompts inside dev containers. See the Codex authentication docs for details about file-based storage and copying `auth.json` to headless environments.
+
+### Host Skills Symlink
+
+If you want Codex to use the Claude skills on your host machine, run this once:
+
+```bash
+mkdir -p ~/.codex/skills
+for d in ~/dotfiles/claude/skills/*; do
+  [ -d "$d" ] || continue
+  ln -sfn "$d" "$HOME/.codex/skills/$(basename "$d")"
+done
+```
+
 ## URL Listener Service
 
 The `url-listener` is an HTTP server (port 7077) that enables dev containers to interact with the host machine:

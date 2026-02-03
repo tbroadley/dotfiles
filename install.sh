@@ -501,6 +501,24 @@ fi
 
 echo "Claude Code settings, hooks, and skills installed"
 
+# Configure Codex settings + sync Claude skills into Codex
+CODEX_DIR="$HOME/.codex"
+mkdir -p "$CODEX_DIR"
+if [ -d "$SCRIPT_DIR/codex" ]; then
+  ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
+  echo "Codex config installed"
+fi
+
+if [ -d "$SCRIPT_DIR/claude/skills" ]; then
+  CODEX_SKILLS_DIR="$CODEX_DIR/skills"
+  mkdir -p "$CODEX_SKILLS_DIR"
+  for skill_dir in "$SCRIPT_DIR/claude/skills"/*; do
+    [ -d "$skill_dir" ] || continue
+    ln -sfn "$skill_dir" "$CODEX_SKILLS_DIR/$(basename "$skill_dir")"
+  done
+  echo "Codex skills synced from Claude"
+fi
+
 # Configure Gemini CLI settings
 GEMINI_DIR="$HOME/.gemini"
 mkdir -p "$GEMINI_DIR"

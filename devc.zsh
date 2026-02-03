@@ -28,6 +28,15 @@ _devc_claude() {
         exec_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
     fi
 
+    # Forward Codex auth cache if present on host
+    local codex_auth_file="$HOME/.codex/auth.json"
+    local codex_auth_b64=""
+    if [ -f "$codex_auth_file" ]; then
+        codex_auth_b64=$(base64 < "$codex_auth_file" | tr -d '\n')
+        up_opts+=(--remote-env "CODEX_AUTH_JSON_B64=$codex_auth_b64")
+        exec_opts+=(--remote-env "CODEX_AUTH_JSON_B64=$codex_auth_b64")
+    fi
+
     # Wait for gh token and add if present
     wait $gh_token_pid 2>/dev/null
     local gh_token=$(cat "$gh_token_file" 2>/dev/null)
@@ -62,6 +71,11 @@ _devc_claude() {
 
     echo "Setting up dotfiles..."
     devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
+        if [ -n "${CODEX_AUTH_JSON_B64:-}" ]; then
+            mkdir -p "$HOME/.codex"
+            echo "$CODEX_AUTH_JSON_B64" | base64 -d > "$HOME/.codex/auth.json"
+            chmod 600 "$HOME/.codex/auth.json"
+        fi
         if [ -d $HOME/dotfiles ]; then
             cd $HOME/dotfiles && git pull
         else
@@ -131,6 +145,15 @@ devc() {
         exec_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
     fi
 
+    # Forward Codex auth cache if present on host
+    local codex_auth_file="$HOME/.codex/auth.json"
+    local codex_auth_b64=""
+    if [ -f "$codex_auth_file" ]; then
+        codex_auth_b64=$(base64 < "$codex_auth_file" | tr -d '\n')
+        up_opts+=(--remote-env "CODEX_AUTH_JSON_B64=$codex_auth_b64")
+        exec_opts+=(--remote-env "CODEX_AUTH_JSON_B64=$codex_auth_b64")
+    fi
+
     # Wait for gh token and add if present
     wait $gh_token_pid 2>/dev/null
     local gh_token=$(cat "$gh_token_file" 2>/dev/null)
@@ -170,6 +193,11 @@ devc() {
 
     echo "Setting up dotfiles..."
     devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
+        if [ -n "${CODEX_AUTH_JSON_B64:-}" ]; then
+            mkdir -p "$HOME/.codex"
+            echo "$CODEX_AUTH_JSON_B64" | base64 -d > "$HOME/.codex/auth.json"
+            chmod 600 "$HOME/.codex/auth.json"
+        fi
         if [ -d $HOME/dotfiles ]; then
             cd $HOME/dotfiles && git pull
         else
