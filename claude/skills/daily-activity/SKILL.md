@@ -1,0 +1,111 @@
+---
+name: daily-activity
+description: Summarize daily GitHub activity including PRs and direct commits with line counts. Use when the user asks "what did I do today", "daily summary", "my GitHub activity", or similar.
+user-invocable: true
+---
+
+# Daily GitHub Activity Summary
+
+Summarize the user's GitHub activity for today (or a specified date), including pull requests and direct commits with line change counts.
+
+## Configuration
+
+**GitHub Username:** tbroadley
+
+**Personal Repos to Check for Direct Commits:**
+- tbroadley/dotfiles
+- tbroadley/status-dashboard
+- tbroadley/experience-sampling
+
+**Timezone:** PST (UTC-8)
+
+## Workflow
+
+### 1. Determine Date Range
+
+By default, summarize today's activity. The user may specify a different date.
+
+Convert the target date to UTC range for GitHub API queries:
+- PST date X = UTC date X 08:00:00 to UTC date X+1 07:59:59
+
+```bash
+# For today in PST
+# PST is UTC-8, so "today" in PST started at 08:00 UTC
+START_UTC=$(TZ=America/Los_Angeles date -v0H -v0M -v0S -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -d "today 00:00 PST" -u +%Y-%m-%dT%H:%M:%SZ)
+END_UTC=$(TZ=America/Los_Angeles date -v+1d -v0H -v0M -v0S -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -d "tomorrow 00:00 PST" -u +%Y-%m-%dT%H:%M:%SZ)
+```
+
+### 2. Find Pull Requests
+
+Search for PRs authored by the user that were updated within the date range:
+
+```bash
+gh search prs --author=tbroadley --updated=">=$TARGET_DATE" --json number,title,repository,createdAt,updatedAt --limit 50
+```
+
+For each PR found:
+1. Check if it was created today OR had commits pushed today
+2. Get the list of commits: `gh pr view <number> -R <repo> --json commits`
+3. Filter commits by date to identify which were pushed today
+4. Get line change stats
+
+**For PRs created today:** Report the total PR additions/deletions.
+
+**For PRs created earlier but with commits today:** Calculate line changes only for today's commits:
+```bash
+gh api repos/<owner>/<repo>/pulls/<number>/commits --paginate --jq '.[] | select(.commit.author.date >= "START_UTC" and .commit.author.date < "END_UTC") | .sha'
+```
+
+Then for each commit SHA:
+```bash
+gh api "repos/<owner>/<repo>/commits/<sha>" --jq '{additions: .stats.additions, deletions: .stats.deletions}'
+```
+
+### 3. Find Direct Commits
+
+For each personal repo in the configuration, check for commits pushed today:
+
+```bash
+gh api "repos/<owner>/<repo>/commits?author=tbroadley&since=$START_UTC&until=$END_UTC" \
+  --jq '.[] | {sha: .sha[0:7], date: .commit.author.date, message: .commit.message | split("\n")[0]}'
+```
+
+For each commit found, get line stats:
+```bash
+gh api "repos/<owner>/<repo>/commits/<sha>" --jq '{additions: .stats.additions, deletions: .stats.deletions}'
+```
+
+### 4. Generate Summary
+
+Present the results in a structured format:
+
+**Pull Requests:**
+| PR | Repository | Title | +/- |
+|----|------------|-------|-----|
+| #N | org/repo | Title | +X/-Y |
+
+Note: For PRs spanning multiple days, indicate whether the +/- is for today's commits only or the total PR.
+
+**Direct Commits by Repo:**
+| Repo | Commits | +/- |
+|------|---------|-----|
+| owner/repo | N | +X/-Y |
+
+Optionally list individual commits with their messages.
+
+**Totals:**
+- Total PRs with activity: N
+- Total direct commits: N
+- Total lines changed: +X/-Y
+
+### 5. Optional: Summarize Changes
+
+If the user asks for a summary of what the changes did (not just line counts), provide a brief description of each PR and group of commits based on their titles/messages.
+
+## Notes
+
+- Use `gh` CLI for all GitHub operations (not WebFetch)
+- Handle pagination for repos/PRs with many commits
+- Large line counts on older PRs may indicate rebases/merges - note this in the output
+- If a repo doesn't exist or user doesn't have access, skip it gracefully
+- The user may ask to add additional repos to check - update the configuration accordingly
