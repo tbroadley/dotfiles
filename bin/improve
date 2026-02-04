@@ -56,7 +56,7 @@ while true; do
 
     log "Checking for unseen tasks..."
 
-    NEW_TASKS=$(curl -s "https://api.todoist.com/rest/v2/tasks" \
+    NEW_TASKS=$(curl -s "https://api.todoist.com/api/v1/tasks" \
         -H "Authorization: Bearer $TODOIST_TOKEN" | \
         node -e "
 const seenTasks = new Set(\`$SEEN_TASKS\`.split('\n').filter(Boolean));
@@ -67,7 +67,8 @@ let data = '';
 process.stdin.on('data', chunk => data += chunk);
 process.stdin.on('end', () => {
     try {
-        const tasks = JSON.parse(data);
+        const response = JSON.parse(data);
+        const tasks = response.results || response;
         const newTasks = tasks
             .filter(t => !seenTasks.has(t.id))
             .filter(t => t.content.startsWith(repoPrefix) || t.content.startsWith(initialsPrefix))
@@ -99,7 +100,7 @@ For each task:
 1. Analyze if it's relevant to this repo ($(basename "$REPO_DIR"))
 2. If relevant: implement the task, commit with message referencing the task ID, push to remote
 3. After successful push, mark the task complete using:
-   curl -X POST \"https://api.todoist.com/rest/v2/tasks/{task_id}/close\" -H \"Authorization: Bearer \$TODOIST_TOKEN\"
+   curl -X POST \"https://api.todoist.com/api/v1/tasks/{task_id}/close\" -H \"Authorization: Bearer \$TODOIST_TOKEN\"
 4. If not relevant: skip silently
 
 Work autonomously. Do not ask for confirmation." 2>&1 | while IFS= read -r line; do
