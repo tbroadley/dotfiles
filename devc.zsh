@@ -112,13 +112,18 @@ _devc_claude() {
 devc() {
     local workspace="${PWD}"
     local rebuild_flag=""
+    local cmd_args=()
 
     if [[ "$1" == "--rebuild" || "$1" == "-r" ]]; then
         rebuild_flag="--remove-existing-container"
+        shift
         echo "Rebuilding dev container..."
     else
         echo "Starting dev container..."
     fi
+
+    # Remaining arguments are the command to run inside the container
+    cmd_args=("$@")
 
     # Restart URL listener via launchd (host-side, runs parallel with devcontainer up)
     echo "Restarting URL listener..."
@@ -218,18 +223,35 @@ devc() {
         fi
     '
 
-    echo "Entering container..."
-    devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" bash -c '
-        # Create a temporary rcfile that sources bashrc then activates venv
-        rcfile=$(mktemp)
-        cat > "$rcfile" << '\''RCEOF'\''
+    if [[ ${#cmd_args[@]} -gt 0 ]]; then
+        # Run specified command inside the container
+        echo "Running command in container: ${cmd_args[*]}"
+        local escaped_args=""
+        for arg in "${cmd_args[@]}"; do
+            escaped_args="$escaped_args '${arg//\'/\'\\\'\'}'"
+        done
+        devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" bash -c "
+            [ -f ~/.bashrc ] && . ~/.bashrc
+            set -a
+            [ -f .env ] && . .env
+            set +a
+            [ -f /opt/python/bin/activate ] && . /opt/python/bin/activate
+            $escaped_args
+        "
+    else
+        echo "Entering container..."
+        devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" bash -c '
+            # Create a temporary rcfile that sources bashrc then activates venv
+            rcfile=$(mktemp)
+            cat > "$rcfile" << '\''RCEOF'\''
 [ -f ~/.bashrc ] && . ~/.bashrc
 set -a
 [ -f .env ] && . .env
 set +a
 [ -f /opt/python/bin/activate ] && . /opt/python/bin/activate
 RCEOF
-        bash --rcfile "$rcfile"
-        rm -f "$rcfile"
-    '
+            bash --rcfile "$rcfile"
+            rm -f "$rcfile"
+        '
+    fi
 }
