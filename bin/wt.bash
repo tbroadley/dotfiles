@@ -126,11 +126,13 @@ EOF
     _WT_PREVIOUS_DIR="$old_dir"
 }
 
-# wtd - delete a git worktree
+# wtd - delete a git worktree and its backing branch
 # Usage: wtd [branch-name]
 #
 # wtd          - delete the current worktree (if inside .worktrees/)
 # wtd <branch> - delete the worktree for <branch>
+#
+# Also deletes the local branch that was backing the worktree.
 wtd() {
     local branch="$1"
 
@@ -144,6 +146,7 @@ wtd() {
     repo_root="${repo_root%/.git}"
 
     local worktree_dir
+    local branch_to_delete
 
     # If no branch specified, try to delete current worktree
     if [ -z "$branch" ]; then
@@ -173,6 +176,11 @@ wtd() {
         return 1
     fi
 
+    # Get the branch name from the worktree before deleting it
+    # The worktree list --porcelain output has: worktree <path>\nHEAD <sha>\nbranch <ref>
+    branch_to_delete=$(git worktree list --porcelain 2>/dev/null | \
+        awk -v wt="$worktree_dir" '/^worktree /{path=$2} /^branch /{if (path == wt) {sub(/^refs\/heads\//, "", $2); print $2}}')
+
     # If we're inside the worktree being deleted, cd to repo root first
     if [[ "$PWD" == "$worktree_dir"* ]]; then
         cd "$repo_root" || return 1
@@ -191,6 +199,15 @@ wtd() {
         rm -rf "$worktree_dir" && echo "Directory removed: $worktree_dir"
         # Also prune any stale worktree entries
         git worktree prune 2>/dev/null
+    fi
+
+    # Delete the backing branch if we found one and it's not a protected branch
+    if [ -n "$branch_to_delete" ] && [ "$branch_to_delete" != "main" ] && [ "$branch_to_delete" != "master" ]; then
+        if git branch -d "$branch_to_delete" 2>/dev/null; then
+            echo "Branch deleted: $branch_to_delete"
+        elif git branch -D "$branch_to_delete" 2>/dev/null; then
+            echo "Branch deleted (forced): $branch_to_delete"
+        fi
     fi
 }
 
