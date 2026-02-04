@@ -84,7 +84,7 @@ def refresh_dictionary() -> None:
         end tell
     end tell
     """
-    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    result = subprocess.run(["/usr/bin/osascript", "-e", script], capture_output=True, text=True)
     if result.returncode == 0 and "Refreshed" in result.stdout:
         print("Refreshed Wispr Flow dictionary")
     else:

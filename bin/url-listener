@@ -11,6 +11,7 @@ Default port: 7077
 
 import argparse
 import json
+import os
 import signal
 import subprocess
 import sys
@@ -20,6 +21,12 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
 CURSOR_CONTAINER_CONFIG_DIR = Path.home() / "Library/Application Support/Cursor/User/globalStorage/anysphere.remote-containers/nameConfigs"
+
+# Environment for launching GUI apps - launchd has minimal PATH
+GUI_ENV = {
+    **os.environ,
+    "PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+}
 
 
 def write_container_config(
@@ -51,7 +58,7 @@ class URLHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/open" and "url" in params:
             url = params["url"][0]
-            subprocess.run(["open", url], check=False)
+            subprocess.run(["/usr/bin/open", url], check=False)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
@@ -72,13 +79,13 @@ class URLHandler(BaseHTTPRequestHandler):
             config = json.dumps({"containerName": f"/{container_name}"})
             hex_config = config.encode().hex()
             if is_file:
-                cmd = ["cursor", "--new-window"]
+                cmd = ["/usr/local/bin/cursor", "--new-window"]
                 for p in paths:
                     cmd.extend(["--file-uri", f"vscode-remote://attached-container+{hex_config}{p}"])
-                subprocess.run(cmd, check=False)
+                subprocess.run(cmd, check=False, env=GUI_ENV)
             else:
                 uri = f"vscode-remote://attached-container+{hex_config}{paths[0]}"
-                subprocess.run(["cursor", "--new-window", "--folder-uri", uri], check=False)
+                subprocess.run(["/usr/local/bin/cursor", "--new-window", "--folder-uri", uri], check=False, env=GUI_ENV)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
@@ -107,7 +114,7 @@ class URLHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write((result.stdout + result.stderr).encode())
         elif parsed.path == "/paste":
-            result = subprocess.run(["pbpaste"], capture_output=True)
+            result = subprocess.run(["/usr/bin/pbpaste"], capture_output=True)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
@@ -126,7 +133,7 @@ class URLHandler(BaseHTTPRequestHandler):
         if parsed.path == "/copy":
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
-            subprocess.run(["pbcopy"], input=body, check=False)
+            subprocess.run(["/usr/bin/pbcopy"], input=body, check=False)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
