@@ -8,10 +8,6 @@
 - Prefix all GitHub comments (PR reviews, issue comments, discussions) with "Claude Code:"
 - Use `gh` CLI to fetch contents of GitHub repos (files, issues, PRs, etc.) instead of WebFetch
 - Don't assume GitHub usernames—look them up via `gh api repos/{owner}/{repo}/collaborators --jq '.[].login'`
-- `gh pr edit` often fails with "Projects (classic) deprecation" errors—use the API directly instead:
-  - Edit PR: `gh api repos/{owner}/{repo}/pulls/{number} -X PATCH -f body="..."`
-  - Add reviewer: `gh api repos/{owner}/{repo}/pulls/{number}/requested_reviewers -X POST -f "reviewers[]=username"`
-  - Add label: `gh api repos/{owner}/{repo}/issues/{number}/labels -f "labels[]=label-name"`
 
 ## Environment
 - AWS CLI: explicitly use production or staging profile

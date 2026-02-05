@@ -306,3 +306,21 @@ gh run watch
 - Prefix all GitHub comments with "Claude Code: "
 - If CI keeps failing after multiple attempts, report the issue to the user
 - The goal is green CI before considering the task complete (on a draft PR for feature branches, or on the commit for direct pushes to main)
+
+## GitHub API Workarounds
+
+`gh pr edit` often fails with "Projects (classic) deprecation" errors. Use the API directly instead:
+
+```bash
+# Edit PR body
+gh api repos/{owner}/{repo}/pulls/{number} -X PATCH -f body="..."
+
+# Add reviewer
+gh api repos/{owner}/{repo}/pulls/{number}/requested_reviewers -X POST -f "reviewers[]=username"
+
+# Add label
+gh api repos/{owner}/{repo}/issues/{number}/labels -f "labels[]=label-name"
+
+# Add assignee
+gh api repos/{owner}/{repo}/issues/{number}/assignees -f "assignees[]=username"
+```
