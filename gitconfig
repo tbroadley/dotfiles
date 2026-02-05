@@ -49,6 +49,7 @@
 	mm = "!f() { git fetch origin main:main && if git merge-base --is-ancestor main HEAD; then echo \"Already up-to-date with main\"; else git merge main && git push; fi; }; f"
 	pf = push --force-with-lease
 	pl = pull
+	plr = pull --rebase
 	ps = push
 	pst = push --tags
 	rb = rebase
