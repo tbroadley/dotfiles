@@ -58,9 +58,21 @@ Use this skill when the user:
 
 Base URL: `https://www.googleapis.com/drive/v3`
 
+**IMPORTANT: Shared Drives** - Always include these parameters on search/list calls to find files in Shared Drives:
+- `includeItemsFromAllDrives=true`
+- `supportsAllDrives=true`
+- `corpora=allDrives`
+
+And on single-file metadata calls, include `supportsAllDrives=true`.
+
 **List Recent Files**:
 ```bash
-curl -s "https://www.googleapis.com/drive/v3/files?pageSize=20&orderBy=modifiedTime%20desc" \
+curl -s -G "https://www.googleapis.com/drive/v3/files" \
+  --data-urlencode "pageSize=20" \
+  --data-urlencode "orderBy=modifiedTime desc" \
+  --data-urlencode "includeItemsFromAllDrives=true" \
+  --data-urlencode "supportsAllDrives=true" \
+  --data-urlencode "corpora=allDrives" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq '.files[] | {name, id, mimeType}'
 ```
 
@@ -69,12 +81,15 @@ curl -s "https://www.googleapis.com/drive/v3/files?pageSize=20&orderBy=modifiedT
 curl -s -G "https://www.googleapis.com/drive/v3/files" \
   --data-urlencode "q=name contains 'meeting notes'" \
   --data-urlencode "pageSize=20" \
+  --data-urlencode "includeItemsFromAllDrives=true" \
+  --data-urlencode "supportsAllDrives=true" \
+  --data-urlencode "corpora=allDrives" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}"
 ```
 
 **Get File Metadata**:
 ```bash
-curl -s "https://www.googleapis.com/drive/v3/files/{FILE_ID}?fields=*" \
+curl -s "https://www.googleapis.com/drive/v3/files/{FILE_ID}?fields=*&supportsAllDrives=true" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}"
 ```
 
@@ -149,6 +164,9 @@ ACCESS_TOKEN=$(google-oauth-token)
 curl -s -G "https://www.googleapis.com/drive/v3/files" \
   --data-urlencode "q=name contains 'project plan' and mimeType = 'application/vnd.google-apps.document'" \
   --data-urlencode "fields=files(id,name,modifiedTime,webViewLink)" \
+  --data-urlencode "includeItemsFromAllDrives=true" \
+  --data-urlencode "supportsAllDrives=true" \
+  --data-urlencode "corpora=allDrives" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}"
 ```
 
@@ -175,6 +193,9 @@ curl -s -G "https://www.googleapis.com/drive/v3/files" \
   --data-urlencode "orderBy=modifiedTime desc" \
   --data-urlencode "pageSize=10" \
   --data-urlencode "fields=files(id,name,modifiedTime)" \
+  --data-urlencode "includeItemsFromAllDrives=true" \
+  --data-urlencode "supportsAllDrives=true" \
+  --data-urlencode "corpora=allDrives" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}"
 ```
 
@@ -183,6 +204,9 @@ curl -s -G "https://www.googleapis.com/drive/v3/files" \
 curl -s -G "https://www.googleapis.com/drive/v3/files" \
   --data-urlencode "q=fullText contains 'quarterly review'" \
   --data-urlencode "fields=files(id,name,mimeType,webViewLink)" \
+  --data-urlencode "includeItemsFromAllDrives=true" \
+  --data-urlencode "supportsAllDrives=true" \
+  --data-urlencode "corpora=allDrives" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}"
 ```
 
