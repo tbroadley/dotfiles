@@ -8,6 +8,7 @@
 - Prefix all GitHub comments (PR reviews, issue comments, discussions) with "Claude Code:"
 - Use `gh` CLI to fetch contents of GitHub repos (files, issues, PRs, etc.) instead of WebFetch
 - Don't assume GitHub usernames—look them up via `gh api repos/{owner}/{repo}/collaborators --jq '.[].login'`
+- When asked to push to an existing PR, push to that PR's branch—don't create a new branch/PR
 
 ## Environment
 - AWS CLI: explicitly use production or staging profile
@@ -40,6 +41,7 @@
 ## Testing (pytest)
 - Don't use classes to group tests
 - Test through public APIs, not internal/private functions
+- Test integration paths end-to-end (e.g., env var → settings class → parsed value), not just downstream functions with pre-parsed args—this catches real bugs in parsing/wiring
 - Mock only at external boundaries (I/O, network, external libraries), not internal implementation details
 - Prefer real data structures over MagicMock for return values
 - Use `assert_called_once_with()` over `call_count` + `assert_any_call()`
