@@ -81,14 +81,34 @@ hawk transcripts <EVAL_SET_ID> --limit 10
 hawk transcripts <EVAL_SET_ID> --raw
 ```
 
+## Known Limitations
+
+- `hawk list samples` has a max `--limit` of 500 (API returns 422 for higher values)
+- `hawk transcript` and `hawk transcripts` time out on large eval files (100MB+), common with side-task evals that have thousands of samples × multiple epochs
+- `hawk list samples` does not index score values — the `score_value` field is often `None`
+
+## Prefer the Data Warehouse for Bulk Analysis
+
+For querying sample-level data across eval sets (scores, limits, errors, token counts), use the `warehouse-query` skill instead of downloading eval files from S3 via `inspect_ai.log.read_eval_log()`. The warehouse has `eval`, `sample`, `score`, and `message` tables. A SQL query takes seconds vs minutes/hours for large eval files.
+
+Example — find all samples that hit the working limit:
+```sql
+SELECT s.id AS sample_id, s.epoch, e.eval_set_id, e.model, e.task_args
+FROM sample s
+JOIN eval e ON s.eval_pk = e.pk
+WHERE e.eval_set_id = 'eval-set-xxx'
+  AND s."limit" = 'working';
+```
+
+Use `hawk transcript <uuid>` only when you need the full conversation transcript for a specific sample.
+
 ## Workflow
 
 1. Run `hawk list eval-sets` to see available eval sets
 2a. Run `hawk list evals <EVAL_SET_ID>` to see available evaluations
-2b. or run `hawk list samples <EVAL_SET_ID>` to find samples of interest
-3a. Run `hawk transcript <uuid>` to get full details on a single sample
-3b. or run `hawk transcripts <eval_set_id> --output-dir ./transcripts` to download all
-4. Read and analyze the transcript(s) to understand the agent's behavior
+2b. or run `hawk list samples <EVAL_SET_ID>` to find samples of interest (max 500 per request)
+3. For bulk sample-level analysis (scores, limits, errors), use `warehouse-query` skill with SQL
+4. Run `hawk transcript <uuid>` only for full conversation details on individual samples
 
 ## API Environments
 
