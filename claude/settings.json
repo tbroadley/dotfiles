@@ -9,6 +9,7 @@
       "Read(//opt/python/**)",
       "Read(//tmp/**)",
       "Read(~/.cache/uv/**)",
+      "Read(~/.local/share/uv/tools/**)",
       "Read(~/dotfiles/**)",
       "Edit(~/dotfiles/**)",
       "Write(~/dotfiles/**)",
