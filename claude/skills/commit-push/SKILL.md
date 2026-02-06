@@ -146,8 +146,28 @@ gh pr view --json number,url,state,isDraft 2>/dev/null
   gh api repos/{owner}/{repo}/issues/{pr_number}/labels -f "labels[]=okr-..."
   ```
 
-**If PR exists but is not a draft:**
-- Continue with the existing PR
+**If PR already exists:**
+- Update the PR title and description to reflect all changes on the branch (not just the latest commit):
+  ```bash
+  # Review all commits on the branch vs base
+  git log origin/$base_branch..HEAD --oneline
+  git diff origin/$base_branch..HEAD --stat
+
+  # Update the PR title and body via the API
+  gh api repos/{owner}/{repo}/pulls/{pr_number} -X PATCH \
+    -f title="<concise title reflecting all branch changes>" \
+    -f body="$(cat <<'EOF'
+  ## Summary
+  <1-3 bullet points covering all changes on the branch>
+
+  ## Test plan
+  <how the changes were validated>
+  EOF
+  )"
+  ```
+- The title should be concise (<70 chars) and reflect the overall purpose of the branch
+- The body should summarize all changes, not just the latest push
+- Preserve any existing sections added by reviewers (e.g., deployment notes)
 
 ### 8. Wait for CI and Ensure It Passes (Feature Branches Only)
 
