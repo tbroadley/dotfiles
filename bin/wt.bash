@@ -10,17 +10,87 @@
 # Track the previous worktree directory for "wt -"
 _WT_PREVIOUS_DIR=""
 
+# Repair a worktree's .git file and the main repo's gitdir pointer when
+# absolute paths are stale (e.g., repo was created on host but accessed in a
+# dev container at a different mount point).
+_wt_repair_worktree() {
+    local worktree_dir="$1"
+    local repo_git_dir="$2"  # e.g., /home/user/app/.git
+
+    local git_file="$worktree_dir/.git"
+    [ -f "$git_file" ] || return 1
+
+    # Read current gitdir pointer from the worktree's .git file
+    local current_gitdir
+    current_gitdir="$(cat "$git_file" 2>/dev/null)" || return 1
+    current_gitdir="${current_gitdir#gitdir: }"
+
+    # Extract the worktree name from the path (last component of gitdir path)
+    local wt_name="${current_gitdir##*/}"
+    [ -n "$wt_name" ] || return 1
+
+    local correct_gitdir="$repo_git_dir/worktrees/$wt_name"
+
+    # Fix the worktree's .git file if the path is wrong
+    if [ "$current_gitdir" != "$correct_gitdir" ]; then
+        echo "gitdir: $correct_gitdir" > "$git_file"
+    fi
+
+    # Fix the main repo's gitdir file pointing back to the worktree
+    local repo_gitdir_file="$repo_git_dir/worktrees/$wt_name/gitdir"
+    if [ -f "$repo_gitdir_file" ]; then
+        local current_back_ref
+        current_back_ref="$(cat "$repo_gitdir_file" 2>/dev/null)"
+        local correct_back_ref="$worktree_dir/.git"
+        if [ "$current_back_ref" != "$correct_back_ref" ]; then
+            echo "$correct_back_ref" > "$repo_gitdir_file"
+        fi
+    fi
+}
+
+# Find the main repo root, even from inside a broken worktree.
+# Falls back to directory traversal when git rev-parse fails.
+_wt_find_repo_root() {
+    # Try git first (works when git paths are valid)
+    local repo_root
+    if repo_root="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" && [ -d "$repo_root" ]; then
+        echo "${repo_root%/.git}"
+        return 0
+    fi
+
+    # Fallback: walk up from PWD looking for a directory with both .git/ and .worktrees/
+    # This handles the case where we're inside a broken worktree whose .git file
+    # points to a stale host path
+    local dir="$PWD"
+    while [ "$dir" != "/" ]; do
+        if [ -d "$dir/.git" ] && [ -d "$dir/.worktrees" ]; then
+            echo "$dir"
+            return 0
+        fi
+        dir="${dir%/*}"
+        [ -z "$dir" ] && dir="/"
+    done
+
+    return 1
+}
+
 wt() {
     local branch="$1"
 
     # Get the main repo root (not worktree root)
     local repo_root
-    repo_root="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || {
+    repo_root="$(_wt_find_repo_root)" || {
         echo "Error: not in a git repository"
         return 1
     }
-    # --git-common-dir returns the .git directory, strip it
-    repo_root="${repo_root%/.git}"
+
+    # If git rev-parse failed but we found repo root by directory traversal,
+    # we're likely in a broken worktree—repair it so git commands work
+    if ! git rev-parse --git-common-dir &>/dev/null; then
+        if [ -d "$repo_root/.git" ]; then
+            _wt_repair_worktree "$PWD" "$repo_root/.git"
+        fi
+    fi
 
     # wt with no args: list worktrees
     if [ -z "$branch" ]; then
@@ -46,6 +116,10 @@ wt() {
 
     # If worktree already exists in .worktrees/, cd into it
     if [ -d "$worktree_dir" ]; then
+        # Repair stale gitdir paths (e.g., created on host, accessed in container)
+        if [ -d "$repo_root/.git" ]; then
+            _wt_repair_worktree "$worktree_dir" "$repo_root/.git"
+        fi
         local old_dir="$PWD"
         cd "$worktree_dir" || return 1
         _WT_PREVIOUS_DIR="$old_dir"
@@ -138,12 +212,17 @@ wtd() {
 
     # Get the main repo root (not worktree root)
     local repo_root
-    repo_root="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || {
+    repo_root="$(_wt_find_repo_root)" || {
         echo "Error: not in a git repository"
         return 1
     }
-    # --git-common-dir returns the .git directory, strip it
-    repo_root="${repo_root%/.git}"
+
+    # Repair current worktree if git paths are broken
+    if ! git rev-parse --git-common-dir &>/dev/null; then
+        if [ -d "$repo_root/.git" ]; then
+            _wt_repair_worktree "$PWD" "$repo_root/.git"
+        fi
+    fi
 
     local worktree_dir
     local branch_to_delete
@@ -213,9 +292,7 @@ wtd() {
 
 # Helper to get main repo root (works from inside worktrees)
 _wt_repo_root() {
-    local repo_root
-    repo_root="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
-    echo "${repo_root%/.git}"
+    _wt_find_repo_root
 }
 
 # Helper to get branch list for completion
