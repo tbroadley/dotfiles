@@ -158,6 +158,62 @@ dcr() {
     devc --rebuild "$@"
 }
 
+# start - spin up a dev container and start claude on a task
+# Usage: start <project> <task description...>
+# Example: start mon "fix the flaky monitoring test"
+# Requires ANTHROPIC_API_KEY in environment (e.g. .zshrc.local)
+start() {
+    if [[ $# -lt 2 ]]; then
+        echo "Usage: start <project> <task description...>"
+        return 1
+    fi
+
+    local project="$1"; shift
+    local task="$*"
+
+    # Generate branch name via Anthropic API (Haiku for speed)
+    echo "Generating branch name..."
+    local branch
+    branch=$(curl -s https://api.anthropic.com/v1/messages \
+        -H "x-api-key: $ANTHROPIC_API_KEY" \
+        -H "anthropic-version: 2023-06-01" \
+        -H "content-type: application/json" \
+        -d "$(jq -n --arg task "$task" '{
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 30,
+            messages: [{role: "user", content: ("Output ONLY a short kebab-case git branch name. No quotes, no prefix. Task: " + $task)}]
+        }')" | jq -r '.content[0].text')
+
+    if [[ -z "$branch" || "$branch" == "null" ]]; then
+        echo "Failed to generate branch name"
+        return 1
+    fi
+
+    # Clean up any whitespace/quotes the model might add
+    branch=$(echo "$branch" | tr -d '"'\'' \n' | head -c 60)
+    echo "Branch: $branch"
+
+    # Resolve project directory with zoxide
+    local dir
+    dir=$(zoxide query "$project") || { echo "Project not found: $project"; return 1; }
+    echo "Project: $dir"
+    cd "$dir" || return 1
+
+    # Start dev container (setup only, don't enter)
+    dc --no-enter || return 1
+
+    # Exec into container: create worktree and start claude with the task
+    devcontainer exec --workspace-folder "$PWD" \
+        --remote-env "START_BRANCH=$branch" \
+        --remote-env "START_TASK=$task" \
+        bash -c '
+            [ -f ~/.bashrc ] && . ~/.bashrc
+            set -a; [ -f .env ] && . .env; set +a
+            [ -f /opt/python/bin/activate ] && . /opt/python/bin/activate
+            wt "$START_BRANCH" && claude "$START_TASK"
+        '
+}
+
 # wt - git worktree helper with completion
 source ~/dotfiles/bin/wt.bash
 

@@ -3,9 +3,25 @@ devc() {
     local rebuild_flag=""
     local cmd_args=()
 
-    if [[ "$1" == "--rebuild" || "$1" == "-r" ]]; then
-        rebuild_flag="--remove-existing-container"
-        shift
+    local no_enter=false
+
+    while [[ "$1" == -* ]]; do
+        case "$1" in
+            --rebuild|-r)
+                rebuild_flag="--remove-existing-container"
+                shift
+                ;;
+            --no-enter|-n)
+                no_enter=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if [[ -n "$rebuild_flag" ]]; then
         echo "Rebuilding dev container..."
     else
         echo "Starting dev container..."
@@ -123,6 +139,11 @@ devc() {
             echo "[ -f \$HOME/.devcontainer_env ] && . \$HOME/.devcontainer_env" >> "$HOME/.bashrc"
         fi
     '
+
+    if [[ "$no_enter" == true ]]; then
+        echo "Container ready (--no-enter)."
+        return 0
+    fi
 
     if [[ ${#cmd_args[@]} -gt 0 ]]; then
         # Run specified command inside the container
