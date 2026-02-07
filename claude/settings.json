@@ -1,7 +1,6 @@
 {
   "cleanupPeriodDays": 999999,
   "permissions": {
-    "additionalDirectories": ["~/dotfiles"],
     "allow": [
       "Bash",
       "Edit",
@@ -44,6 +43,9 @@
       "Bash(mkfs:*)",
       "Bash(truncate:*)",
       "Bash(sudo:*)"
+    ],
+    "additionalDirectories": [
+      "~/dotfiles"
     ]
   },
   "model": "opus",
@@ -76,6 +78,8 @@
     "command": "cat >/dev/null; R=$(git config --get remote.origin.url 2>/dev/null | sed -E 's#^https?://[^@]+@github\\.com/##; s#^(https?://|git@)?github\\.com[/:]##; s#\\.git$##'); B=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); [ -n \"$R\" ] && echo \"$R $B\" || echo \"(no git remote)\""
   },
   "enabledPlugins": {
-    "warehouse-query@metr-eval-execution": true
+    "warehouse-query@metr-eval-execution": true,
+    "hugging-face-cli@huggingface-skills": true,
+    "hugging-face-datasets@huggingface-skills": true
   }
 }
