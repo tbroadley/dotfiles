@@ -29,6 +29,9 @@ export PATH="$PATH:$HOME/.orbstack/bin"
 # Local binaries (apf, etc.)
 export PATH="$HOME/.local/bin:$PATH"
 
+# Dotfiles scripts (iterate)
+export PATH="$HOME/dotfiles/bin:$PATH"
+
 # Aliases
 alias c=clear
 alias d=docker
