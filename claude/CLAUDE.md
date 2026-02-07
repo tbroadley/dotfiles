@@ -20,7 +20,6 @@
 ## Environment
 - AWS CLI: explicitly use production or staging profile
 - Use `uv` for Python dependency management, not `pip`. Use `uv pip install`, `uv add`, `uv run`, etc.
-- HuggingFace repos: include the repo ID (e.g., `org/repo-name`) in the repo's `CLAUDE.md` so it's discoverable for CLI operations
 
 ## Iteration Speed
 - If a script takes more than a few seconds to run, optimize it before running it repeatedly
