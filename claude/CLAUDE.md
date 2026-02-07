@@ -1,5 +1,12 @@
 # Global Rules
 
+## Autonomy & Verification Loops
+- At the start of every non-trivial task, establish a **verification loop** — a command or check you can run repeatedly to confirm your work is correct (e.g., `pytest path/to/tests`, `bash script.sh && echo OK`, `python -c "import module"`, checking output matches expected).
+- If the user hasn't provided a verification method, **ask them** what command or check you should use to verify success. Do this once, upfront, during planning — not mid-implementation.
+- Once you have a verification loop: **use it autonomously**. Run it after each significant change. If it fails, diagnose and fix without asking the user. Loop until it passes.
+- Do NOT stop to ask "does this look right?" or "should I continue?" — verify with the loop instead. Only stop for genuinely ambiguous decisions or destructive actions.
+- If you hit a problem you can't resolve after 2-3 attempts, then ask for help — but explain what you tried.
+
 ## Git
 - When working in a git worktree, change to the worktree directory rather than running commands from the main repo—this avoids confusion about which files are being modified
 - When you need to clone a repo, create a `.clones` directory under the current working directory and clone into it (e.g., `.clones/some-repo`)
