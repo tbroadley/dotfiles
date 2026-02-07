@@ -115,14 +115,7 @@ remove_from_rc() {
 # Aliases (work in both shells)
 add_to_rc "alias b=basedpyright" "alias b=basedpyright"
 add_to_rc "claude()" 'claude() { ANTHROPIC_API_KEY= ANTHROPIC_BASE_URL= command claude "$@"; }'
-add_to_rc "alias d=dvc" "alias d=dvc"
 add_to_rc "alias dotfiles=" "alias dotfiles='git -C ~/dotfiles pull && ~/dotfiles/install.sh && exec \$SHELL'"
-add_to_rc "alias dpl=" "alias dpl='dvc pull'"
-add_to_rc "alias dps=" "alias dps='dvc push'"
-add_to_rc "alias dr=" "alias dr='dvc repro'"
-add_to_rc "alias dco=" "alias dco='dvc checkout'"
-add_to_rc "alias dcof=" "alias dcof='dvc checkout --force'"
-add_to_rc "alias dplf=" "alias dplf='dvc pull --force'"
 add_to_rc "alias g=git" "alias g=git"
 add_to_rc "alias ppl=" "alias ppl='pivot pull'"
 add_to_rc "alias pps=" "alias pps='pivot push'"

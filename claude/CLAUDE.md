@@ -12,6 +12,8 @@
 
 ## Environment
 - AWS CLI: explicitly use production or staging profile
+- Use `uv` for Python dependency management, not `pip`. Use `uv pip install`, `uv add`, `uv run`, etc.
+- Use `huggingface-cli` (`hf`) for HuggingFace operations, not web fetching or raw API calls
 
 ## Iteration Speed
 - If a script takes more than a few seconds to run, optimize it before running it repeatedly

@@ -5,13 +5,6 @@ bindkey "^[[B" history-beginning-search-forward
 # Homebrew
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
-# pnpm
-export PNPM_HOME="$HOME/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-
 # nvm
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
@@ -33,22 +26,16 @@ export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"
 # OrbStack
 export PATH="$PATH:$HOME/.orbstack/bin"
 
-# Antigravity
-export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
-
 # Local binaries (apf, etc.)
 export PATH="$HOME/.local/bin:$PATH"
 
 # Aliases
 alias c=clear
 alias d=docker
-alias f='pnpm -w fmt && pnpm -w lint'
 alias g=git
 alias k=kubectl
 alias kc='kubectl config use-context'
-alias p=pnpm
 alias psa='dvc push && git push'
-alias t='pnpm -w typecheck'
 alias tf=terraform
 alias v=vim
 # Claude wrapper functions that warn if running outside dev container in a dir with devcontainer setup
@@ -88,22 +75,6 @@ setopt prompt_subst
 RPROMPT='${vcs_info_msg_0_}'
 zstyle ':vcs_info:git:*' formats '%b'
 PROMPT='%1~ %# '
-
-# Docker helper functions
-ds() {
-    docker start $1
-}
-dsr() {
-    ds "$(docker ps -aq --filter=label=runId=$1)"
-}
-de() {
-    ds $1
-    docker exec -it $1 bash
-}
-der() {
-    dsr $1
-    de "$(docker ps -aq --filter=label=runId=$1)"
-}
 
 # Run install.sh in all dev containers (parallel)
 dotfiles-sync() {

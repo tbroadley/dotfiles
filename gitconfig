@@ -17,12 +17,10 @@
 	br = branch -r
 	cam = commit -am
 	cb = checkout -b
-	cl = "!f() { git clone git@github.com:${1}/${2} $HOME/Documents/src/${2}; }; f"
 	cm = commit -m
 	cmt = commit --all --message "cmt"
 	co = checkout
 	co-remote = "!f() { git fetch ${1} ${2} && git checkout --track remotes/${1}/${2}; }; f"
-	com = checkout master
 	cor = "!f() { git co origin/${1}; }; f"
 	cp = cherry-pick
 	cpa = cherry-pick --abort
@@ -35,9 +33,6 @@
 	dsh = "!f() { if [ -z ${1} ]; then git diff --stat HEAD; else git diff --stat HEAD~${1}; fi; }; f"
 	ec = config --edit --global
 	f = fetch
-	fixb = "!f() { git b ${1}; git reset --hard HEAD~${2} && git co ${1}; }; f"
-	fixup = "!f() { CURRBRANCH=`git rev-parse --abbrev-ref HEAD`; RESETTO=`git merge-base master ${CURRBRANCH}`; COMMITMSG=`git rev-list --format=%B master..${CURRBRANCH} | tail -2`; git reset ${RESETTO}; git add .; git commit -m \"${COMMITMSG}\"; }; f"
-	ghc = "!f() { git clone git@github.com:${1}.git; }; f"
 	gone = ! "git checkout main && git pull && git branch --format '%(refname:short) %(upstream:track)' | awk '$2 == \"[gone]\" {print $1}' | xargs -r git branch -D"
 	i = init
 	l = log
@@ -64,7 +59,6 @@
 	rvc = revert --continue
 	rvh = revert HEAD
 	s = status
-	smu = "!f() { git submodule update --recursive --remote && git commit --all --message 'Update submodules'; }; f"
 	st = stash
 	stp = stash pop
 	sync = "!f() { git pull && git push; }; f"
