@@ -180,7 +180,10 @@ PROMPT
                     content.filter(c => c.type === 'tool_use').forEach(c => {
                         console.error('[Tool] ' + c.name + ': ' + JSON.stringify(c.input).substring(0, 200));
                     });
-                    content.filter(c => c.type === 'text').map(c => c.text).join('') || ''" "$line" 2>/dev/null || true
+                    content.filter(c => c.type === 'text').forEach(c => {
+                        if (c.text) console.error(c.text);
+                    });
+                    ''" "$line" 2>/dev/null || true
                 ;;
             user)
                 node -pe "
@@ -224,7 +227,7 @@ append_to_cumulative() {
         echo "---"
         echo "$summary"
         if [[ -n "$fix_result" ]]; then
-            echo "Fix agent result: ${fix_result:0:500}"
+            echo "Fix agent result: ${fix_result:0:2000}"
         fi
     } >> "$CUMULATIVE_LOG"
 }
