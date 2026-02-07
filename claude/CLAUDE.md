@@ -20,7 +20,6 @@
 ## Environment
 - AWS CLI: explicitly use production or staging profile
 - Use `uv` for Python dependency management, not `pip`. Use `uv pip install`, `uv add`, `uv run`, etc.
-- Use `huggingface-cli` (`hf`) for HuggingFace operations, not web fetching or raw API calls
 
 ## Iteration Speed
 - If a script takes more than a few seconds to run, optimize it before running it repeatedly
@@ -58,27 +57,3 @@
 - Don't be defensive in test assertions: use direct access (`result["value"]`) instead of `.get()` with defaults—if it fails, the test should fail
 - Don't add comments to tests—the test name and assertions should be self-explanatory
 - When exact counts are expected, use exact assertions (`assert len(items) == 1`) not loose ones (`assert len(items) >= 1`)
-
-## DVC (Data Version Control)
-- Track large generated/processed data files with DVC (`dvc add`), not git
-- After modifying `dvc.yaml`: `dvc repro` then `dvc push` before committing
-
-## Pivot (Pipeline Management)
-- Similar to DVC but with programmatic stage registration via `pipeline.py`
-- After modifying pipeline stages or data: `pivot run` then `pivot push` before committing
-
-## Research Engineering
-
-### Validate Before Scaling
-- ALWAYS run on a tiny sample first (N=5-10) and inspect the outputs yourself before scaling up
-- If a script will take >30 seconds, first run a 5-second version and verify results look reasonable
-- Add `--limit N` or `--dry-run` flags to scripts that process large datasets
-- Check sample outputs for obvious problems: repeated text, empty values, wrong format, garbled content
-- Only proceed to full-scale runs after confirming the small sample looks correct
-
-### Be Skeptical (Null Hypothesis: Your Code Is Wrong)
-- Assume generated data is garbage until you've inspected samples and confirmed otherwise
-- When results look "too good" or "too clean", investigate—they're probably wrong
-- Print descriptive statistics (min, max, mean, distribution) and check for anomalies
-- Before reporting results, actively try to find bugs that would invalidate them
-- Don't trust that code works just because it runs without errors—verify the outputs make sense
