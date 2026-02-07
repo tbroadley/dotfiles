@@ -57,6 +57,12 @@ devc() {
         exec_opts+=(--remote-env "GH_TOKEN=$gh_token")
     fi
 
+    # Check if container already exists (to know if we need dotfiles setup)
+    local container_existed=false
+    if docker ps -a -q --filter "label=devcontainer.local_folder=$workspace" | grep -q .; then
+        container_existed=true
+    fi
+
     if ! devcontainer up \
         --workspace-folder "$workspace" \
         "${up_opts[@]}" \
@@ -85,7 +91,7 @@ devc() {
         fi
     fi
 
-    if [[ -n "$rebuild_flag" ]]; then
+    if [[ -n "$rebuild_flag" || "$container_existed" == "false" ]]; then
         echo "Setting up dotfiles..."
         devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
             if [ -d $HOME/dotfiles ]; then
