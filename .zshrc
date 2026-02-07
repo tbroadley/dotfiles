@@ -199,19 +199,24 @@ start() {
     echo "Project: $dir"
     cd "$dir" || return 1
 
-    # Start dev container (setup only, don't enter)
-    dc --no-enter || return 1
+    if [ -d "$dir/.devcontainer" ]; then
+        # Start dev container (setup only, don't enter)
+        dc --no-enter || return 1
 
-    # Exec into container: create worktree and start claude with the task
-    devcontainer exec --workspace-folder "$PWD" \
-        --remote-env "START_BRANCH=$branch" \
-        --remote-env "START_TASK=$task" \
-        bash -c '
-            [ -f ~/.bashrc ] && . ~/.bashrc
-            set -a; [ -f .env ] && . .env; set +a
-            [ -f /opt/python/bin/activate ] && . /opt/python/bin/activate
-            wt "$START_BRANCH" && claude "$START_TASK"
-        '
+        # Exec into container: create worktree and start claude with the task
+        devcontainer exec --workspace-folder "$PWD" \
+            --remote-env "START_BRANCH=$branch" \
+            --remote-env "START_TASK=$task" \
+            bash -c '
+                [ -f ~/.bashrc ] && . ~/.bashrc
+                set -a; [ -f .env ] && . .env; set +a
+                [ -f /opt/python/bin/activate ] && . /opt/python/bin/activate
+                wt "$START_BRANCH" && claude "$START_TASK"
+            '
+    else
+        # No dev container — run locally
+        wt "$branch" && claude "$task"
+    fi
 }
 
 # wt - git worktree helper with completion
