@@ -38,31 +38,9 @@ alias kc='kubectl config use-context'
 alias psa='dvc push && git push'
 alias tf=terraform
 alias v=vim
-# Claude wrapper functions that warn if running outside dev container in a dir with devcontainer setup
-unalias cl clc clr 2>/dev/null
-_claude_in_devcontainer() {
-    local claude_cmd="$1"
-    shift
-    if [[ ! -f /.dockerenv && ( -d .devcontainer || -f .devcontainer.json ) ]]; then
-        printf "Warning: Running outside dev container in a directory with devcontainer setup.\nRun on host anyway? [y/N] "
-        read -r reply
-        if [[ "$reply" =~ ^[Yy]$ ]]; then
-            claude $claude_cmd "$@"
-        else
-            printf "Launch dev container and run claude there? [Y/n] "
-            read -r reply2
-            if [[ ! "$reply2" =~ ^[Nn]$ ]]; then
-                source ~/dotfiles/devc.zsh
-                _devc_claude "$claude_cmd" "$@"
-            fi
-        fi
-    else
-        claude $claude_cmd "$@"
-    fi
-}
-cl() { _claude_in_devcontainer "" "$@"; }
-clc() { _claude_in_devcontainer "--continue" "$@"; }
-clr() { _claude_in_devcontainer "--resume" "$@"; }
+alias cl=claude
+alias clc='claude --continue'
+alias clr='claude --resume'
 
 # Completions
 autoload -Uz compinit && compinit
