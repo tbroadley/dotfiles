@@ -446,18 +446,12 @@ set +u
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 set -u
 
-# Install local bin scripts (fast, do immediately)
-cp "$SCRIPT_DIR/bin/open-url-on-host" "$HOME/.local/bin/"
-cp "$SCRIPT_DIR/bin/cursor-in-container" "$HOME/.local/bin/cursor"
-cp "$SCRIPT_DIR/bin/pbcopy" "$HOME/.local/bin/"
-cp "$SCRIPT_DIR/bin/pbpaste" "$HOME/.local/bin/"
-cp "$SCRIPT_DIR/bin/wispr-add-dictionary-remote" "$HOME/.local/bin/wispr-add-dictionary"
-cp "$SCRIPT_DIR/bin/improve" "$HOME/.local/bin/"
-chmod +x "$HOME/.local/bin/open-url-on-host" "$HOME/.local/bin/cursor" \
-         "$HOME/.local/bin/pbcopy" "$HOME/.local/bin/pbpaste" \
-         "$HOME/.local/bin/wispr-add-dictionary" "$HOME/.local/bin/improve"
+# Add dotfiles bin to PATH and create symlinks for renamed scripts
+add_to_rc 'export PATH="$HOME/dotfiles/bin:$PATH"' 'export PATH="$HOME/dotfiles/bin:$PATH"'
+ln -sf "$SCRIPT_DIR/bin/cursor-in-container" "$HOME/.local/bin/cursor"
+ln -sf "$SCRIPT_DIR/bin/wispr-add-dictionary-remote" "$HOME/.local/bin/wispr-add-dictionary"
 add_to_rc 'export BROWSER=open-url-on-host' 'export BROWSER=open-url-on-host'
-echo "Local bin scripts installed (URL forwarding, cursor, clipboard, wispr, improve)"
+echo "Dotfiles bin added to PATH"
 
 # Configure Claude Code settings, hooks, and skills (fast, do immediately)
 CLAUDE_DIR="$HOME/.claude"
