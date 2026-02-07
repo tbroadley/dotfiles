@@ -1,114 +1,3 @@
-_devc_claude() {
-    local claude_cmd="$1"
-    shift
-    local workspace="${PWD}"
-
-    echo "Starting dev container..."
-
-    # Restart URL listener via launchd (host-side, independent of container)
-    launchctl kickstart -k gui/$(id -u)/com.thomas.url-listener &>/dev/null &
-    local url_listener_pid=$!
-
-    # Get GitHub token in background (gh CLI may take a moment)
-    local gh_token_file=$(mktemp)
-    gh auth token > "$gh_token_file" 2>/dev/null &
-    local gh_token_pid=$!
-
-    local up_opts=()
-    local exec_opts=()
-
-    # Check local env vars (instant) while gh token is fetching
-    if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
-        up_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
-        exec_opts+=(--remote-env "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN")
-    fi
-
-    if [ -n "${TODOIST_TOKEN:-}" ]; then
-        up_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
-        exec_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
-    fi
-
-    # Forward Codex auth cache if present on host
-    local codex_auth_file="$HOME/.codex/auth.json"
-    local codex_auth_b64=""
-    if [ -f "$codex_auth_file" ]; then
-        codex_auth_b64=$(base64 < "$codex_auth_file" | tr -d '\n')
-        up_opts+=(--remote-env "CODEX_AUTH_JSON_B64=$codex_auth_b64")
-        exec_opts+=(--remote-env "CODEX_AUTH_JSON_B64=$codex_auth_b64")
-    fi
-
-    # Wait for gh token and add if present
-    wait $gh_token_pid 2>/dev/null
-    local gh_token=$(cat "$gh_token_file" 2>/dev/null)
-    rm -f "$gh_token_file"
-    if [[ -n "$gh_token" ]]; then
-        up_opts+=(--remote-env "GH_TOKEN=$gh_token")
-        exec_opts+=(--remote-env "GH_TOKEN=$gh_token")
-    fi
-
-    if ! devcontainer up \
-        --workspace-folder "$workspace" \
-        "${up_opts[@]}"; then
-        echo "Failed to start dev container"
-        return 1
-    fi
-
-    # Wait for URL listener setup to complete
-    wait $url_listener_pid 2>/dev/null
-
-    # Get container info with combined query
-    local container_id container_name
-    container_id=$(docker ps -q --filter "label=devcontainer.local_folder=$workspace")
-    if [[ -n "$container_id" ]]; then
-        container_name=$(docker inspect --format '{{.Name}}' "$container_id" 2>/dev/null | sed 's/^\///')
-        [[ -n "$container_name" ]] && exec_opts+=(--remote-env "DEVCONTAINER_NAME=$container_name")
-
-        if command -v apf &> /dev/null; then
-            echo "Starting automatic port forwarding with watchdog..."
-            ( ~/dotfiles/bin/apf-watchdog "$container_id" &>/dev/null & )
-        fi
-    fi
-
-    echo "Setting up dotfiles..."
-    devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
-        if [ -n "${CODEX_AUTH_JSON_B64:-}" ]; then
-            mkdir -p "$HOME/.codex"
-            echo "$CODEX_AUTH_JSON_B64" | base64 -d > "$HOME/.codex/auth.json"
-            chmod 600 "$HOME/.codex/auth.json"
-        fi
-        if [ -d $HOME/dotfiles ]; then
-            cd $HOME/dotfiles && git pull
-        else
-            git clone https://github.com/tbroadley/dotfiles.git $HOME/dotfiles
-        fi
-        bash $HOME/dotfiles/install.sh
-
-        env_file="$HOME/.devcontainer_env"
-        : > "$env_file"
-        [ -n "${GH_TOKEN:-}" ] && echo "export GH_TOKEN=\"$GH_TOKEN\"" >> "$env_file"
-        [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && echo "export CLAUDE_CODE_OAUTH_TOKEN=\"$CLAUDE_CODE_OAUTH_TOKEN\"" >> "$env_file"
-        [ -n "${TODOIST_TOKEN:-}" ] && echo "export TODOIST_TOKEN=\"$TODOIST_TOKEN\"" >> "$env_file"
-
-        if ! grep -q "devcontainer_env" "$HOME/.bashrc" 2>/dev/null; then
-            echo "[ -f \$HOME/.devcontainer_env ] && . \$HOME/.devcontainer_env" >> "$HOME/.bashrc"
-        fi
-    '
-
-    echo "Running claude in container..."
-    local escaped_args=""
-    for arg in "$@"; do
-        escaped_args="$escaped_args '${arg//\'/\'\\\'\'}'"
-    done
-    devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" bash -c "
-        [ -f ~/.bashrc ] && . ~/.bashrc
-        set -a
-        [ -f .env ] && . .env
-        set +a
-        [ -f /opt/python/bin/activate ] && . /opt/python/bin/activate
-        claude $claude_cmd $escaped_args
-    "
-}
-
 devc() {
     local workspace="${PWD}"
     local rebuild_flag=""
@@ -196,19 +85,25 @@ devc() {
         fi
     fi
 
-    echo "Setting up dotfiles..."
+    if [[ -n "$rebuild_flag" ]]; then
+        echo "Setting up dotfiles..."
+        devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
+            if [ -d $HOME/dotfiles ]; then
+                cd $HOME/dotfiles && git pull
+            else
+                git clone https://github.com/tbroadley/dotfiles.git $HOME/dotfiles
+            fi
+            bash $HOME/dotfiles/install.sh
+        '
+    fi
+
+    echo "Setting up auth..."
     devcontainer exec --workspace-folder "$workspace" "${exec_opts[@]}" sh -c '
         if [ -n "${CODEX_AUTH_JSON_B64:-}" ]; then
             mkdir -p "$HOME/.codex"
             echo "$CODEX_AUTH_JSON_B64" | base64 -d > "$HOME/.codex/auth.json"
             chmod 600 "$HOME/.codex/auth.json"
         fi
-        if [ -d $HOME/dotfiles ]; then
-            cd $HOME/dotfiles && git pull
-        else
-            git clone https://github.com/tbroadley/dotfiles.git $HOME/dotfiles
-        fi
-        bash $HOME/dotfiles/install.sh
 
         # Persist auth tokens in container
         env_file="$HOME/.devcontainer_env"
