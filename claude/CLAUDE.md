@@ -1,3 +1,8 @@
+# About This File
+This file is git-tracked in the `dotfiles` repo and symlinked to `~/.claude/CLAUDE.md`.
+Changes made here affect all Claude Code instances across all environments.
+To persist changes: commit and push from the dotfiles repo.
+
 # Global Rules
 
 ## Autonomy & Verification Loops
