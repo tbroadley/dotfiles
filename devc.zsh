@@ -33,7 +33,7 @@ devc() {
     # Restart URL listener via launchd (host-side, runs parallel with devcontainer up)
     echo "Restarting URL listener..."
     launchctl kickstart -k gui/$(id -u)/com.thomas.url-listener &>/dev/null &
-    local url_listener_pid=$!
+    disown
 
     # Get GitHub token in background (gh CLI may take a moment)
     local gh_token_file=$(mktemp)
