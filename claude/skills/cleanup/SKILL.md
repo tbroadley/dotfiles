@@ -160,22 +160,220 @@ def test_validate_email(email: str, expected: bool):
 - Tests that check different aspects of behavior (not just input/output variations)
 - Tests where parameterization would obscure the intent
 
-### 4. Other Patterns to Remove
+### 4. Remove Defensive Code Patterns
 
-- Unnecessary type: ignore comments (fix the actual type issue instead)
-- Defensive `.get()` calls with defaults that hide bugs
+**HIGHEST PRIORITY**: Remove unnecessary defensive programming that hides bugs instead of failing loudly.
+
+#### Defensive `.get()` Calls
+Replace `.get()` with default values on internal data structures with direct access. Let KeyError propagate.
+
+**Before:**
+```python
+user_id = data.get("user_id", None)
+if user_id is None:
+    return
+```
+
+**After:**
+```python
+user_id = data["user_id"]  # Let KeyError propagate if missing
+```
+
+#### Unnecessary Try-Except Blocks
+Remove try-except blocks that catch exceptions without specific handling logic.
+
+**Before:**
+```python
+try:
+    result = parse_data(input)
+except Exception as e:
+    logger.warning(f"Parse failed: {e}")
+    result = None
+```
+
+**After:**
+```python
+result = parse_data(input)  # Let exceptions propagate
+```
+
+#### Unnecessary None Checks
+Remove None checks on fields that should always exist in internal data structures.
+
+**Before:**
+```python
+if score.metadata is not None and "error" in score.metadata:
+    error = score.metadata.get("error", "unknown")
+```
+
+**After:**
+```python
+if "error" in score.metadata:
+    error = score.metadata["error"]
+```
+
+#### Validating Internal Invariants
+Remove validation that checks internal invariants. Trust internal code.
+
+**Before:**
+```python
+def process_user(user: User) -> str:
+    if not isinstance(user, User):
+        raise TypeError("Expected User instance")
+    if user.email is None:
+        raise ValueError("User email is required")
+    return user.email
+```
+
+**After:**
+```python
+def process_user(user: User) -> str:
+    return user.email
+```
+
+### 5. Fix Type Checking Issues
+
+Replace `type: ignore` comments with proper type narrowing.
+
+**Before:**
+```python
+result = some_function()  # type: ignore
+```
+
+**After (Option 1 - Assert isinstance):**
+```python
+result = some_function()
+assert isinstance(result, ExpectedType)
+```
+
+**After (Option 2 - Assert not None):**
+```python
+result = some_optional_function()
+assert result is not None
+```
+
+**Keep type: ignore only for legitimate library limitations:**
+```python
+# pandas groupby has incomplete type stubs
+grouped = df.groupby("column")  # pyright: ignore[reportUnknownMemberType]
+```
+
+### 6. Improve Error Handling
+
+Make code fail early and loudly instead of continuing with invalid state.
+
+**Before:**
+```python
+try:
+    data = json.loads(raw_data)
+except json.JSONDecodeError:
+    logger.warning("Invalid JSON, using empty dict")
+    data = {}
+```
+
+**After:**
+```python
+data = json.loads(raw_data)  # Let JSONDecodeError propagate
+```
+
+**Add newlines after raise statements:**
+```python
+# Before
+if value < 0:
+    raise ValueError("Value must be positive")
+return value * 2
+
+# After
+if value < 0:
+    raise ValueError("Value must be positive")
+
+return value * 2
+```
+
+### 7. Fix Import Style (Google Style Guide)
+
+**Import modules, not individual items:**
+```python
+# Before
+from mypackage.module import FunctionA, FunctionB, ClassC
+
+# After
+from mypackage import module
+# Use as: module.FunctionA(), module.ClassC()
+```
+
+**Move imports to top level:**
+```python
+# Before
+def some_function():
+    import expensive_module
+    return expensive_module.do_work()
+
+# After
+import expensive_module
+
+def some_function():
+    return expensive_module.do_work()
+```
+
+**Exception: TYPE_CHECKING guard for type-only imports:**
+```python
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mypackage import SomeType
+```
+
+### 8. Improve Test Structure
+
+Beyond parameterization, also look for:
+
+**Using real instances instead of MagicMock:**
+```python
+# Before
+mock_target = MagicMock(spec=Target)
+mock_target.name = "test"
+
+# After
+target = Target(name="test")  # Use real instance of simple class
+```
+
+**Direct assertions instead of defensive ones:**
+```python
+# Before (defensive)
+result = some_function()
+assert result.get("value") == expected
+
+# After (direct)
+result = some_function()
+assert result["value"] == expected  # Let KeyError fail the test
+```
+
+**Mock only at boundaries:**
+```python
+# Mock external APIs, not internal code
+mocker.patch("requests.get")  # Good - external boundary
+mocker.patch("myapp.internal_helper")  # Bad - internal code
+```
+
+### 9. Other Patterns to Remove
+
 - Overly verbose error messages that duplicate context
 - Redundant validation that duplicates framework behavior
 - Empty except blocks or overly broad exception handling
 - Unused imports added "just in case"
+- Unnecessary intermediate variables that don't improve clarity
 
 ## Workflow
 
 1. **Identify files to clean**: Run `git diff main...HEAD --name-only` to find files changed on this branch, then focus cleanup on only the changed portions of those files (not pre-existing code)
-2. **Review systematically**: Go through each cleanup category above, but only for code introduced on this branch
+2. **Review systematically**: Go through each cleanup category above in priority order, but only for code introduced on this branch:
+   - **Priority 1 (CRITICAL)**: Defensive code patterns (sections 4-6)
+   - **Priority 2 (HIGH)**: Test structure and parameterization (sections 3, 8)
+   - **Priority 3 (MEDIUM)**: Type checking issues (section 5)
+   - **Priority 4 (LOW)**: Comments, docstrings, imports (sections 1, 2, 7)
 3. **Make changes**: Edit files to remove unwanted patterns in the new/changed code
 4. **Run tests**: Ensure changes don't break anything
-5. **Summarize**: Tell the user what was cleaned up
+5. **Summarize**: Tell the user what was cleaned up, organized by category
 
 ## Notes
 

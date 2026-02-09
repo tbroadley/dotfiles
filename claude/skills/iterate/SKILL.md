@@ -83,9 +83,24 @@ Tell the review subagent:
 
 Based on the review subagent's response:
 
-- **If "done"**: Run the full commit-push skill (`/commit-push`) to open/update the PR, wait for CI, and handle PR comments. Then report the final summary to the user.
 - **If "continue"**: Append the review findings to the cumulative context. Go back to Step 1, but this time the implementation subagent addresses the review findings instead of the original plan.
-- **If 5 iterations reached**: Run the full commit-push skill (`/commit-push`) anyway. Then report the cumulative summary and any remaining findings to the user.
+- **If "done" or 5 iterations reached**: Proceed to Step 5 (Cleanup) before finalizing.
+
+### Step 5: Cleanup
+
+Before finalizing, run the cleanup skill to remove anti-patterns from the changed code:
+
+1. **Spawn cleanup subagent**: Launch a Task subagent (subagent_type: "general-purpose") and instruct it to run the cleanup skill
+2. **Give it context**: Provide the cumulative context and emphasize that cleanup should only apply to code changed on this branch (not pre-existing code on main)
+3. **Validate and commit**: After cleanup, the subagent should validate (linter/typechecker/tests), commit changes with message "Clean up code before PR", and push
+4. **Append to context**: Add a cleanup summary to the cumulative context
+
+### Step 6: Finalize
+
+After cleanup is complete:
+
+- Run the full commit-push skill (`/commit-push`) to open/update the PR, wait for CI, and handle PR comments
+- Report the final summary to the user, including the cumulative context and cleanup summary
 
 ### Cumulative Context
 
@@ -96,6 +111,12 @@ Maintain a running summary across iterations. After each iteration, append:
 Implemented: <what was done>
 Review: <verdict> — <summary>
 Findings: <list of findings, if any>
+```
+
+After cleanup, append:
+```
+--- Cleanup ---
+Changes: <what was cleaned up>
 ```
 
 Pass this full context to every subagent so they understand the history and avoid re-introducing old issues.
