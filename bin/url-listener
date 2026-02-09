@@ -151,7 +151,10 @@ def main():
     parser.add_argument("--port", type=int, default=7077, help="Port to listen on")
     args = parser.parse_args()
 
-    server = HTTPServer(("0.0.0.0", args.port), URLHandler)
+    server = HTTPServer(("0.0.0.0", args.port), URLHandler, bind_and_activate=False)
+    server.allow_reuse_address = True
+    server.server_bind()
+    server.server_activate()
     signal.signal(signal.SIGTERM, lambda *_: threading.Thread(target=server.shutdown).start())
     print(f"URL listener started on port {args.port}", file=sys.stderr)
     try:

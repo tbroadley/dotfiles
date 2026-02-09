@@ -87,9 +87,6 @@ devc() {
         return 1
     fi
 
-    # Wait for URL listener setup to complete
-    wait $url_listener_pid 2>/dev/null
-
     # Get container ID and name for port forwarding and Cursor integration
     local container_id container_name
     container_id=$(docker ps -q --filter "label=devcontainer.local_folder=$workspace")
