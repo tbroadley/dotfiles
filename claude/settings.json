@@ -9,6 +9,7 @@
       "Read(//tmp/**)",
       "Read(~/.cache/uv/**)",
       "Read(~/.local/share/uv/tools/**)",
+      "Read(~/.claude/**)",
       "Read(~/dotfiles/**)",
       "Edit(~/dotfiles/**)",
       "Write(~/dotfiles/**)",
