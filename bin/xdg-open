@@ -1,0 +1,4 @@
+#!/bin/bash
+# Shim for xdg-open in dev containers.
+# Delegates to open-url-on-host so tools expecting xdg-open (e.g. OAuth flows) work.
+exec open-url-on-host "$@"
