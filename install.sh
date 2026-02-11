@@ -324,6 +324,43 @@ install_zoxide() {
   echo "zoxide installation completed"
 }
 
+install_pup() {
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "Skipping pup (not Linux)"
+    return 0
+  fi
+  if command -v pup >/dev/null 2>&1; then
+    echo "pup is already installed: pup $(pup --version 2>&1 | head -1)"
+    return 0
+  fi
+
+  echo "Installing pup..."
+  ARCH=$(uname -m)
+  case $ARCH in
+    x86_64)
+      PUP_ARCH="Linux_x86_64"
+      PUP_CHECKSUM="7f2a347c2b34ecf3cec4facae7528a4e36279f61b68c989a477f7c5ab312dbe6"
+      ;;
+    aarch64|arm64)
+      PUP_ARCH="Linux_arm64"
+      PUP_CHECKSUM="186dcb5318a5efd066418b54285c362ecd270a54fa764d506a2b59093a657b55"
+      ;;
+    *) echo "Unsupported architecture for pup: $ARCH"; return 1 ;;
+  esac
+
+  PUP_VERSION="0.9.2"
+  local tmp_file="/tmp/pup-$$.tar.gz"
+  local tmp_dir="/tmp/pup-$$"
+  wget -q -O "$tmp_file" "https://github.com/DataDog/pup/releases/download/v${PUP_VERSION}/pup_${PUP_VERSION}_${PUP_ARCH}.tar.gz"
+  verify_checksum "$tmp_file" "$PUP_CHECKSUM"
+  mkdir -p "$tmp_dir"
+  tar -xzf "$tmp_file" -C "$tmp_dir"
+  mv "$tmp_dir/pup" "$HOME/.local/bin/"
+  rm -rf "$tmp_file" "$tmp_dir"
+  chmod +x "$HOME/.local/bin/pup"
+  echo "pup installation completed"
+}
+
 install_nvm_and_node() {
   # Check common nvm locations (devcontainer images often have it pre-installed elsewhere)
   if [ -s "/usr/local/share/nvm/nvm.sh" ]; then
@@ -400,7 +437,7 @@ install_shell_alias_suggestions() {
 
 # Export functions and variables for subshells
 export -f verify_checksum
-export -f install_ripgrep install_jq install_gh install_zoxide install_nvm_and_node
+export -f install_ripgrep install_jq install_gh install_zoxide install_pup install_nvm_and_node
 export -f install_claude_code install_shell_alias_suggestions
 export HOME SCRIPT_DIR
 
@@ -408,7 +445,7 @@ export HOME SCRIPT_DIR
 echo "Starting Phase 1 installations (parallel)..."
 
 # Start background jobs and track PIDs
-for job_name in ripgrep jq gh zoxide nvm claude-code shell-alias-suggestions; do
+for job_name in ripgrep jq gh zoxide pup nvm claude-code shell-alias-suggestions; do
   output_file="$TEMP_DIR/${job_name}.out"
   JOB_OUTPUT_FILES["$job_name"]="$output_file"
   case "$job_name" in
@@ -416,6 +453,7 @@ for job_name in ripgrep jq gh zoxide nvm claude-code shell-alias-suggestions; do
     jq)                      install_jq > "$output_file" 2>&1 & ;;
     gh)                      install_gh > "$output_file" 2>&1 & ;;
     zoxide)                  install_zoxide > "$output_file" 2>&1 & ;;
+    pup)                     install_pup > "$output_file" 2>&1 & ;;
     nvm)                     install_nvm_and_node > "$output_file" 2>&1 & ;;
     claude-code)             install_claude_code > "$output_file" 2>&1 & ;;
     shell-alias-suggestions) install_shell_alias_suggestions > "$output_file" 2>&1 & ;;
@@ -433,7 +471,7 @@ for job_name in "${!JOB_PIDS[@]}"; do
 done
 
 # Print output from successful jobs
-for job_name in ripgrep jq gh zoxide nvm claude-code shell-alias-suggestions; do
+for job_name in ripgrep jq gh zoxide pup nvm claude-code shell-alias-suggestions; do
   output_file="${JOB_OUTPUT_FILES[$job_name]}"
   # Check if job_name exists in FAILED_JOBS array
   if [ -f "$output_file" ] && ! [[ -v "FAILED_JOBS[$job_name]" ]]; then
