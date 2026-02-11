@@ -73,6 +73,20 @@ devc() {
         exec_opts+=(--remote-env "GH_TOKEN=$gh_token")
     fi
 
+    # Detect host timezone and forward to container
+    local host_tz=""
+    if [[ "$(uname)" == "Darwin" ]]; then
+        host_tz=$(readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||')
+    elif [[ -f /etc/timezone ]]; then
+        host_tz=$(cat /etc/timezone)
+    elif [[ -n "${TZ:-}" ]]; then
+        host_tz="$TZ"
+    fi
+    if [[ -n "$host_tz" ]]; then
+        up_opts+=(--remote-env "TZ=$host_tz")
+        exec_opts+=(--remote-env "TZ=$host_tz")
+    fi
+
     # Check if container already exists (to know if we need dotfiles setup)
     local container_existed=false
     if docker ps -a -q --filter "label=devcontainer.local_folder=$workspace" | grep -q .; then
@@ -130,10 +144,14 @@ devc() {
         [ -n "${GH_TOKEN:-}" ] && echo "export GH_TOKEN=\"$GH_TOKEN\"" >> "$env_file"
         [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && echo "export CLAUDE_CODE_OAUTH_TOKEN=\"$CLAUDE_CODE_OAUTH_TOKEN\"" >> "$env_file"
         [ -n "${TODOIST_TOKEN:-}" ] && echo "export TODOIST_TOKEN=\"$TODOIST_TOKEN\"" >> "$env_file"
+        [ -n "${TZ:-}" ] && echo "export TZ=\"$TZ\"" >> "$env_file"
 
-        # Source from bashrc if not already configured
+        # Source from shell rc files if not already configured
         if ! grep -q "devcontainer_env" "$HOME/.bashrc" 2>/dev/null; then
             echo "[ -f \$HOME/.devcontainer_env ] && . \$HOME/.devcontainer_env" >> "$HOME/.bashrc"
+        fi
+        if [ -f "$HOME/.zshrc" ] && ! grep -q "devcontainer_env" "$HOME/.zshrc" 2>/dev/null; then
+            echo "[ -f \$HOME/.devcontainer_env ] && . \$HOME/.devcontainer_env" >> "$HOME/.zshrc"
         fi
     '
 

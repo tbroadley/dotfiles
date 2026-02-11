@@ -135,7 +135,14 @@ add_to_rc "alias clr=" "alias clr='claude --resume'"
 add_to_rc "alias codex=" "alias codex='codex --add-dir /opt/python'"
 add_to_rc "alias cx=" "alias cx='codex --add-dir /opt/python'"
 add_to_rc "export ANTHROPIC_MODEL=opus" "export ANTHROPIC_MODEL=opus"
+add_to_rc "export PYTHON_KEYRING_BACKEND=" "export PYTHON_KEYRING_BACKEND=keyrings.alt.file.PlaintextKeyring"
 add_to_rc "export EDITOR=vim" "export EDITOR=vim"
+# Persist host timezone if forwarded via TZ env var
+if [ -n "${TZ:-}" ]; then
+  # Remove any old TZ export before adding the current one
+  remove_from_rc "export TZ="
+  add_to_rc "export TZ=" "export TZ=$TZ"
+fi
 add_to_rc "export LANG=en_US.UTF-8" "export LANG=en_US.UTF-8"
 add_to_rc "export LC_ALL=en_US.UTF-8" "export LC_ALL=en_US.UTF-8"
 add_to_rc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
