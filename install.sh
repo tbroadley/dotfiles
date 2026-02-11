@@ -143,6 +143,7 @@ if [ -n "${TZ:-}" ]; then
   remove_from_rc "export TZ="
   add_to_rc "export TZ=" "export TZ=$TZ"
 fi
+add_to_rc "export DD_SITE=" "export DD_SITE=us3.datadoghq.com"
 add_to_rc "export LANG=en_US.UTF-8" "export LANG=en_US.UTF-8"
 add_to_rc "export LC_ALL=en_US.UTF-8" "export LC_ALL=en_US.UTF-8"
 add_to_rc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
