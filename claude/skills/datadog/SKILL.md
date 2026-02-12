@@ -172,6 +172,67 @@ Works in both `pup logs search --query=` and API calls:
 
 Common filters: `service:name`, `status:error|warn|info|debug`, `@http.status_code:500`, `host:hostname`, `env:production`
 
+## Hawk/Scout Scan Metrics
+
+Hawk scan jobs emit structured log entries containing `@scan_metrics` and `@scan_progress` fields. These are **log-based** (not Datadog custom metrics) — query them via `pup logs search`.
+
+### Querying scan metrics
+
+```bash
+# Get scan metrics for a specific job (use --limit 1000 --sort asc for chronological history)
+pup logs search \
+  --query="inspect_ai_job_id:<JOB_ID> @scan_metrics.tasks_scanning:*" \
+  --from="7d" --limit 1000 --sort asc -o json
+
+# Note: default limit is 10. Use --limit 1000 to get more entries.
+# Logs are emitted every ~6 seconds by inspect_scout.
+# To cover the full timeline, query both --sort asc (oldest 1000) and --sort desc (newest 1000).
+```
+
+### Available fields
+
+**`@scan_metrics.*`** (from `inspect_scout.ScanMetrics`):
+
+| Field | Description |
+|-------|-------------|
+| `@scan_metrics.task_count` | Total async worker tasks |
+| `@scan_metrics.tasks_idle` | Workers doing nothing |
+| `@scan_metrics.tasks_parsing` | Workers parsing transcript files |
+| `@scan_metrics.tasks_scanning` | Workers running scanners (making API calls) |
+| `@scan_metrics.buffered_scanner_jobs` | Jobs buffered waiting to be scanned |
+| `@scan_metrics.completed_scans` | Total completed scan operations |
+| `@scan_metrics.memory_usage` | Process memory (RSS/USS) in bytes |
+| `@scan_metrics.process_count` | Number of OS processes |
+| `@scan_metrics.batch_pending` | Pending batch API requests |
+| `@scan_metrics.batch_failures` | Failed batch API requests |
+| `@scan_metrics.batch_oldest_created` | Timestamp of oldest pending batch |
+
+**`@scan_progress.*`**:
+
+| Field | Description |
+|-------|-------------|
+| `@scan_progress.completed` | Number of completed scans |
+| `@scan_progress.total` | Total scans expected |
+| `@scan_progress.percent` | Completion percentage |
+
+### Common tags for filtering
+
+- `inspect_ai_job_id:<JOB_ID>` — the scan run ID
+- `inspect_ai_job_type:scan`
+- `inspect_ai_created_by:<user>`
+- `kube_job:<JOB_ID>`
+- `service:runner`
+
+### Container-level metrics
+
+Standard Datadog container metrics are also available, tagged by `kube_job:<JOB_ID>`:
+
+```bash
+pup metrics query --query="avg:container.pid.thread_count{kube_job:<JOB_ID>}" --from="24h"
+pup metrics query --query="avg:container.cpu.usage{kube_job:<JOB_ID>}" --from="24h"
+pup metrics query --query="avg:container.memory.usage{kube_job:<JOB_ID>}" --from="24h"
+```
+
 ## Notes
 
 - Datadog site: `us3.datadoghq.com`
