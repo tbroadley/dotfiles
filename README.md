@@ -13,33 +13,14 @@ git clone https://github.com/tbroadley/dotfiles.git ~/dotfiles
 
 ## Claude Code Authentication in Dev Containers
 
-Claude Code uses OAuth tokens stored in the macOS Keychain, which aren't accessible from containers. To authenticate Claude Code in dev containers:
+Claude Code stores its API key in the macOS Keychain (service "Claude Code"), which isn't accessible from containers. The `devc` function reads the key from the keychain and forwards it as `ANTHROPIC_API_KEY` to containers automatically.
 
-### 1. Generate a long-lived token
+### Setup
 
-Run this on your Mac:
+1. Log in to Claude Code on your Mac: `claude /login`
+2. Use dev containers as normal — `devc` handles forwarding.
 
-```bash
-claude setup-token
-```
-
-This outputs an OAuth token valid for 1 year.
-
-### 2. Add the token to your shell config
-
-Add to your `~/.zshrc` (before sourcing the dotfiles):
-
-```bash
-export CLAUDE_CODE_OAUTH_TOKEN="<your-token-here>"
-```
-
-### 3. Use dev containers as normal
-
-The `devc` function automatically forwards `CLAUDE_CODE_OAUTH_TOKEN` to containers. The `install.sh` script configures Claude Code to use the token.
-
-### Refreshing the token
-
-When the token expires (after ~1 year), run `claude setup-token` again and update your `~/.zshrc`.
+If you use an OAuth token instead (`CLAUDE_CODE_OAUTH_TOKEN` env var), `devc` forwards that too.
 
 ## Codex Configuration in Dev Containers
 

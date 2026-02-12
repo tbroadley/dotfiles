@@ -114,7 +114,7 @@ remove_from_rc() {
 
 # Aliases (work in both shells)
 add_to_rc "alias b=basedpyright" "alias b=basedpyright"
-add_to_rc "claude()" 'claude() { ANTHROPIC_API_KEY= ANTHROPIC_BASE_URL= command claude "$@"; }'
+remove_from_rc "claude()"
 add_to_rc "alias dotfiles=" "alias dotfiles='git -C ~/dotfiles pull && ~/dotfiles/install.sh && exec \$SHELL'"
 add_to_rc "alias g=git" "alias g=git"
 add_to_rc "alias ppl=" "alias ppl='pivot pull'"
@@ -572,7 +572,7 @@ if [ -d "$SCRIPT_DIR/gemini" ]; then
 fi
 
 # Configure Claude Code authentication if token is available
-if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] || [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   if [ -f "$HOME/.claude.json" ]; then
     jq '. + {"hasCompletedOnboarding": true}' "$HOME/.claude.json" > "$HOME/.claude.json.tmp" && mv "$HOME/.claude.json.tmp" "$HOME/.claude.json"
   else
