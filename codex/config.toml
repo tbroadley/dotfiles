@@ -4,3 +4,7 @@ cli_auth_credentials_store = "file"
 
 [sandbox_workspace_write]
 network_access = true
+writable_roots = [
+  "/home/metr/dotfiles",
+  "/home/metr/.config/hawk-cli"
+]
