@@ -401,20 +401,25 @@ install_nvm_and_node() {
 }
 
 install_claude_code() {
+  # Check if already installed as a native binary (not the node/npm version)
   if command -v claude >/dev/null 2>&1; then
-    echo "Claude Code is already installed: $(claude --version)"
-    return 0
+    local claude_path
+    claude_path="$(command -v claude)"
+    # Resolve symlinks to get the actual binary
+    if [ -L "$claude_path" ]; then
+      claude_path="$(readlink -f "$claude_path")"
+    fi
+    if file "$claude_path" 2>/dev/null | grep -q "ELF"; then
+      echo "Claude Code (native) is already installed: $(claude --version)"
+      return 0
+    fi
+    echo "Claude Code is installed via Node/npm, replacing with native installer..."
+    # Remove the npm installation
+    npm uninstall -g @anthropic-ai/claude-code 2>/dev/null || true
   fi
 
-  echo "Installing Claude Code..."
-  # Note: Update this checksum when Claude Code releases new versions
-  # Verify at: curl -fsSL https://claude.ai/install.sh | sha256sum
-  CLAUDE_INSTALL_CHECKSUM="363382bed8849f78692bd2f15167a1020e1f23e7da1476ab8808903b6bebae05"
-  local tmp_file="/tmp/claude-install-$$.sh"
-  curl -fsSL -o "$tmp_file" https://claude.ai/install.sh
-  verify_checksum "$tmp_file" "$CLAUDE_INSTALL_CHECKSUM"
-  bash "$tmp_file"
-  rm -f "$tmp_file"
+  echo "Installing Claude Code (native)..."
+  curl -fsSL https://claude.ai/install.sh | bash
   echo "Claude Code installation completed"
 }
 
