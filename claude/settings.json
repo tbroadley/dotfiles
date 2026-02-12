@@ -46,7 +46,8 @@
       "Bash(sudo:*)"
     ],
     "additionalDirectories": [
-      "~/dotfiles"
+      "~/dotfiles",
+      "~/.worktrees"
     ]
   },
   "model": "opus",

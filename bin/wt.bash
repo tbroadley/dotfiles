@@ -5,6 +5,9 @@
 # wt -         - cd to the previously selected worktree (like cd -)
 # wt <branch>  - if worktree exists, cd into it; otherwise create it
 #
+# Worktrees are stored in ~/.worktrees/<repo-name>/<branch-dir>.
+# Legacy worktrees under <repo-root>/.worktrees/ are also supported.
+#
 # Supports bash and zsh with tab completion for branch names.
 
 # Track the previous worktree directory for "wt -"
@@ -58,10 +61,32 @@ _wt_find_repo_root() {
         return 0
     fi
 
-    # Fallback: walk up from PWD looking for a directory with both .git/ and .worktrees/
-    # This handles the case where we're inside a broken worktree whose .git file
-    # points to a stale host path
+    # Fallback: walk up from PWD looking for a .git file (worktree) and parse it
     local dir="$PWD"
+    while [ "$dir" != "/" ]; do
+        if [ -f "$dir/.git" ]; then
+            local gitdir
+            gitdir="$(cat "$dir/.git" 2>/dev/null)"
+            gitdir="${gitdir#gitdir: }"
+            # gitdir: /path/to/repo/.git/worktrees/<name>
+            local repo_git="${gitdir%/worktrees/*}"
+            local repo="${repo_git%/.git}"
+            if [ -d "$repo/.git" ]; then
+                echo "$repo"
+                return 0
+            fi
+            break
+        fi
+        if [ -d "$dir/.git" ]; then
+            echo "$dir"
+            return 0
+        fi
+        dir="${dir%/*}"
+        [ -z "$dir" ] && dir="/"
+    done
+
+    # Legacy fallback: walk up looking for .git/ + .worktrees/ (old layout)
+    dir="$PWD"
     while [ "$dir" != "/" ]; do
         if [ -d "$dir/.git" ] && [ -d "$dir/.worktrees" ]; then
             echo "$dir"
@@ -72,6 +97,12 @@ _wt_find_repo_root() {
     done
 
     return 1
+}
+
+# Get the ~/.worktrees/<repo-name> directory for a given repo root
+_wt_home_dir() {
+    local repo_root="$1"
+    echo "$HOME/.worktrees/$(basename "$repo_root")"
 }
 
 wt() {
@@ -112,10 +143,18 @@ wt() {
 
     # Replace forward slashes with dashes for directory name (e.g., user/feature -> user-feature)
     local dir_name="${branch//\//-}"
-    local worktree_dir="$repo_root/.worktrees/$dir_name"
+    local home_wt_dir="$(_wt_home_dir "$repo_root")/$dir_name"
+    local legacy_wt_dir="$repo_root/.worktrees/$dir_name"
 
-    # If worktree already exists in .worktrees/, cd into it
-    if [ -d "$worktree_dir" ]; then
+    # Check both locations for existing worktree (prefer new, fall back to legacy)
+    local worktree_dir=""
+    if [ -d "$home_wt_dir" ]; then
+        worktree_dir="$home_wt_dir"
+    elif [ -d "$legacy_wt_dir" ]; then
+        worktree_dir="$legacy_wt_dir"
+    fi
+
+    if [ -n "$worktree_dir" ]; then
         # Repair stale gitdir paths (e.g., created on host, accessed in container)
         if [ -d "$repo_root/.git" ]; then
             _wt_repair_worktree "$worktree_dir" "$repo_root/.git"
@@ -137,18 +176,19 @@ wt() {
         return 0
     fi
 
-    # Create .worktrees directory if needed
-    mkdir -p "$repo_root/.worktrees"
+    # Create worktree in ~/.worktrees/<repo-name>/
+    local new_wt_dir="$home_wt_dir"
+    mkdir -p "$(_wt_home_dir "$repo_root")"
 
     # Try to create the worktree
     # First, try checking out existing branch (local or remote-tracking)
-    if git worktree add "$worktree_dir" "$branch" 2>/dev/null; then
+    if git worktree add "$new_wt_dir" "$branch" 2>/dev/null; then
         : # success
     # If that fails, try creating a new branch tracking the remote
-    elif git worktree add "$worktree_dir" -b "$branch" "origin/$branch" 2>/dev/null; then
+    elif git worktree add "$new_wt_dir" -b "$branch" "origin/$branch" 2>/dev/null; then
         : # success, created local branch tracking remote
     # If that also fails, try creating a brand new branch from current HEAD
-    elif git worktree add -b "$branch" "$worktree_dir" 2>/dev/null; then
+    elif git worktree add -b "$branch" "$new_wt_dir" 2>/dev/null; then
         : # success, created new branch
     else
         echo "Error: failed to create worktree for branch: $branch"
@@ -163,12 +203,12 @@ wt() {
     fi
 
     # Copy .env if it exists in main repo
-    [ -f "$repo_root/.env" ] && cp "$repo_root/.env" "$worktree_dir/"
+    [ -f "$repo_root/.env" ] && cp "$repo_root/.env" "$new_wt_dir/"
 
     # Set up DVC cache sharing if DVC is used
     if [ -d "$repo_root/.dvc" ]; then
-        mkdir -p "$worktree_dir/.dvc"
-        cat > "$worktree_dir/.dvc/config.local" << EOF
+        mkdir -p "$new_wt_dir/.dvc"
+        cat > "$new_wt_dir/.dvc/config.local" << EOF
 [cache]
     dir = $repo_root/.dvc/cache
 EOF
@@ -176,17 +216,17 @@ EOF
 
     # Set up Pivot cache sharing if Pivot is used
     if [ -d "$repo_root/.pivot" ]; then
-        mkdir -p "$worktree_dir/.pivot"
+        mkdir -p "$new_wt_dir/.pivot"
         # Copy existing config from root repo
-        [ -f "$repo_root/.pivot/config.yaml" ] && cp "$repo_root/.pivot/config.yaml" "$worktree_dir/.pivot/"
+        [ -f "$repo_root/.pivot/config.yaml" ] && cp "$repo_root/.pivot/config.yaml" "$new_wt_dir/.pivot/"
         # Set cache dir to point to root repo's cache
-        (cd "$worktree_dir" && pivot config set cache.dir "$repo_root/.pivot/cache") 2>/dev/null || true
+        (cd "$new_wt_dir" && pivot config set cache.dir "$repo_root/.pivot/cache") 2>/dev/null || true
     fi
 
     # Set up VS Code/Cursor settings to use worktree's venv for Python
     if [ -f "$repo_root/pyproject.toml" ] || [ -f "$repo_root/setup.py" ]; then
-        mkdir -p "$worktree_dir/.vscode"
-        cat > "$worktree_dir/.vscode/settings.json" << 'EOF'
+        mkdir -p "$new_wt_dir/.vscode"
+        cat > "$new_wt_dir/.vscode/settings.json" << 'EOF'
 {
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.analysis.extraPaths": ["${workspaceFolder}"]
@@ -194,16 +234,16 @@ EOF
 EOF
     fi
 
-    echo "Worktree created: $worktree_dir"
+    echo "Worktree created: $new_wt_dir"
     local old_dir="$PWD"
-    cd "$worktree_dir" || return 1
+    cd "$new_wt_dir" || return 1
     _WT_PREVIOUS_DIR="$old_dir"
 }
 
 # wtd - delete a git worktree and its backing branch
 # Usage: wtd [branch-name]
 #
-# wtd          - delete the current worktree (if inside .worktrees/)
+# wtd          - delete the current worktree (if inside a worktree directory)
 # wtd <branch> - delete the worktree for <branch>
 #
 # Also deletes the local branch that was backing the worktree.
@@ -226,17 +266,21 @@ wtd() {
 
     local worktree_dir
     local branch_to_delete
+    local home_wt_base="$(_wt_home_dir "$repo_root")"
 
     # If no branch specified, try to delete current worktree
     if [ -z "$branch" ]; then
-        # Check if we're inside .worktrees/
-        if [[ "$PWD" == "$repo_root/.worktrees/"* ]]; then
-            # Extract the worktree name from the path
+        # Check if we're inside either worktree location
+        if [[ "$PWD" == "$home_wt_base/"* ]]; then
+            local rel_path="${PWD#$home_wt_base/}"
+            branch="${rel_path%%/*}"
+            worktree_dir="$home_wt_base/$branch"
+        elif [[ "$PWD" == "$repo_root/.worktrees/"* ]]; then
             local rel_path="${PWD#$repo_root/.worktrees/}"
             branch="${rel_path%%/*}"
             worktree_dir="$repo_root/.worktrees/$branch"
         else
-            echo "Error: not inside a worktree (must be in .worktrees/ to delete current)"
+            echo "Error: not inside a worktree (must be in a worktree directory to delete current)"
             echo ""
             echo "Usage: wtd [branch-name]"
             echo ""
@@ -247,12 +291,18 @@ wtd() {
     else
         # Replace forward slashes with dashes for directory name (e.g., user/feature -> user-feature)
         local dir_name="${branch//\//-}"
-        worktree_dir="$repo_root/.worktrees/$dir_name"
-    fi
-
-    if [ ! -d "$worktree_dir" ]; then
-        echo "Error: worktree does not exist: $worktree_dir"
-        return 1
+        local home_wt_dir="$home_wt_base/$dir_name"
+        local legacy_wt_dir="$repo_root/.worktrees/$dir_name"
+        if [ -d "$home_wt_dir" ]; then
+            worktree_dir="$home_wt_dir"
+        elif [ -d "$legacy_wt_dir" ]; then
+            worktree_dir="$legacy_wt_dir"
+        else
+            echo "Error: worktree does not exist in either:"
+            echo "  $home_wt_dir"
+            echo "  $legacy_wt_dir"
+            return 1
+        fi
     fi
 
     # Get the branch name from the worktree before deleting it
@@ -306,7 +356,12 @@ _wt_branches() {
                grep -v '^HEAD$' | \
                sort -u)
 
-    # Also include existing worktree directory names (in case branch was deleted)
+    # Include worktree names from both locations
+    local home_wt_base="$(_wt_home_dir "$repo_root")"
+    if [ -d "$home_wt_base" ]; then
+        worktree_names=$(ls -1 "$home_wt_base" 2>/dev/null)
+        branches=$(printf '%s\n%s' "$branches" "$worktree_names" | sort -u)
+    fi
     if [ -d "$repo_root/.worktrees" ]; then
         worktree_names=$(ls -1 "$repo_root/.worktrees" 2>/dev/null)
         branches=$(printf '%s\n%s' "$branches" "$worktree_names" | sort -u)
@@ -320,9 +375,11 @@ _wtd_worktrees() {
     local repo_root
     repo_root="$(_wt_repo_root)" || return
 
-    if [ -d "$repo_root/.worktrees" ]; then
-        ls -1 "$repo_root/.worktrees" 2>/dev/null
-    fi
+    local home_wt_base="$(_wt_home_dir "$repo_root")"
+    {
+        [ -d "$home_wt_base" ] && ls -1 "$home_wt_base" 2>/dev/null
+        [ -d "$repo_root/.worktrees" ] && ls -1 "$repo_root/.worktrees" 2>/dev/null
+    } | sort -u
 }
 
 # Shell-specific completion setup
