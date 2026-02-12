@@ -18,7 +18,7 @@ Personal dotfiles for dev container setup. The `install.sh` script configures a 
 **Shell Configuration**:
 - inputrc: arrow-key history search
 - gitconfig/gitignore: git aliases and global ignores
-- Shell aliases: `g`=git, `d`=dvc, `pt`=pytest, `cl`=claude, etc.
+- Shell aliases: `g`=git, `pr`=pivot repro/run, `pt`=pytest, `cl`=claude, etc.
 - Environment: `ANTHROPIC_MODEL=opus`, `EDITOR=vim`
 
 **Claude Code Setup** (copied from `claude/`):
