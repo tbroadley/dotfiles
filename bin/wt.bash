@@ -13,6 +13,20 @@
 # Track the previous worktree directory for "wt -"
 _WT_PREVIOUS_DIR=""
 
+# Trust a directory in Claude Code's ~/.claude.json so it skips the trust dialog.
+_wt_claude_trust() {
+    local dir="$1"
+    local claude_json="$HOME/.claude.json"
+    [ -f "$claude_json" ] || return 0
+    command -v jq &>/dev/null || return 0
+    local tmp="${claude_json}.tmp.$$"
+    if jq --arg d "$dir" '.projects[$d].hasTrustDialogAccepted = true' "$claude_json" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$claude_json"
+    else
+        rm -f "$tmp"
+    fi
+}
+
 # Repair a worktree's .git file and the main repo's gitdir pointer when
 # absolute paths are stale (e.g., repo was created on host but accessed in a
 # dev container at a different mount point).
@@ -201,6 +215,9 @@ wt() {
         git worktree list
         return 1
     fi
+
+    # Trust the new worktree in Claude Code
+    _wt_claude_trust "$new_wt_dir"
 
     # Copy .env if it exists in main repo
     [ -f "$repo_root/.env" ] && cp "$repo_root/.env" "$new_wt_dir/"
