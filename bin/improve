@@ -56,33 +56,39 @@ while true; do
 
     log "Checking for unseen tasks..."
 
-    NEW_TASKS=$(curl -s "https://api.todoist.com/api/v1/tasks" \
-        -H "Authorization: Bearer $TODOIST_TOKEN" | \
-        node -e "
-const seenTasks = new Set(\`$SEEN_TASKS\`.split('\n').filter(Boolean));
-const repoPrefix = '$REPO_NAME:';
-const initialsPrefix = '$REPO_INITIALS:';
+    NEW_TASKS=$(SEEN_TASKS="$SEEN_TASKS" REPO_NAME="$REPO_NAME" REPO_INITIALS="$REPO_INITIALS" \
+        node --no-warnings -e "
+const https = require('https');
+const seenTasks = new Set((process.env.SEEN_TASKS || '').split('\n').filter(Boolean));
+const repoPrefix = process.env.REPO_NAME + ':';
+const initialsPrefix = process.env.REPO_INITIALS + ':';
+const token = process.env.TODOIST_TOKEN;
 
-let data = '';
-process.stdin.on('data', chunk => data += chunk);
-process.stdin.on('end', () => {
-    try {
-        const response = JSON.parse(data);
-        const tasks = response.results || response;
-        const newTasks = tasks
-            .filter(t => !seenTasks.has(t.id))
-            .filter(t => t.content.startsWith(repoPrefix) || t.content.startsWith(initialsPrefix))
-            .map(t => ({
-                id: t.id,
-                content: t.content,
-                description: t.description || '',
-                project_id: t.project_id || ''
-            }));
-        if (newTasks.length > 0) {
-            console.log(JSON.stringify(newTasks));
-        }
-    } catch (e) {}
-});
+function fetchPage(cursor) {
+    const url = 'https://api.todoist.com/api/v1/tasks' + (cursor ? '?cursor=' + cursor : '');
+    return new Promise((resolve, reject) => {
+        https.get(url, { headers: { 'Authorization': 'Bearer ' + token } }, res => {
+            let d = '';
+            res.on('data', c => d += c);
+            res.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
+        }).on('error', reject);
+    });
+}
+
+(async () => {
+    let allTasks = [];
+    let cursor = null;
+    do {
+        const resp = await fetchPage(cursor);
+        allTasks.push(...(resp.results || resp));
+        cursor = resp.next_cursor || null;
+    } while (cursor);
+    const newTasks = allTasks
+        .filter(t => !seenTasks.has(t.id))
+        .filter(t => t.content.startsWith(repoPrefix) || t.content.startsWith(initialsPrefix))
+        .map(t => ({ id: t.id, content: t.content, description: t.description || '', project_id: t.project_id || '' }));
+    if (newTasks.length > 0) console.log(JSON.stringify(newTasks));
+})().catch(() => {});
 " 2>/dev/null || echo "")
 
     if [[ -n "$NEW_TASKS" && "$NEW_TASKS" != "[]" ]]; then
