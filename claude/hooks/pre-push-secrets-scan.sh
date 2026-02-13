@@ -15,23 +15,29 @@ if [ -z "$diff_output" ]; then
     exit 0
 fi
 
-prompt="Analyze this git diff for sensitive data that should not be pushed to a repository.
+prompt="Analyze this git diff for hardcoded secrets that should not be pushed to a repository.
 
-Look for:
-- API keys, tokens, secrets (AWS, GitHub, Stripe, etc.)
-- Passwords or credentials
-- Private keys (SSH, PGP, etc.)
-- Connection strings with embedded credentials
-- .env file contents with real values
-- High-entropy strings that look like secrets
+Look ONLY for actual secret values directly embedded in the code:
+- Hardcoded API keys, tokens, or secrets (e.g. \`api_key = \"sk-abc123...\"\`)
+- Hardcoded passwords or credentials
+- Private key material (SSH, PGP, etc.)
+- Connection strings with embedded passwords
+- .env file contents with real secret values
+- High-entropy strings that look like actual secret values
+
+Do NOT flag:
+- References to environment variables (e.g. \`process.env.API_KEY\`, \`\$TODOIST_TOKEN\`, \`os.getenv()\`)
+- Code that reads secrets from config files, vaults, or env vars at runtime
+- Variable names or keys that mention \"token\", \"secret\", \"key\", etc. without containing actual secret values
+- Authorization headers that use variables/env vars for the token value
 
 <diff>
 $diff_output
 </diff>
 
 Respond with ONLY a JSON object (no markdown, no explanation):
-- If NO secrets found: {\"safe\": true}
-- If secrets found: {\"safe\": false, \"findings\": [\"brief description of each finding\"]}"
+- If NO hardcoded secrets found: {\"safe\": true}
+- If hardcoded secrets found: {\"safe\": false, \"findings\": [\"brief description of each finding\"]}"
 
 scan_result=$(claude --print --model haiku --allowedTools '' --max-turns 1 -p "$prompt" 2>/dev/null) || exit 0
 
