@@ -88,12 +88,15 @@ Based on the review subagent's response:
 
 ### Step 5: Cleanup
 
-Before finalizing, run the cleanup skill to remove anti-patterns from the changed code:
+Before finalizing, run the `/cleanup` skill to remove anti-patterns and enforce CLAUDE.md conventions on the changed code:
 
-1. **Spawn cleanup subagent**: Launch a Task subagent (subagent_type: "general-purpose") and instruct it to run the cleanup skill
-2. **Give it context**: Provide the cumulative context and emphasize that cleanup should only apply to code changed on this branch (not pre-existing code on main)
+1. **Spawn cleanup subagent**: Launch a Task subagent (subagent_type: "general-purpose") and instruct it to run the cleanup skill (invoke `/cleanup`)
+2. **Give it context**: Provide the cumulative context. Instruct it to:
+   - Read the project's `CLAUDE.md` and `~/.claude/CLAUDE.md` to check changed code against all style rules and conventions
+   - Apply both the hardcoded cleanup patterns and any CLAUDE.md rule violations
+   - Only clean up code changed on this branch (not pre-existing code on main)
 3. **Validate and commit**: After cleanup, the subagent should validate (linter/typechecker/tests), commit changes with message "Clean up code before PR", and push
-4. **Append to context**: Add a cleanup summary to the cumulative context
+4. **Append to context**: Add a cleanup summary to the cumulative context, noting which changes came from CLAUDE.md rules vs hardcoded patterns
 
 ### Step 6: Finalize
 

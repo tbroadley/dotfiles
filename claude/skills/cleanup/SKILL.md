@@ -21,6 +21,22 @@ Do NOT clean up anti-patterns in code that was already on `main` unless the user
 3. Consolidates tests using parameterization
 4. Removes other unwanted patterns
 
+## Crosscheck Against CLAUDE.md
+
+Before applying the hardcoded patterns below, also check the changed code against rules from:
+
+1. **Project CLAUDE.md**: Read the repo's `CLAUDE.md` (if it exists) for project-specific style rules, conventions, and patterns
+2. **Global CLAUDE.md**: Read `~/.claude/CLAUDE.md` (if it exists) for global coding style rules
+
+Scan the changed code for violations of any rules in these files. Common things to catch:
+- Import style violations (e.g., importing individual items instead of modules)
+- Testing anti-patterns (e.g., using classes to group tests, defensive `.get()` in assertions, mocking internals)
+- Python style violations (e.g., for-loop accumulators instead of comprehensions, if-else blocks instead of ternary for simple returns)
+- Error handling violations (e.g., logging warnings instead of failing early)
+- Any other project-specific or global conventions defined in these files
+
+CLAUDE.md rules take **equal priority** to the hardcoded patterns below — violations of CLAUDE.md rules are just as important to fix.
+
 ## Cleanup Tasks
 
 ### 1. Remove Unnecessary Comments
@@ -365,15 +381,16 @@ mocker.patch("myapp.internal_helper")  # Bad - internal code
 
 ## Workflow
 
-1. **Identify files to clean**: Run `git diff main...HEAD --name-only` to find files changed on this branch, then focus cleanup on only the changed portions of those files (not pre-existing code)
-2. **Review systematically**: Go through each cleanup category above in priority order, but only for code introduced on this branch:
-   - **Priority 1 (CRITICAL)**: Defensive code patterns (sections 4-6)
-   - **Priority 2 (HIGH)**: Test structure and parameterization (sections 3, 8)
-   - **Priority 3 (MEDIUM)**: Type checking issues (section 5)
-   - **Priority 4 (LOW)**: Comments, docstrings, imports (sections 1, 2, 7)
-3. **Make changes**: Edit files to remove unwanted patterns in the new/changed code
-4. **Run tests**: Ensure changes don't break anything
-5. **Summarize**: Tell the user what was cleaned up, organized by category
+1. **Load rules**: Read the project's `CLAUDE.md` and `~/.claude/CLAUDE.md` (if they exist) to understand all applicable style rules and conventions
+2. **Identify files to clean**: Run `git diff main...HEAD --name-only` to find files changed on this branch, then focus cleanup on only the changed portions of those files (not pre-existing code)
+3. **Review systematically**: Check changed code against both CLAUDE.md rules and the hardcoded patterns above, in priority order:
+   - **Priority 1 (CRITICAL)**: Defensive code patterns (sections 4-6) and CLAUDE.md "fail early" rules
+   - **Priority 2 (HIGH)**: Test structure and parameterization (sections 3, 8) and CLAUDE.md testing rules
+   - **Priority 3 (MEDIUM)**: Type checking issues (section 5) and CLAUDE.md type checking rules
+   - **Priority 4 (LOW)**: Comments, docstrings, imports (sections 1, 2, 7) and CLAUDE.md import/style rules
+4. **Make changes**: Edit files to fix violations in the new/changed code
+5. **Run tests**: Ensure changes don't break anything
+6. **Summarize**: Tell the user what was cleaned up, organized by category, noting which changes came from CLAUDE.md rules vs hardcoded patterns
 
 ## Notes
 
