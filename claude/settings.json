@@ -57,7 +57,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/check-devcontainer.sh"
+            "command": "~/.claude/hooks/check-branch-freshness.sh",
+            "timeout": 10000
           }
         ]
       }

@@ -15,6 +15,7 @@ To persist changes: commit and push from the dotfiles repo.
 ## Git
 - When working in a git worktree, change to the worktree directory rather than running commands from the main repo—this avoids confusion about which files are being modified
 - When you need to clone a repo, create a `.clones` directory under the current working directory and clone into it (e.g., `.clones/some-repo`)
+- Before writing code, ensure the current branch is up to date with its remote. If the SessionStart hook warns the branch is behind, run `git pull --rebase` before making changes. If asked to work from a specific branch (e.g., main), fetch and fast-forward it first.
 
 ## GitHub
 - Prefix all GitHub comments (PR reviews, issue comments, discussions) with "Claude Code:"
