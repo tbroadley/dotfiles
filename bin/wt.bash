@@ -429,9 +429,21 @@ elif [ -n "$ZSH_VERSION" ]; then
         _describe 'worktree' worktrees
     }
 
-    # compdef requires compinit to have been run first
+    # compdef requires compinit to have been run first.
+    # If compdef isn't available yet (wt.bash sourced before compinit),
+    # defer registration via a precmd hook that runs once after compinit.
     if (( $+functions[compdef] )); then
         compdef _wt_completion wt
         compdef _wtd_completion wtd
+    else
+        _wt_deferred_compdef() {
+            if (( $+functions[compdef] )); then
+                compdef _wt_completion wt
+                compdef _wtd_completion wtd
+                precmd_functions=(${precmd_functions:#_wt_deferred_compdef})
+                unfunction _wt_deferred_compdef
+            fi
+        }
+        precmd_functions+=(_wt_deferred_compdef)
     fi
 fi
