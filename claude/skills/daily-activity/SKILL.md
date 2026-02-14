@@ -40,9 +40,10 @@ gh search prs --author=tbroadley --updated=">=$TARGET_DATE" --json number,title,
 
 For each PR found:
 1. Check if it was created today OR had commits pushed today
-2. Get the list of commits: `gh pr view <number> -R <repo> --json commits`
-3. Filter commits by date to identify which were pushed today
-4. Get line change stats
+2. Filter commits by date to identify which were pushed today
+3. Get line change stats
+
+**IMPORTANT:** Always use `gh api` to list PR commits—never use `gh pr view --json commits`. The `--json commits` output can show rebased timestamps (e.g., all commits dated identically) instead of actual author dates, causing today's commits to be missed entirely.
 
 **For PRs created today:** Report the total PR additions/deletions.
 
