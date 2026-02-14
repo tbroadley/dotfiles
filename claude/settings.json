@@ -84,6 +84,5 @@
     "warehouse-query@metr-eval-execution": true,
     "hugging-face-cli@huggingface-skills": true,
     "hugging-face-datasets@huggingface-skills": true
-  },
-  "fastMode": true
+  }
 }
