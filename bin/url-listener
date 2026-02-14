@@ -119,6 +119,24 @@ class URLHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(result.stdout)
+        elif parsed.path == "/notify":
+            title = params.get("title", ["Claude Code"])[0]
+            message = params.get("message", [""])[0]
+            sound = params.get("sound", [""])[0]
+            if not message:
+                self.send_response(400)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"Missing message parameter")
+                return
+            script = f'display notification {json.dumps(message)} with title {json.dumps(title)}'
+            if sound:
+                script += f' sound name {json.dumps(sound)}'
+            subprocess.run(["/usr/bin/osascript", "-e", script], check=False)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
         elif parsed.path == "/health":
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")

@@ -52,6 +52,12 @@ To persist changes: commit and push from the dotfiles repo.
 - Use absolute imports, not relative (even within the same package)
 - Exceptions: typing, collections.abc, typing_extensions for type checking
 
+## Notifications
+- Use `notify "message"` to send a macOS notification to the user (works in both dev containers and on host)
+- Use `notify -t "Title" "message"` to set a custom title (default: "Claude Code")
+- Use `notify -s default "message"` to play a sound with the notification
+- Use notifications to alert the user when long-running tasks complete, when you need input, or when something unexpected happens
+
 ## Testing (pytest)
 - Don't use classes to group tests
 - Test through public APIs, not internal/private functions

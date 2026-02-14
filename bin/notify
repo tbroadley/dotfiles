@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Send a macOS notification. Works on host and in dev containers.
+# Usage: notify [-t title] [-s sound] message
+
+TITLE="Claude Code"
+SOUND=""
+
+while getopts "t:s:" opt; do
+    case "$opt" in
+        t) TITLE="$OPTARG" ;;
+        s) SOUND="$OPTARG" ;;
+        *) echo "Usage: notify [-t title] [-s sound] message" >&2; exit 1 ;;
+    esac
+done
+shift $((OPTIND - 1))
+
+MESSAGE="$*"
+if [ -z "$MESSAGE" ]; then
+    echo "Usage: notify [-t title] [-s sound] message" >&2
+    exit 1
+fi
+
+urlencode() { python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read()))" <<< "$1"; }
+json_quote() { python3 -c "import json, sys; print(json.dumps(sys.stdin.read().strip()))" <<< "$1"; }
+
+if [ -f /.dockerenv ]; then
+    PORT="${URL_LISTENER_PORT:-7077}"
+    URL="http://host.docker.internal:${PORT}/notify?title=$(urlencode "$TITLE")&message=$(urlencode "$MESSAGE")"
+    if [ -n "$SOUND" ]; then
+        URL="${URL}&sound=$(urlencode "$SOUND")"
+    fi
+    curl -sf "$URL" >/dev/null 2>&1 &
+else
+    SCRIPT="display notification $(json_quote "$MESSAGE") with title $(json_quote "$TITLE")"
+    if [ -n "$SOUND" ]; then
+        SCRIPT="$SCRIPT sound name $(json_quote "$SOUND")"
+    fi
+    /usr/bin/osascript -e "$SCRIPT"
+fi
