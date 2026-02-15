@@ -33,8 +33,16 @@ RUN apt-get update -qq && \
     npm install -g @anthropic-ai/claude-code
 USER node
 WORKDIR /home/node
-RUN echo '{"hasCompletedOnboarding":true,"theme":"dark"}' > /home/node/.claude.json
-ENTRYPOINT ["claude", "--dangerously-skip-permissions"]
+RUN printf '#!/bin/sh\n\
+mkdir -p /home/node/sandbox /home/node/.claude\n\
+echo "$_CLAUDE_STATE" > /home/node/.claude.json\n\
+echo "$_CLAUDE_SETTINGS" > /home/node/.claude/settings.json\n\
+echo "$_CLAUDE_MD" > /home/node/sandbox/CLAUDE.md\n\
+cd /home/node/sandbox\n\
+git init -q\n\
+exec claude --dangerously-skip-permissions "$@"\n' > /home/node/entrypoint.sh \
+    && chmod +x /home/node/entrypoint.sh
+ENTRYPOINT ["/home/node/entrypoint.sh"]
 DOCKERFILE
     echo "Sandbox image built"
 fi
@@ -50,11 +58,44 @@ if [[ -z "$api_key" ]]; then
     exit 1
 fi
 
+# Pre-approve the API key and bypass permissions to skip interactive prompts
+# Claude Code identifies keys by their last 20 characters
+key_suffix="${api_key: -20}"
+claude_state="{\"hasCompletedOnboarding\":true,\"theme\":\"dark\",\"bypassPermissionsModeAccepted\":true,\"effortCalloutDismissed\":true,\"customApiKeyResponses\":{\"approved\":[\"${key_suffix}\"]}}"
+
+# Settings: use opus model
+claude_settings='{"model":"opus"}'
+
+# Project instructions
+read -r -d '' claude_md << 'INSTRUCTIONS' || true
+# Sandbox Planning Session
+
+You are in an isolated sandbox container for research and planning. You have:
+
+- **Full internet access** — use WebSearch and WebFetch liberally
+- **No access to any codebase or file system** beyond this container
+- **No credentials** — you cannot access private repos, APIs, or services
+
+## Your Role
+
+Help the user design and plan by:
+
+1. **Researching thoroughly** — search the web, read documentation, explore options
+2. **Comparing alternatives** — lay out trade-offs between approaches
+3. **Producing concrete artifacts** — architecture docs, API designs, implementation plans
+4. **Iterating on feedback** — refine plans based on the user's input
+
+Do not hesitate to run many web searches. That is the whole point of this environment.
+INSTRUCTIONS
+
 exec docker run --rm -it \
     --name "claude-sandbox-$$" \
     --cap-drop=ALL \
     --security-opt=no-new-privileges \
     -e ANTHROPIC_API_KEY="$api_key" \
     -e ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-}" \
+    -e _CLAUDE_STATE="$claude_state" \
+    -e _CLAUDE_SETTINGS="$claude_settings" \
+    -e _CLAUDE_MD="$claude_md" \
     "$IMAGE_NAME" \
     "$@"
