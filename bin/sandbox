@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# sandbox: Run Claude Code in an isolated container for safe planning/research
+#
+# - No host filesystem access
+# - No credentials forwarded (except Anthropic API key for Claude Code to function)
+# - Internet access for web searches
+# - Claude Code runs with --dangerously-skip-permissions
+#
+# Usage: sandbox [options] [prompt...]
+#   -r, --rebuild   Rebuild the sandbox Docker image
+
+IMAGE_NAME="claude-sandbox"
+REBUILD=false
+
+while [[ "${1:-}" == -* ]]; do
+    case "$1" in
+        --rebuild|-r) REBUILD=true; shift ;;
+        --) shift; break ;;
+        *) break ;;
+    esac
+done
+
+# Build image if needed
+if [[ "$REBUILD" == true ]] || ! docker image inspect "$IMAGE_NAME" &>/dev/null; then
+    echo "Building sandbox image..."
+    docker build -t "$IMAGE_NAME" - <<'DOCKERFILE'
+FROM node:lts-slim
+RUN apt-get update -qq && \
+    apt-get install -y -qq --no-install-recommends git curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    npm install -g @anthropic-ai/claude-code
+USER node
+WORKDIR /home/node
+ENTRYPOINT ["claude", "--dangerously-skip-permissions"]
+DOCKERFILE
+    echo "Sandbox image built"
+fi
+
+# Get Anthropic API key (env var first, then macOS keychain)
+api_key="${ANTHROPIC_API_KEY:-}"
+if [[ -z "$api_key" ]] && command -v security &>/dev/null; then
+    api_key=$(security find-generic-password -s "Claude Code" -w 2>/dev/null) || true
+fi
+
+if [[ -z "$api_key" ]]; then
+    echo "Error: ANTHROPIC_API_KEY not found in environment or macOS keychain"
+    exit 1
+fi
+
+exec docker run --rm -it \
+    --name "claude-sandbox-$$" \
+    --cap-drop=ALL \
+    --security-opt=no-new-privileges \
+    -e ANTHROPIC_API_KEY="$api_key" \
+    -e ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-}" \
+    "$IMAGE_NAME" \
+    "$@"
