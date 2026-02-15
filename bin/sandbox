@@ -33,6 +33,7 @@ RUN apt-get update -qq && \
     npm install -g @anthropic-ai/claude-code
 USER node
 WORKDIR /home/node
+RUN echo '{"hasCompletedOnboarding":true,"theme":"dark"}' > /home/node/.claude.json
 ENTRYPOINT ["claude", "--dangerously-skip-permissions"]
 DOCKERFILE
     echo "Sandbox image built"
