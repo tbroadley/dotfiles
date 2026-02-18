@@ -12,6 +12,7 @@ This document lists all setup steps needed for each Claude Code skill.
 | linear | API key | `LINEAR_API_KEY` |
 | datadog | API + App keys | `DD_API_KEY`, `DD_APP_KEY`, `DD_SITE` |
 | airtable | Personal access token | `AIRTABLE_TOKEN` |
+| bitwarden | CLI + vault login | `BW_SESSION` |
 | google-calendar | OAuth setup | - |
 | gmail | OAuth setup | - |
 | google-drive | OAuth setup | - |
@@ -95,6 +96,16 @@ pip install hawk-cli
    ```bash
    export AIRTABLE_TOKEN="pat..."
    ```
+
+### bitwarden
+1. Install: `brew install bitwarden-cli`
+2. Login: `bw login` (email + master password + 2FA)
+3. Unlock: `bw unlock` (returns a session token)
+4. Add to shell profile:
+   ```bash
+   export BW_SESSION="..."
+   ```
+5. Note: Session tokens expire after inactivity. Re-run `bw unlock` and update `BW_SESSION` when needed.
 
 ---
 
@@ -217,6 +228,9 @@ curl -s "https://gmail.googleapis.com/gmail/v1/users/me/profile" \
 
 curl -s "https://www.googleapis.com/drive/v3/files?pageSize=5" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq '.files[].name'
+
+# Bitwarden
+bw status --session "$(printenv BW_SESSION)" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
 
 # Alfred Clipboard
 sqlite3 ~/Library/Application\ Support/Alfred/Databases/clipboard.alfdb \
