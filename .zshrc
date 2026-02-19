@@ -44,6 +44,7 @@ alias v=vim
 alias cl=claude
 alias clc='claude --continue'
 alias clr='claude --resume'
+alias oc=opencode
 
 # Completions
 autoload -Uz compinit && compinit
