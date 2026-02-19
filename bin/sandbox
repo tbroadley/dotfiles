@@ -9,7 +9,9 @@ set -euo pipefail
 # - Claude Code runs with --dangerously-skip-permissions
 #
 # Usage: sandbox [options] [prompt...]
-#   -r, --rebuild   Rebuild the sandbox Docker image
+#   -r, --rebuild    Rebuild the sandbox Docker image
+#   -l, --list       List existing sandbox containers
+#   -a, --attach ID  Restart and attach to a stopped sandbox container
 
 IMAGE_NAME="claude-sandbox"
 REBUILD=false
@@ -17,6 +19,15 @@ REBUILD=false
 while [[ "${1:-}" == -* ]]; do
     case "$1" in
         --rebuild|-r) REBUILD=true; shift ;;
+        --list|-l)
+            docker ps -a --filter "name=claude-sandbox-" \
+                --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.CreatedAt}}"
+            exit 0 ;;
+        --attach|-a)
+            shift
+            container="${1:?Usage: sandbox --attach <container-id-or-name>}"
+            docker start -ai "$container"
+            exit $? ;;
         --) shift; break ;;
         *) break ;;
     esac
@@ -88,7 +99,7 @@ Help the user design and plan by:
 Do not hesitate to run many web searches. That is the whole point of this environment.
 INSTRUCTIONS
 
-exec docker run --rm -it \
+exec docker run -it \
     --name "claude-sandbox-$$" \
     --cap-drop=ALL \
     --security-opt=no-new-privileges \
