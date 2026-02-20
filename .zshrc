@@ -45,6 +45,7 @@ alias cl=claude
 alias clc='claude --continue'
 alias clr='claude --resume'
 alias oc=opencode
+alias awsl='aws sso login'
 
 # Completions
 autoload -Uz compinit && compinit
