@@ -1,0 +1,27 @@
+#!/bin/bash
+# Store SSH key passphrases in macOS Keychain.
+#
+# This adds your SSH key passphrase to the macOS login keychain so the SSH
+# agent can unlock the key automatically. Run once per key.
+#
+# Usage: ssh-keychain-setup [key_path]
+#   key_path: path to SSH private key (default: ~/.ssh/id_ed25519)
+#
+# Prerequisites: ~/.ssh/config must have:
+#   Host *
+#     AddKeysToAgent yes
+#     UseKeychain yes
+
+set -euo pipefail
+
+key_path="${1:-$HOME/.ssh/id_ed25519}"
+
+if [[ ! -f "$key_path" ]]; then
+  echo "Error: key not found: $key_path" >&2
+  exit 1
+fi
+
+echo "Adding $key_path to macOS Keychain..."
+echo "You'll be prompted for the key's passphrase (one time only)."
+ssh-add --apple-use-keychain "$key_path"
+echo "Done. The passphrase is now stored in your login keychain."
