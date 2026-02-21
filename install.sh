@@ -138,7 +138,6 @@ add_to_rc "alias clr=" "alias clr='claude --resume'"
 add_to_rc "alias awsl=" "alias awsl='aws sso login'"
 add_to_rc "alias codex=" "alias codex='codex --add-dir /opt/python'"
 add_to_rc "alias cx=" "alias cx='codex --add-dir /opt/python'"
-add_to_rc "alias oc=opencode" "alias oc=opencode"
 add_to_rc "export ANTHROPIC_MODEL=opus" "export ANTHROPIC_MODEL=opus"
 add_to_rc "export PYTHON_KEYRING_BACKEND=" "export PYTHON_KEYRING_BACKEND=keyrings.alt.file.PlaintextKeyring"
 add_to_rc "export EDITOR=vim" "export EDITOR=vim"
@@ -425,17 +424,6 @@ install_claude_code() {
   echo "Claude Code installation completed"
 }
 
-install_opencode() {
-  if command -v opencode >/dev/null 2>&1; then
-    echo "OpenCode is already installed: $(opencode --version 2>&1 | head -1)"
-    return 0
-  fi
-
-  echo "Installing OpenCode..."
-  OPENCODE_INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path
-  echo "OpenCode installation completed"
-}
-
 install_shell_alias_suggestions() {
   if ! command -v uv >/dev/null 2>&1; then
     echo "uv not found, skipping shell-alias-suggestions installation"
@@ -461,14 +449,14 @@ install_shell_alias_suggestions() {
 # Export functions and variables for subshells
 export -f verify_checksum
 export -f install_ripgrep install_jq install_gh install_zoxide install_pup install_nvm_and_node
-export -f install_claude_code install_opencode install_shell_alias_suggestions
+export -f install_claude_code install_shell_alias_suggestions
 export HOME SCRIPT_DIR
 
 # Phase 1: Run independent installations in parallel
 echo "Starting Phase 1 installations (parallel)..."
 
 # Start background jobs and track PIDs
-for job_name in ripgrep jq gh zoxide pup nvm claude-code opencode shell-alias-suggestions; do
+for job_name in ripgrep jq gh zoxide pup nvm claude-code shell-alias-suggestions; do
   output_file="$TEMP_DIR/${job_name}.out"
   JOB_OUTPUT_FILES["$job_name"]="$output_file"
   case "$job_name" in
@@ -479,7 +467,6 @@ for job_name in ripgrep jq gh zoxide pup nvm claude-code opencode shell-alias-su
     pup)                     install_pup > "$output_file" 2>&1 & ;;
     nvm)                     install_nvm_and_node > "$output_file" 2>&1 & ;;
     claude-code)             install_claude_code > "$output_file" 2>&1 & ;;
-    opencode)                install_opencode > "$output_file" 2>&1 & ;;
     shell-alias-suggestions) install_shell_alias_suggestions > "$output_file" 2>&1 & ;;
   esac
   JOB_PIDS["$job_name"]=$!
@@ -495,7 +482,7 @@ for job_name in "${!JOB_PIDS[@]}"; do
 done
 
 # Print output from successful jobs
-for job_name in ripgrep jq gh zoxide pup nvm claude-code opencode shell-alias-suggestions; do
+for job_name in ripgrep jq gh zoxide pup nvm claude-code shell-alias-suggestions; do
   output_file="${JOB_OUTPUT_FILES[$job_name]}"
   # Check if job_name exists in FAILED_JOBS array
   if [ -f "$output_file" ] && ! [[ -v "FAILED_JOBS[$job_name]" ]]; then
