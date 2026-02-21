@@ -46,6 +46,7 @@
       "Bash(sudo:*)"
     ],
     "additionalDirectories": [
+      "~/app",
       "~/dotfiles",
       "~/.worktrees"
     ]
