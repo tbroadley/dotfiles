@@ -81,7 +81,8 @@ Use `gh api` instead of `gh pr edit` to avoid "Projects (classic) deprecation" e
 
 ## Notes
 
-- Always pin URLs to a commit hash. Without it, GitHub may serve stale cached images for hours.
+- Always pin URLs to a **full** commit hash (`git rev-parse HEAD`). Short hashes (e.g., `4f295cd`) return 404 on `gist.githubusercontent.com`.
 - Use `chmod u+w` before overwriting files — gist clones may have read-only permissions.
 - Binary files (PNG, JPG) cannot be uploaded via `gh gist create` directly — the git clone/push approach is required.
 - The gist accumulates files over time. This is fine; old files don't cost anything.
+- **Bash `!` escaping**: Never build the PR body in a double-quoted bash variable — `!` in `![alt](url)` gets escaped to `\!` by bash history expansion, breaking image markdown. Always use a heredoc (`<<EOF`) to pass the body to `gh api`, as shown in step 6.
