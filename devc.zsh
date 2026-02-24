@@ -68,6 +68,11 @@ devc() {
         exec_opts+=(--remote-env "LINEAR_API_KEY=$LINEAR_API_KEY")
     fi
 
+    if [ -n "${BW_SESSION:-}" ]; then
+        up_opts+=(--remote-env "BW_SESSION=$BW_SESSION")
+        exec_opts+=(--remote-env "BW_SESSION=$BW_SESSION")
+    fi
+
     # Forward Codex auth cache if present on host
     local codex_auth_file="$HOME/.codex/auth.json"
     local codex_auth_b64=""
@@ -159,6 +164,7 @@ devc() {
         [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && echo "export CLAUDE_CODE_OAUTH_TOKEN=\"$CLAUDE_CODE_OAUTH_TOKEN\"" >> "$env_file"
         [ -n "${TODOIST_TOKEN:-}" ] && echo "export TODOIST_TOKEN=\"$TODOIST_TOKEN\"" >> "$env_file"
         [ -n "${LINEAR_API_KEY:-}" ] && echo "export LINEAR_API_KEY=\"$LINEAR_API_KEY\"" >> "$env_file"
+        [ -n "${BW_SESSION:-}" ] && echo "export BW_SESSION=\"$BW_SESSION\"" >> "$env_file"
         [ -n "${TZ:-}" ] && echo "export TZ=\"$TZ\"" >> "$env_file"
 
         # Source from shell rc files if not already configured
