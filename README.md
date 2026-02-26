@@ -20,8 +20,6 @@ Claude Code stores its API key in the macOS Keychain (service "Claude Code"), wh
 1. Log in to Claude Code on your Mac: `claude /login`
 2. Use dev containers as normal — `devc` handles forwarding.
 
-If you use an OAuth token instead (`CLAUDE_CODE_OAUTH_TOKEN` env var), `devc` forwards that too.
-
 ## Codex Configuration in Dev Containers
 
 The `install.sh` script configures Codex inside dev containers:

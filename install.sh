@@ -651,7 +651,7 @@ fi
 
 # Configure Claude Code authentication if token is available
 if _agent_allowed claude_code; then
-  if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] || [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
     if [ -f "$HOME/.claude.json" ]; then
       jq '. + {"hasCompletedOnboarding": true}' "$HOME/.claude.json" > "$HOME/.claude.json.tmp" && mv "$HOME/.claude.json.tmp" "$HOME/.claude.json"
     else
