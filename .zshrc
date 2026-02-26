@@ -41,10 +41,16 @@ alias kc='kubectl config use-context'
 alias psa='dvc push && git push'
 alias tf=terraform
 alias v=vim
-alias cl=claude
-alias clc='claude --continue'
-alias clr='claude --resume'
 alias awsl='aws sso login'
+
+# Agent gating: block agents not listed in .allowed-agents (if file exists)
+source ~/dotfiles/bin/agent-gate.sh
+cl() { _check_agent_allowed claude_code && claude "$@"; }
+clc() { _check_agent_allowed claude_code && claude --continue "$@"; }
+clr() { _check_agent_allowed claude_code && claude --resume "$@"; }
+gemini() { _check_agent_allowed gemini && command gemini "$@"; }
+codex() { _check_agent_allowed codex && command codex "$@"; }
+cx() { _check_agent_allowed codex && command codex "$@"; }
 
 # Completions
 autoload -Uz compinit && compinit
@@ -168,6 +174,7 @@ start() {
         echo "Usage: start <project> <task description...>"
         return 1
     fi
+    _check_agent_allowed claude_code || return 1
 
     local project="$1"; shift
     local task="$*"

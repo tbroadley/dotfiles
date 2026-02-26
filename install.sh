@@ -112,6 +112,43 @@ remove_from_rc() {
   done
 }
 
+# Agent gating: detect workspace and determine which agents are allowed
+source "$SCRIPT_DIR/bin/agent-gate.sh"
+
+_workspace_dir="${CONTAINER_WORKSPACE_FOLDER:-}"
+if [[ -z "$_workspace_dir" ]] && [[ -d /workspaces ]]; then
+  _ws_dirs=(/workspaces/*/)
+  [[ ${#_ws_dirs[@]} -eq 1 ]] && _workspace_dir="${_ws_dirs[0]%/}"
+fi
+
+_agent_allowed() {
+  [[ -z "$_workspace_dir" ]] && return 0
+  _check_agent_allowed "$1" "$_workspace_dir" 2>/dev/null
+}
+
+uninstall_claude_code() {
+  local claude_path
+  claude_path="$(command -v claude 2>/dev/null)" || return 0
+  echo "Uninstalling Claude Code (not allowed per .allowed-agents)..."
+  rm -f "$claude_path"
+  rm -rf "$HOME/.claude" "$HOME/.claude.json"
+}
+
+uninstall_codex() {
+  if npm list -g @openai/codex >/dev/null 2>&1; then
+    echo "Uninstalling Codex (not allowed per .allowed-agents)..."
+    npm uninstall -g @openai/codex
+  fi
+  rm -rf "$HOME/.codex"
+}
+
+uninstall_gemini() {
+  if [[ -d "$HOME/.gemini" ]]; then
+    echo "Removing Gemini config (not allowed per .allowed-agents)..."
+  fi
+  rm -rf "$HOME/.gemini"
+}
+
 # Aliases (work in both shells)
 add_to_rc "alias b=basedpyright" "alias b=basedpyright"
 remove_from_rc "claude()"
@@ -132,13 +169,30 @@ add_to_rc "psa()" 'psa() { if command -v pivot &>/dev/null; then pivot push; eli
 add_to_rc "alias pt=pytest" "alias pt=pytest"
 add_to_rc "alias r=ruff" "alias r=ruff"
 add_to_rc "alias v=vim" "alias v=vim"
-add_to_rc "alias cl=claude" "alias cl=claude"
-add_to_rc "alias clc=" "alias clc='claude --continue'"
-add_to_rc "alias clr=" "alias clr='claude --resume'"
 add_to_rc "alias awsl=" "alias awsl='aws sso login'"
-add_to_rc "alias codex=" "alias codex='codex --add-dir /opt/python'"
-add_to_rc "alias cx=" "alias cx='codex --add-dir /opt/python'"
-add_to_rc "export ANTHROPIC_MODEL=opus" "export ANTHROPIC_MODEL=opus"
+
+# Agent gating: block agents not listed in .allowed-agents (if file exists)
+add_to_rc "source ~/dotfiles/bin/agent-gate.sh" "source ~/dotfiles/bin/agent-gate.sh"
+remove_from_rc 'alias cl=' 'alias clc=' 'alias clr=' 'alias codex=' 'alias cx='
+if _agent_allowed claude_code; then
+  add_to_rc "cl()" 'cl() { _check_agent_allowed claude_code && claude "$@"; }'
+  add_to_rc "clc()" 'clc() { _check_agent_allowed claude_code && claude --continue "$@"; }'
+  add_to_rc "clr()" 'clr() { _check_agent_allowed claude_code && claude --resume "$@"; }'
+  add_to_rc "export ANTHROPIC_MODEL=opus" "export ANTHROPIC_MODEL=opus"
+else
+  remove_from_rc 'cl()' 'clc()' 'clr()' 'export ANTHROPIC_MODEL=opus'
+fi
+if _agent_allowed gemini; then
+  add_to_rc "gemini()" 'gemini() { _check_agent_allowed gemini && command gemini "$@"; }'
+else
+  remove_from_rc 'gemini()'
+fi
+if _agent_allowed codex; then
+  add_to_rc "codex()" 'codex() { _check_agent_allowed codex && command codex --add-dir /opt/python "$@"; }'
+  add_to_rc "cx()" 'cx() { _check_agent_allowed codex && command codex --add-dir /opt/python "$@"; }'
+else
+  remove_from_rc 'codex()' 'cx()'
+fi
 add_to_rc "export PYTHON_KEYRING_BACKEND=" "export PYTHON_KEYRING_BACKEND=keyrings.alt.file.PlaintextKeyring"
 add_to_rc "export EDITOR=vim" "export EDITOR=vim"
 # Persist host timezone if forwarded via TZ env var
@@ -450,13 +504,22 @@ install_shell_alias_suggestions() {
 export -f verify_checksum
 export -f install_ripgrep install_jq install_gh install_zoxide install_pup install_nvm_and_node
 export -f install_claude_code install_shell_alias_suggestions
+export -f uninstall_claude_code uninstall_codex uninstall_gemini
 export HOME SCRIPT_DIR
 
 # Phase 1: Run independent installations in parallel
 echo "Starting Phase 1 installations (parallel)..."
 
+# Build Phase 1 job list (gate agent tools)
+PHASE1_JOBS=(ripgrep jq gh zoxide pup nvm shell-alias-suggestions)
+if _agent_allowed claude_code; then
+  PHASE1_JOBS+=(claude-code)
+else
+  PHASE1_JOBS+=(uninstall-claude-code)
+fi
+
 # Start background jobs and track PIDs
-for job_name in ripgrep jq gh zoxide pup nvm claude-code shell-alias-suggestions; do
+for job_name in "${PHASE1_JOBS[@]}"; do
   output_file="$TEMP_DIR/${job_name}.out"
   JOB_OUTPUT_FILES["$job_name"]="$output_file"
   case "$job_name" in
@@ -467,6 +530,7 @@ for job_name in ripgrep jq gh zoxide pup nvm claude-code shell-alias-suggestions
     pup)                     install_pup > "$output_file" 2>&1 & ;;
     nvm)                     install_nvm_and_node > "$output_file" 2>&1 & ;;
     claude-code)             install_claude_code > "$output_file" 2>&1 & ;;
+    uninstall-claude-code)   uninstall_claude_code > "$output_file" 2>&1 & ;;
     shell-alias-suggestions) install_shell_alias_suggestions > "$output_file" 2>&1 & ;;
   esac
   JOB_PIDS["$job_name"]=$!
@@ -482,7 +546,7 @@ for job_name in "${!JOB_PIDS[@]}"; do
 done
 
 # Print output from successful jobs
-for job_name in ripgrep jq gh zoxide pup nvm claude-code shell-alias-suggestions; do
+for job_name in "${PHASE1_JOBS[@]}"; do
   output_file="${JOB_OUTPUT_FILES[$job_name]}"
   # Check if job_name exists in FAILED_JOBS array
   if [ -f "$output_file" ] && ! [[ -v "FAILED_JOBS[$job_name]" ]]; then
@@ -510,76 +574,91 @@ add_to_rc 'export BROWSER=open-url-on-host' 'export BROWSER=open-url-on-host'
 echo "Dotfiles bin added to PATH"
 
 # Configure Claude Code settings, hooks, and skills (fast, do immediately)
-CLAUDE_DIR="$HOME/.claude"
-mkdir -p "$CLAUDE_DIR"
-cp -r "$SCRIPT_DIR/claude/"* "$CLAUDE_DIR/"
-chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
+if _agent_allowed claude_code; then
+  CLAUDE_DIR="$HOME/.claude"
+  mkdir -p "$CLAUDE_DIR"
+  cp -r "$SCRIPT_DIR/claude/"* "$CLAUDE_DIR/"
+  chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 
-# Install external skills from GitHub repos
-install_external_skills() {
-  local skills_dir="$CLAUDE_DIR/skills"
-  mkdir -p "$skills_dir"
+  # Install external skills from GitHub repos
+  install_external_skills() {
+    local skills_dir="$CLAUDE_DIR/skills"
+    mkdir -p "$skills_dir"
 
-  # List of external skills: "repo:skill_path:local_name"
-  local external_skills=(
-    "sjawhar/pivot:skills/writing-pivot-stages:writing-pivot-stages"
-  )
+    # List of external skills: "repo:skill_path:local_name"
+    local external_skills=(
+      "sjawhar/pivot:skills/writing-pivot-stages:writing-pivot-stages"
+    )
 
-  for spec in "${external_skills[@]}"; do
-    IFS=':' read -r repo skill_path local_name <<< "$spec"
-    local target_dir="$skills_dir/$local_name"
-    mkdir -p "$target_dir"
+    for spec in "${external_skills[@]}"; do
+      IFS=':' read -r repo skill_path local_name <<< "$spec"
+      local target_dir="$skills_dir/$local_name"
+      mkdir -p "$target_dir"
 
-    if gh api "repos/$repo/contents/$skill_path/SKILL.md" 2>/dev/null | jq -r '.content' | base64 -d > "$target_dir/SKILL.md" 2>/dev/null; then
-      echo "Installed skill: $local_name (from $repo)"
-    else
-      echo "Warning: Failed to install skill $local_name from $repo"
-    fi
-  done
-}
+      if gh api "repos/$repo/contents/$skill_path/SKILL.md" 2>/dev/null | jq -r '.content' | base64 -d > "$target_dir/SKILL.md" 2>/dev/null; then
+        echo "Installed skill: $local_name (from $repo)"
+      else
+        echo "Warning: Failed to install skill $local_name from $repo"
+      fi
+    done
+  }
 
-if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  install_external_skills
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    install_external_skills
+  else
+    echo "Skipping external skills (gh CLI not authenticated)"
+  fi
+
+  echo "Claude Code settings, hooks, and skills installed"
 else
-  echo "Skipping external skills (gh CLI not authenticated)"
+  echo "Skipping Claude Code settings (not allowed per .allowed-agents)"
 fi
-
-echo "Claude Code settings, hooks, and skills installed"
 
 # Configure Codex settings + sync Claude skills into Codex
-CODEX_DIR="$HOME/.codex"
-mkdir -p "$CODEX_DIR"
-if [ -d "$SCRIPT_DIR/codex" ]; then
-  ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
-  echo "Codex config installed"
-fi
+if _agent_allowed codex; then
+  CODEX_DIR="$HOME/.codex"
+  mkdir -p "$CODEX_DIR"
+  if [ -d "$SCRIPT_DIR/codex" ]; then
+    ln -sf "$SCRIPT_DIR/codex/config.toml" "$CODEX_DIR/config.toml"
+    echo "Codex config installed"
+  fi
 
-if [ -d "$SCRIPT_DIR/claude/skills" ]; then
-  CODEX_SKILLS_DIR="$CODEX_DIR/skills"
-  mkdir -p "$CODEX_SKILLS_DIR"
-  for skill_dir in "$SCRIPT_DIR/claude/skills"/*; do
-    [ -d "$skill_dir" ] || continue
-    ln -sfn "$skill_dir" "$CODEX_SKILLS_DIR/$(basename "$skill_dir")"
-  done
-  echo "Codex skills synced from Claude"
+  if [ -d "$SCRIPT_DIR/claude/skills" ]; then
+    CODEX_SKILLS_DIR="$CODEX_DIR/skills"
+    mkdir -p "$CODEX_SKILLS_DIR"
+    for skill_dir in "$SCRIPT_DIR/claude/skills"/*; do
+      [ -d "$skill_dir" ] || continue
+      ln -sfn "$skill_dir" "$CODEX_SKILLS_DIR/$(basename "$skill_dir")"
+    done
+    echo "Codex skills synced from Claude"
+  fi
+else
+  echo "Skipping Codex config (not allowed per .allowed-agents)"
 fi
 
 # Configure Gemini CLI settings
-GEMINI_DIR="$HOME/.gemini"
-mkdir -p "$GEMINI_DIR"
-if [ -d "$SCRIPT_DIR/gemini" ]; then
-  ln -sf "$SCRIPT_DIR/gemini/settings.json" "$GEMINI_DIR/settings.json"
-  echo "Gemini CLI settings installed"
+if _agent_allowed gemini; then
+  GEMINI_DIR="$HOME/.gemini"
+  mkdir -p "$GEMINI_DIR"
+  if [ -d "$SCRIPT_DIR/gemini" ]; then
+    ln -sf "$SCRIPT_DIR/gemini/settings.json" "$GEMINI_DIR/settings.json"
+    echo "Gemini CLI settings installed"
+  fi
+else
+  uninstall_gemini
+  echo "Skipping Gemini settings (not allowed per .allowed-agents)"
 fi
 
 # Configure Claude Code authentication if token is available
-if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] || [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-  if [ -f "$HOME/.claude.json" ]; then
-    jq '. + {"hasCompletedOnboarding": true}' "$HOME/.claude.json" > "$HOME/.claude.json.tmp" && mv "$HOME/.claude.json.tmp" "$HOME/.claude.json"
-  else
-    echo '{"hasCompletedOnboarding": true}' > "$HOME/.claude.json"
+if _agent_allowed claude_code; then
+  if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] || [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    if [ -f "$HOME/.claude.json" ]; then
+      jq '. + {"hasCompletedOnboarding": true}' "$HOME/.claude.json" > "$HOME/.claude.json.tmp" && mv "$HOME/.claude.json.tmp" "$HOME/.claude.json"
+    else
+      echo '{"hasCompletedOnboarding": true}' > "$HOME/.claude.json"
+    fi
+    echo "Claude Code onboarding bypass configured"
   fi
-  echo "Claude Code onboarding bypass configured"
 fi
 
 # Define Phase 2 installation functions (depend on Phase 1)
@@ -624,15 +703,24 @@ export -f install_codex setup_gh_auth
 # Phase 2: Run npm-dependent and gh-auth in parallel
 echo "Starting Phase 2 installations (parallel)..."
 
+# Build Phase 2 job list (gate agent tools)
+PHASE2_JOBS=(gh-auth)
+if _agent_allowed codex; then
+  PHASE2_JOBS+=(codex)
+else
+  PHASE2_JOBS+=(uninstall-codex)
+fi
+
 declare -A PHASE2_PIDS=()
 declare -A PHASE2_OUTPUT=()
 
-for job_name in codex gh-auth; do
+for job_name in "${PHASE2_JOBS[@]}"; do
   output_file="$TEMP_DIR/${job_name}.out"
   PHASE2_OUTPUT["$job_name"]="$output_file"
   case "$job_name" in
-    codex)   install_codex > "$output_file" 2>&1 & ;;
-    gh-auth) setup_gh_auth > "$output_file" 2>&1 & ;;
+    codex)            install_codex > "$output_file" 2>&1 & ;;
+    uninstall-codex)  uninstall_codex > "$output_file" 2>&1 & ;;
+    gh-auth)          setup_gh_auth > "$output_file" 2>&1 & ;;
   esac
   PHASE2_PIDS["$job_name"]=$!
 done
@@ -647,7 +735,7 @@ for job_name in "${!PHASE2_PIDS[@]}"; do
 done
 
 # Print output from Phase 2 jobs
-for job_name in codex gh-auth; do
+for job_name in "${PHASE2_JOBS[@]}"; do
   output_file="${PHASE2_OUTPUT[$job_name]}"
   if [ -f "$output_file" ] && ! [[ -v "FAILED_JOBS[$job_name]" ]]; then
     cat "$output_file"
@@ -657,7 +745,7 @@ done
 echo "Phase 2 installations completed"
 
 # Phase 3: Install Claude Code plugins (requires both gh auth and claude)
-if [ -n "${GH_TOKEN:-}" ] && command -v claude >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+if _agent_allowed claude_code && [ -n "${GH_TOKEN:-}" ] && command -v claude >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   echo "Installing Claude Code plugins..."
   GITHUB_TOKEN="$GH_TOKEN" claude plugin marketplace add METR/eval-execution-claude 2>/dev/null || true
   GITHUB_TOKEN="$GH_TOKEN" claude plugin marketplace add huggingface/skills 2>/dev/null || true

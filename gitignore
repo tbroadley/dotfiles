@@ -4,3 +4,4 @@
 .specstory
 .worktrees
 .pivot_restore_lock_*
+.allowed-agents
