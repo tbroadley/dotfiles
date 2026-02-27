@@ -51,7 +51,7 @@ clr() { _check_agent_allowed claude_code && claude --resume "$@"; }
 gemini() { _check_agent_allowed gemini && command gemini "$@"; }
 codex() { _check_agent_allowed codex && command codex "$@"; }
 cx() { _check_agent_allowed codex && command codex "$@"; }
-cxr() { _check_agent_allowed codex && command codex --resume "$@"; }
+cxr() { _check_agent_allowed codex && command codex resume "$@"; }
 
 # Completions
 autoload -Uz compinit && compinit

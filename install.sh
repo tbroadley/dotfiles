@@ -190,7 +190,7 @@ fi
 if _agent_allowed codex; then
   add_to_rc "codex()" 'codex() { _check_agent_allowed codex && command codex --add-dir /opt/python "$@"; }'
   add_to_rc "cx()" 'cx() { _check_agent_allowed codex && command codex --add-dir /opt/python "$@"; }'
-  add_to_rc "cxr()" 'cxr() { _check_agent_allowed codex && command codex --resume --add-dir /opt/python "$@"; }'
+  add_to_rc "cxr()" 'cxr() { _check_agent_allowed codex && command codex resume --add-dir /opt/python "$@"; }'
 else
   remove_from_rc 'codex()' 'cx()' 'cxr()'
 fi
