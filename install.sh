@@ -464,7 +464,7 @@ install_claude_code() {
     if [ -L "$claude_path" ]; then
       claude_path="$(readlink -f "$claude_path")"
     fi
-    if file "$claude_path" 2>/dev/null | grep -q "ELF"; then
+    if [[ "$claude_path" == *"/.local/share/claude/"* ]]; then
       echo "Claude Code (native) is already installed: $(claude --version)"
       return 0
     fi
