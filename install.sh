@@ -187,6 +187,7 @@ if _agent_allowed gemini; then
 else
   remove_from_rc 'gemini()'
 fi
+remove_from_rc 'codex --resume'
 if _agent_allowed codex; then
   add_to_rc "codex()" 'codex() { _check_agent_allowed codex && command codex --add-dir /opt/python "$@"; }'
   add_to_rc "cx()" 'cx() { _check_agent_allowed codex && command codex --add-dir /opt/python "$@"; }'
