@@ -1,7 +1,8 @@
 approval_policy = "never"
-sandbox_mode = "workspace-write"
+sandbox_mode = "danger-full-access"
 cli_auth_credentials_store = "file"
 model = "gpt-5.3-codex"
+model_reasoning_effort = "medium"
 
 [sandbox_workspace_write]
 network_access = true
@@ -10,5 +11,9 @@ writable_roots = [
   "/home/metr/.config/hawk-cli"
 ]
 
+[notice]
+hide_full_access_warning = true
+
 [notice.model_migrations]
 "gpt-5.2-codex" = "gpt-5.3-codex"
+"gpt-5.1-codex-mini" = "gpt-5.3-codex"
