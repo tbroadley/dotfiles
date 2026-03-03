@@ -49,9 +49,9 @@ cl() { _check_agent_allowed claude_code && claude "$@"; }
 clc() { _check_agent_allowed claude_code && claude --continue "$@"; }
 clr() { _check_agent_allowed claude_code && claude --resume "$@"; }
 gemini() { _check_agent_allowed gemini && command gemini "$@"; }
-codex() { _check_agent_allowed codex && command codex "$@"; }
-cx() { _check_agent_allowed codex && command codex "$@"; }
-cxr() { _check_agent_allowed codex && command codex resume "$@"; }
+codex() { _check_agent_allowed codex && command codex --add-dir /opt/python --add-dir "$HOME/.cache/uv" "$@"; }
+cx() { _check_agent_allowed codex && command codex --add-dir /opt/python --add-dir "$HOME/.cache/uv" "$@"; }
+cxr() { _check_agent_allowed codex && command codex resume --add-dir /opt/python --add-dir "$HOME/.cache/uv" "$@"; }
 
 # Completions
 autoload -Uz compinit && compinit

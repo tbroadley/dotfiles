@@ -8,7 +8,8 @@ model_reasoning_effort = "medium"
 network_access = true
 writable_roots = [
   "/home/metr/dotfiles",
-  "/home/metr/.config/hawk-cli"
+  "/home/metr/.config/hawk-cli",
+  "/home/metr/.cache/uv"
 ]
 
 [notice]
