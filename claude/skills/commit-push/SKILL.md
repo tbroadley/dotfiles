@@ -72,10 +72,7 @@ Once local validation passes:
 1. Run `git status` and `git diff` to see changes
 2. Run `git log --oneline -3` to match commit message style
 3. Stage changes with `git add`
-4. Create commit with descriptive message ending with:
-   ```
-   Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
-   ```
+4. Create commit with a descriptive message
 5. Push to remote with `git push`
 
 ### 5. Check if on Main Branch
