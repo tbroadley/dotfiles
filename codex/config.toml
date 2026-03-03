@@ -1,5 +1,5 @@
 approval_policy = "never"
-sandbox_mode = "danger-full-access"
+sandbox_mode = "workspace-write"
 cli_auth_credentials_store = "file"
 model = "gpt-5.3-codex"
 model_reasoning_effort = "medium"
@@ -17,3 +17,6 @@ hide_full_access_warning = true
 [notice.model_migrations]
 "gpt-5.2-codex" = "gpt-5.3-codex"
 "gpt-5.1-codex-mini" = "gpt-5.3-codex"
+
+[features]
+use_linux_sandbox_bwrap = true
