@@ -691,10 +691,16 @@ setup_gh_auth() {
 
   if ! gh auth status >/dev/null 2>&1; then
     echo "Authenticating GitHub CLI with GH_TOKEN..."
-    echo "$GH_TOKEN" | gh auth login --with-token
+    # Temporarily unset GH_TOKEN so gh auth login can store credentials
+    GH_TOKEN_SAVED="$GH_TOKEN"
+    unset GH_TOKEN
+    echo "$GH_TOKEN_SAVED" | gh auth login --with-token
+    export GH_TOKEN="$GH_TOKEN_SAVED"
   fi
 
   gh auth setup-git
+  # Clear any existing values first to make this idempotent
+  git config --global --unset-all url."https://github.com/".insteadOf 2>/dev/null || true
   git config --global url."https://github.com/".insteadOf "git@github.com:"
   git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
   echo "GitHub CLI git credential helper configured"
