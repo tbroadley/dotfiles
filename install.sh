@@ -116,9 +116,19 @@ remove_from_rc() {
 source "$SCRIPT_DIR/bin/agent-gate.sh"
 
 _workspace_dir="${CONTAINER_WORKSPACE_FOLDER:-}"
+if [[ -z "$_workspace_dir" ]] && [[ -n "${WORKSPACE_FOLDER:-}" ]]; then
+  _workspace_dir="$WORKSPACE_FOLDER"
+fi
 if [[ -z "$_workspace_dir" ]] && [[ -d /workspaces ]]; then
   _ws_dirs=(/workspaces/*/)
   [[ ${#_ws_dirs[@]} -eq 1 ]] && _workspace_dir="${_ws_dirs[0]%/}"
+fi
+if [[ -z "$_workspace_dir" ]]; then
+  for _candidate in /home/*/app /home/*/workspace /workspace; do
+    [[ -d "$_candidate" ]] || continue
+    _workspace_dir="$_candidate"
+    break
+  done
 fi
 
 _agent_allowed() {
