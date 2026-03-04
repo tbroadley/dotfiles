@@ -117,6 +117,7 @@ if [[ ${#COPY_PATHS[@]} -gt 0 ]]; then
     for path in "${COPY_PATHS[@]}"; do
         cp -a $path "$COPY_DIR/"
     done
+    chmod -R a+rX "$COPY_DIR"
     VOLUME_ARGS=(-v "$COPY_DIR:/home/node/sandbox/files:ro")
     echo "Copied ${#COPY_PATHS[@]} path(s) into sandbox at /home/node/sandbox/files/"
 fi
