@@ -12,9 +12,11 @@ set -euo pipefail
 #   -r, --rebuild    Rebuild the sandbox Docker image
 #   -l, --list       List existing sandbox containers
 #   -a, --attach ID  Restart and attach to a stopped sandbox container
+#   -c, --copy PATH  Copy file/dir into sandbox (repeatable, globs supported)
 
 IMAGE_NAME="claude-sandbox"
 REBUILD=false
+COPY_PATHS=()
 
 while [[ "${1:-}" == -* ]]; do
     case "$1" in
@@ -28,6 +30,10 @@ while [[ "${1:-}" == -* ]]; do
             container="${1:?Usage: sandbox --attach <container-id-or-name>}"
             docker start -ai "$container"
             exit $? ;;
+        --copy|-c)
+            shift
+            COPY_PATHS+=("${1:?Usage: sandbox --copy <path>}")
+            shift ;;
         --) shift; break ;;
         *) break ;;
     esac
@@ -99,6 +105,22 @@ Help the user design and plan by:
 Do not hesitate to run many web searches. That is the whole point of this environment.
 INSTRUCTIONS
 
+if [[ ${#COPY_PATHS[@]} -gt 0 ]]; then
+    claude_md+=$'\n\n## Copied Files\n\nThe user has copied files from their host into `./files/` (read-only). Use these for context.'
+fi
+
+# Copy files into a temp dir and bind-mount if requested
+VOLUME_ARGS=()
+if [[ ${#COPY_PATHS[@]} -gt 0 ]]; then
+    COPY_DIR=$(mktemp -d)
+    trap 'rm -rf "$COPY_DIR"' EXIT
+    for path in "${COPY_PATHS[@]}"; do
+        cp -a $path "$COPY_DIR/"
+    done
+    VOLUME_ARGS=(-v "$COPY_DIR:/home/node/sandbox/files:ro")
+    echo "Copied ${#COPY_PATHS[@]} path(s) into sandbox at /home/node/sandbox/files/"
+fi
+
 exec docker run -it \
     --name "claude-sandbox-$$" \
     --cap-drop=ALL \
@@ -108,5 +130,6 @@ exec docker run -it \
     -e _CLAUDE_STATE="$claude_state" \
     -e _CLAUDE_SETTINGS="$claude_settings" \
     -e _CLAUDE_MD="$claude_md" \
+    "${VOLUME_ARGS[@]}" \
     "$IMAGE_NAME" \
     "$@"
