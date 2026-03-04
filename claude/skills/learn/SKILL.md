@@ -111,7 +111,7 @@ Group related learnings under existing sections in CLAUDE.md when possible.
 **Add to the current repo's `AGENTS.md` or `CLAUDE.md` if:**
 - It's specific to this codebase (gotchas, quirks, non-obvious patterns)
 - It documents surprising behavior discovered while working
-- It would help future Claude sessions working on this repo
+- It would help future coding-agent sessions working on this repo
 - It's something that "I wish I knew before starting"
 
 Prefer `AGENTS.md` if it exists; otherwise use `CLAUDE.md`. Create the file if neither exists and the learning is valuable enough.
@@ -148,7 +148,7 @@ git commit -m "Add learnings from conversation
 
 <brief summary of what was added>
 
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+Co-Authored-By: <agent-name> <agent-noreply-email>"
 git push
 ```
 
@@ -156,11 +156,11 @@ git push
 ```bash
 # In the current repo (not dotfiles)
 git add AGENTS.md CLAUDE.md 2>/dev/null
-git commit -m "Document learnings from Claude session
+git commit -m "Document learnings from current session
 
 <brief summary of gotchas/discoveries added>
 
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+Co-Authored-By: <agent-name> <agent-noreply-email>"
 git push
 ```
 

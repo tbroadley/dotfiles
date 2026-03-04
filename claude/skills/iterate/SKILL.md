@@ -34,7 +34,7 @@ Enter plan mode and write the finalized plan as a numbered list of concrete impl
 ## Post-Implementation
 
 After all implementation steps are complete and validation passes:
-1. Stage and commit all changes with a descriptive message ending with `Co-Authored-By: Claude <noreply@anthropic.com>`
+1. Stage and commit all changes with a descriptive message ending with `Co-Authored-By: <agent-name> <agent-noreply-email>`
 2. Push to remote
 3. Invoke the `/iterate-review` skill to review, clean up, and finalize the changes
 ```

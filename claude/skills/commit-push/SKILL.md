@@ -237,7 +237,7 @@ For each unresolved comment that was addressed:
 1. Leave a reply:
    ```bash
    gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
-     -f body="Claude Code: <explanation of how this was addressed>"
+     -f body="<agent-name>: <explanation of how this was addressed>"
    ```
 
 2. Resolve the thread:
@@ -320,7 +320,7 @@ gh run watch
 - Steps 6-9 only apply to feature branches (not main/master)
 - Step 10 only applies when pushing directly to main/master
 - Only respond to PR comments that were actually addressed by the changes
-- Prefix all GitHub comments with "Claude Code: "
+- Prefix all GitHub comments with "<agent-name>: "
 - If CI keeps failing after multiple attempts, report the issue to the user
 - The goal is green CI before considering the task complete (on a draft PR for feature branches, or on the commit for direct pushes to main)
 
