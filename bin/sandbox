@@ -50,6 +50,7 @@ RUN apt-get update -qq && \
     npm install -g @anthropic-ai/claude-code
 USER node
 WORKDIR /home/node
+RUN mkdir -p /home/node/sandbox
 RUN printf '#!/bin/sh\n\
 mkdir -p /home/node/sandbox /home/node/.claude\n\
 echo "$_CLAUDE_STATE" > /home/node/.claude.json\n\
