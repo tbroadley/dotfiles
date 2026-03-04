@@ -18,7 +18,7 @@ For each PR comment, choose one of these responses:
 
 ## Comment Prefix
 
-When leaving comments on PRs, always prefix with "Claude Code: " to make it clear the comment came from Claude.
+When leaving comments on PRs, always prefix with the current coding agent name (for example, "Codex: " or "Claude Code: "), not a hardcoded agent name.
 
 ## Comment Guidelines
 
