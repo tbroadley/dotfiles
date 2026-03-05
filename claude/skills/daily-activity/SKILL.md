@@ -14,6 +14,30 @@ Summarize the user's GitHub activity for today (or a specified date), including 
 
 **Timezone:** PST (UTC-8)
 
+## Quick Start (Reusable Script)
+
+Use the script first; it already applies the full workflow and date-window logic:
+
+```bash
+# Today in America/Los_Angeles
+/Users/thomas/dotfiles/claude/skills/daily-activity/scripts/daily_activity_report.sh
+
+# Specific date
+/Users/thomas/dotfiles/claude/skills/daily-activity/scripts/daily_activity_report.sh --date 2026-03-04
+```
+
+If needed, pass overrides:
+
+```bash
+/Users/thomas/dotfiles/claude/skills/daily-activity/scripts/daily_activity_report.sh \
+  --date 2026-03-04 \
+  --username tbroadley \
+  --email thomas@metr.org \
+  --timezone America/Los_Angeles
+```
+
+The script outputs a ready-to-send markdown summary with PR activity, non-PR default-branch commits, non-PR branch-only commits, and totals.
+
 ## Workflow
 
 ### 1. Determine Date Range
@@ -161,6 +185,7 @@ If the user asks for what the changes did (not just line counts), provide a brie
 
 ## Notes
 
+- Prefer running the reusable script above instead of ad-hoc API calls
 - Use `gh` CLI for all GitHub operations (not WebFetch)
 - Handle pagination for repos/PRs with many commits
 - Large line counts on older PRs may indicate rebases/merges; call this out
