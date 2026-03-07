@@ -1,5 +1,5 @@
 ---
-name: monitoring
+name: hawk-monitoring
 description: Monitor Hawk job status, view logs, and diagnose issues. Use when the user wants to check job progress, view error logs, debug a failing job, or generate a monitoring report for a Hawk evaluation run.
 ---
 

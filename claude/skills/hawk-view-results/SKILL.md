@@ -1,5 +1,5 @@
 ---
-name: view-results
+name: hawk-view-results
 description: View and analyze Hawk evaluation results. Use when the user wants to see eval-set results, check evaluation status, list samples, view transcripts, or analyze agent behavior from a completed evaluation run.
 ---
 

@@ -46,6 +46,88 @@ for d in ~/dotfiles/claude/skills/*; do
 done
 ```
 
+## Claude Skills Setup
+
+The skill loader treats Markdown files inside `claude/skills/` as skills, so setup notes live here in the repo README instead of alongside the skills.
+
+### Quick reference
+
+| Skill | Setup required | Env var(s) |
+|-------|---------------|------------|
+| alfred-clipboard | None | - |
+| learn | None | - |
+| todoist | API token | `TODOIST_TOKEN` |
+| linear | API key | `LINEAR_API_KEY` |
+| datadog | API + app keys | `DD_API_KEY`, `DD_APP_KEY`, `DD_SITE` |
+| airtable | Personal access token | `AIRTABLE_TOKEN` |
+| bitwarden | CLI + vault login | `BW_SESSION` |
+| gws-calendar / gws-gmail / gws-drive | gws CLI + auth | `GOOGLE_WORKSPACE_CLI_CLIENT_ID`, `GOOGLE_WORKSPACE_CLI_CLIENT_SECRET` |
+| read-inspect-eval | Python package | `uv pip install inspect-ai` |
+| download-inspect-eval | AWS CLI + profile | `AWS_PROFILE=production` |
+| hawk-monitoring / hawk-view-results | hawk CLI | `uv pip install hawk-cli` |
+
+### Common setup
+
+Add secrets to `~/.zshrc.local`:
+
+```bash
+export TODOIST_TOKEN="..."
+export LINEAR_API_KEY="..."
+export DD_API_KEY="..."
+export DD_APP_KEY="..."
+export DD_SITE="us3.datadoghq.com"
+export AIRTABLE_TOKEN="..."
+export BW_SESSION="..."
+export GOOGLE_WORKSPACE_CLI_CLIENT_ID="..."
+export GOOGLE_WORKSPACE_CLI_CLIENT_SECRET="..."
+```
+
+Then reload your shell:
+
+```bash
+source ~/.zshrc.local
+```
+
+### Service-specific notes
+
+- `todoist`: create a token at <https://todoist.com/app/settings/integrations/developer>
+- `linear`: create a personal API key at <https://linear.app/settings/account/security>
+- `datadog`: create API and application keys in Datadog org settings
+- `airtable`: create a token at <https://airtable.com/create/tokens> with `data.records:read` and `schema.bases:read`
+- `bitwarden`: install `bitwarden-cli`, run `bw login`, then `bw unlock` and export `BW_SESSION`
+- Google Workspace skills: install `@googleworkspace/cli`, create a desktop OAuth client in the `metr-pub` project, export the client ID/secret, then run `gws auth login`
+- `read-inspect-eval`: `uv pip install inspect-ai`
+- `download-inspect-eval`: verify access with `AWS_PROFILE=production aws s3 ls s3://production-metr-inspect-data/`
+- `hawk-monitoring` / `hawk-view-results`: `uv pip install hawk-cli`
+
+### Smoke tests
+
+```bash
+curl -s "https://api.todoist.com/rest/v2/projects" \
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.[].name'
+
+curl -s -X POST "https://api.linear.app/graphql" \
+  -H "Authorization: $(printenv LINEAR_API_KEY)" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ viewer { name } }"}' | jq '.data.viewer.name'
+
+curl -s "https://api.$(printenv DD_SITE)/api/v1/validate" \
+  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
+  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
+
+curl -s "https://api.airtable.com/v0/meta/bases" \
+  -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)" | jq '.bases[].name'
+
+gws calendar +agenda --today
+gws gmail +triage --max 3
+gws drive files list --params '{"pageSize": 5}'
+
+bw status --session "$(printenv BW_SESSION)" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
+
+sqlite3 ~/Library/Application\ Support/Alfred/Databases/clipboard.alfdb \
+  "SELECT substr(item, 1, 50) FROM clipboard ORDER BY ts DESC LIMIT 5;"
+```
+
 ## URL Listener Service
 
 The `url-listener` is an HTTP server (port 7077) that enables dev containers to interact with the host machine:
