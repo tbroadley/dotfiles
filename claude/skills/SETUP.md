@@ -13,9 +13,9 @@ This document lists all setup steps needed for each Claude Code skill.
 | datadog | API + App keys | `DD_API_KEY`, `DD_APP_KEY`, `DD_SITE` |
 | airtable | Personal access token | `AIRTABLE_TOKEN` |
 | bitwarden | CLI + vault login | `BW_SESSION` |
-| google-calendar | OAuth setup | - |
-| gmail | OAuth setup | - |
-| google-drive | OAuth setup | - |
+| gws-calendar | gws CLI + auth | `GOOGLE_WORKSPACE_CLI_CLIENT_ID`, `GOOGLE_WORKSPACE_CLI_CLIENT_SECRET` |
+| gws-gmail | gws CLI + auth | `GOOGLE_WORKSPACE_CLI_CLIENT_ID`, `GOOGLE_WORKSPACE_CLI_CLIENT_SECRET` |
+| gws-drive | gws CLI + auth | `GOOGLE_WORKSPACE_CLI_CLIENT_ID`, `GOOGLE_WORKSPACE_CLI_CLIENT_SECRET` |
 | read-inspect-eval | Python package | `pip install inspect-ai` |
 | download-inspect-eval | AWS CLI + profile | `AWS_PROFILE=production` |
 | hawk-monitoring | hawk CLI | `pip install hawk-cli` |
@@ -109,66 +109,67 @@ pip install hawk-cli
 
 ---
 
-## Google Services (Calendar, Gmail, Drive)
+## Google Workspace (Calendar, Gmail, Drive, Docs, Sheets)
 
-All Google skills use OAuth with a persistent refresh token. One-time setup for all three.
+All Google skills use the `gws` CLI (`@googleworkspace/cli`). One-time setup for all services.
 
-### Step 1: Create OAuth Client
+### Step 1: Install gws
 
-1. Go to [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials)
-2. Select or create a project
-3. Click **Create Credentials** → **OAuth client ID**
-4. If prompted, configure the OAuth consent screen:
-   - User Type: **External** (or Internal if using Workspace)
-   - App name: "Claude Code" (or anything)
-   - User support email: your email
-   - Developer contact: your email
-   - Scopes: skip for now
-   - Test users: add your email
-5. Back in Credentials, create OAuth client ID:
+```bash
+npm install -g @googleworkspace/cli
+```
+
+### Step 2: Create OAuth Client
+
+`gws auth setup` cannot automatically create OAuth clients. You must create one manually:
+
+1. **Configure OAuth consent screen** (if not already done):
+   https://console.cloud.google.com/apis/credentials/consent?project=metr-pub
+   - User Type: External
+   - App name: `gws CLI`
+   - Support email: your email
+   - Save and continue through all screens
+
+2. **Create OAuth client ID**:
+   https://console.cloud.google.com/apis/credentials?project=metr-pub
+   - Click **Create Credentials → OAuth client ID**
    - Application type: **Desktop app**
-   - Name: "Claude Code"
-6. Download the JSON file (click the download icon)
+   - Name: `gws CLI`
+   - Copy the **Client ID** and **Client Secret**
 
-### Step 2: Enable APIs
+### Step 3: Set Environment Variables and Login
 
-Enable these APIs in your project:
-- [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
-- [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
-- [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
-
-### Step 3: Run Setup
-
+Add to `~/.zshrc.local`:
 ```bash
-google-oauth-setup ~/Downloads/client_secret_*.json
+export GOOGLE_WORKSPACE_CLI_CLIENT_ID="your-client-id"
+export GOOGLE_WORKSPACE_CLI_CLIENT_SECRET="your-client-secret"
 ```
 
-This will:
-1. Open your browser for authorization
-2. Start a local server to capture the OAuth callback
-3. Exchange the authorization code for tokens
-4. Save credentials to `~/.config/google-oauth/credentials.json`
-
-### How it works
-
-The `google-oauth-token` script automatically refreshes access tokens using the stored refresh token. Tokens are cached for their validity period (~1 hour) to avoid unnecessary API calls.
-
+Then login:
 ```bash
-ACCESS_TOKEN=$(google-oauth-token)
+source ~/.zshrc.local
+gws auth login
 ```
 
-The refresh token persists indefinitely unless you revoke it, so you won't need to re-authenticate.
+This opens a browser for OAuth consent. Once complete, tokens are stored in `~/.config/gws/`.
+
+Note: If your OAuth app is unverified (testing mode), Google limits consent to ~25 scopes. Use `-s` to select specific services instead of the `recommended` preset:
+```bash
+gws auth login -s drive,gmail,calendar,sheets,docs
+```
 
 ### Troubleshooting
 
-Check status:
+Test that auth works:
 ```bash
-google-oauth-setup --status
+gws drive files list --params '{"pageSize": 3}'
+gws gmail users messages list --params '{"userId": "me", "maxResults": 3}'
+gws calendar calendarList list --params '{"maxResults": 3}'
 ```
 
-If you see "Token has been expired or revoked", re-run the setup:
+Re-login if tokens expire (you'll see `invalid_grant` errors):
 ```bash
-google-oauth-setup ~/Downloads/client_secret_*.json
+gws auth login
 ```
 
 ---
@@ -187,7 +188,10 @@ export DD_SITE="us3.datadoghq.com"
 export AIRTABLE_TOKEN="..."
 ```
 
-Note: Google credentials are stored in `~/.config/google-oauth/credentials.json` (not as environment variables).
+export GOOGLE_WORKSPACE_CLI_CLIENT_ID="..."
+export GOOGLE_WORKSPACE_CLI_CLIENT_SECRET="..."
+
+Note: OAuth tokens are managed by `gws` CLI (stored in `~/.config/gws/`).
 
 Then reload: `source ~/.zshrc`
 
@@ -217,17 +221,10 @@ curl -s "https://api.$(printenv DD_SITE)/api/v1/validate" \
 curl -s "https://api.airtable.com/v0/meta/bases" \
   -H "Authorization: Bearer $(printenv AIRTABLE_TOKEN)" | jq '.bases[].name'
 
-# Google (all three)
-ACCESS_TOKEN=$(google-oauth-token)
-
-curl -s "https://www.googleapis.com/calendar/v3/users/me/calendarList" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq '.items[].summary'
-
-curl -s "https://gmail.googleapis.com/gmail/v1/users/me/profile" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}"
-
-curl -s "https://www.googleapis.com/drive/v3/files?pageSize=5" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq '.files[].name'
+# Google Workspace (all services via gws CLI)
+gws calendar +agenda --today
+gws gmail +triage --max 3
+gws drive files list --params '{"pageSize": 5}'
 
 # Bitwarden
 bw status --session "$(printenv BW_SESSION)" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"
