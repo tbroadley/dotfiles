@@ -693,6 +693,25 @@ install_codex() {
   fi
 }
 
+install_gws() {
+  # Re-source nvm (needed in subshell)
+  if [ -s "/usr/local/share/nvm/nvm.sh" ]; then
+    export NVM_DIR="/usr/local/share/nvm"
+  else
+    export NVM_DIR="$HOME/.nvm"
+  fi
+  set +u
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  set -u
+
+  if command -v gws >/dev/null 2>&1; then
+    echo "gws CLI is already installed: $(gws --version 2>/dev/null || echo 'unknown version')"
+  else
+    echo "Installing @googleworkspace/cli globally..."
+    npm install -g @googleworkspace/cli
+  fi
+}
+
 setup_gh_auth() {
   if [ -z "${GH_TOKEN:-}" ]; then
     echo "GH_TOKEN not set, skipping GitHub CLI authentication"
@@ -716,13 +735,13 @@ setup_gh_auth() {
   echo "GitHub CLI git credential helper configured"
 }
 
-export -f install_codex setup_gh_auth
+export -f install_codex install_gws setup_gh_auth
 
 # Phase 2: Run npm-dependent and gh-auth in parallel
 echo "Starting Phase 2 installations (parallel)..."
 
 # Build Phase 2 job list (gate agent tools)
-PHASE2_JOBS=(gh-auth)
+PHASE2_JOBS=(gh-auth gws)
 if _agent_allowed codex; then
   PHASE2_JOBS+=(codex)
 else
@@ -738,6 +757,7 @@ for job_name in "${PHASE2_JOBS[@]}"; do
   case "$job_name" in
     codex)            install_codex > "$output_file" 2>&1 & ;;
     uninstall-codex)  uninstall_codex > "$output_file" 2>&1 & ;;
+    gws)              install_gws > "$output_file" 2>&1 & ;;
     gh-auth)          setup_gh_auth > "$output_file" 2>&1 & ;;
   esac
   PHASE2_PIDS["$job_name"]=$!

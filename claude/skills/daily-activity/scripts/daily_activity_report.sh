@@ -50,11 +50,16 @@ if [[ -z "$TARGET_DATE" ]]; then
   TARGET_DATE=$(TZ="$TIMEZONE" date +%Y-%m-%d)
 fi
 
-if START_UTC=$(TZ="$TIMEZONE" date -u -j -f "%Y-%m-%d %H:%M:%S" "$TARGET_DATE 00:00:00" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null); then
-  END_UTC=$(TZ="$TIMEZONE" date -u -j -v+1d -f "%Y-%m-%d %H:%M:%S" "$TARGET_DATE 00:00:00" +"%Y-%m-%dT%H:%M:%SZ")
+if START_EPOCH=$(TZ="$TIMEZONE" date -j -f "%Y-%m-%d %H:%M:%S" "$TARGET_DATE 00:00:00" +%s 2>/dev/null); then
+  END_EPOCH=$(TZ="$TIMEZONE" date -j -v+1d -f "%Y-%m-%d %H:%M:%S" "$TARGET_DATE 00:00:00" +%s)
+  START_UTC=$(date -u -r "$START_EPOCH" +"%Y-%m-%dT%H:%M:%SZ")
+  END_UTC=$(date -u -r "$END_EPOCH" +"%Y-%m-%dT%H:%M:%SZ")
 else
-  START_UTC=$(TZ="$TIMEZONE" date -u -d "$TARGET_DATE 00:00:00" +"%Y-%m-%dT%H:%M:%SZ")
-  END_UTC=$(TZ="$TIMEZONE" date -u -d "$TARGET_DATE 00:00:00 +1 day" +"%Y-%m-%dT%H:%M:%SZ")
+  START_EPOCH=$(TZ="$TIMEZONE" date -d "$TARGET_DATE 00:00:00" +%s)
+  NEXT_DATE=$(TZ="$TIMEZONE" date -d "$TARGET_DATE +1 day" +%Y-%m-%d)
+  END_EPOCH=$(TZ="$TIMEZONE" date -d "$NEXT_DATE 00:00:00" +%s)
+  START_UTC=$(date -u -d "@$START_EPOCH" +"%Y-%m-%dT%H:%M:%SZ")
+  END_UTC=$(date -u -d "@$END_EPOCH" +"%Y-%m-%dT%H:%M:%SZ")
 fi
 
 tmp_dir=$(mktemp -d)
@@ -62,13 +67,19 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 pr_rows_file="$tmp_dir/pr_rows.tsv"
 pr_today_shas="$tmp_dir/pr_today_shas.txt"
-all_rows="$tmp_dir/all_rows.tsv"
+repos_file="$tmp_dir/repos.txt"
+candidate_rows="$tmp_dir/candidate_rows.tsv"
 nonpr_rows="$tmp_dir/nonpr_rows.tsv"
+skipped_repos="$tmp_dir/skipped_repos.txt"
+push_refs="$tmp_dir/push_refs.tsv"
 
 : > "$pr_rows_file"
 : > "$pr_today_shas"
-: > "$all_rows"
+: > "$repos_file"
+: > "$candidate_rows"
 : > "$nonpr_rows"
+: > "$skipped_repos"
+: > "$push_refs"
 
 prs_json=$(gh search prs --author="$USERNAME" --updated=">=$TARGET_DATE" --json number,title,repository,createdAt,updatedAt,url --limit 100)
 
@@ -88,7 +99,10 @@ printf '%s' "$prs_json" | jq -r '.[] | @base64' | while IFS= read -r pr_b64; do
   pr_commits=$(gh api "repos/$repo/pulls/$number/commits?per_page=250" --paginate)
   today_shas=$(printf '%s' "$pr_commits" | jq -r --arg s "$START_UTC" --arg e "$END_UTC" '.[] | select(.commit.author.date >= $s and .commit.author.date < $e) | .sha')
   if [[ -n "$today_shas" ]]; then
-    printf '%s\n' "$today_shas" >> "$pr_today_shas"
+    while IFS= read -r sha; do
+      [[ -z "$sha" ]] && continue
+      printf '%s\t%s\n' "$repo" "$sha" >> "$pr_today_shas"
+    done < <(printf '%s\n' "$today_shas")
   fi
 
   has_today=false
@@ -120,63 +134,91 @@ printf '%s' "$prs_json" | jq -r '.[] | @base64' | while IFS= read -r pr_b64; do
     minus=$((minus + d))
   done < <(printf '%s\n' "$shas")
 
+  printf '%s\n' "$repo" >> "$repos_file"
   printf '%s\t#%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$repo" "$number" "$title" "$url" "$created_today" "$plus" "$minus" "$basis" >> "$pr_rows_file"
 done
 
 sort -u "$pr_today_shas" -o "$pr_today_shas"
 
 commit_search=$(gh search commits --author="$USERNAME" --author-date=">=$TARGET_DATE" --json repository,sha,commit,url --limit 300)
-printf '%s' "$commit_search" | jq -r --arg s "$START_UTC" --arg e "$END_UTC" '.[] | select(.commit.author.date >= $s and .commit.author.date < $e) | @base64' | while IFS= read -r c_b64; do
-  c=$(printf '%s' "$c_b64" | base64 --decode)
-  repo=$(printf '%s' "$c" | jq -r '.repository.fullName')
-  sha=$(printf '%s' "$c" | jq -r '.sha')
-  msg=$(printf '%s' "$c" | jq -r '.commit.message | split("\n")[0] | gsub("\t"; " ") | gsub("\\|"; "/")')
-  printf '%s\t%s\t%s\n' "$repo" "$sha" "$msg" >> "$all_rows"
-done
-sort -u "$all_rows" -o "$all_rows"
+printf '%s' "$commit_search" | jq -r --arg s "$START_UTC" --arg e "$END_UTC" '.[] | select(.commit.author.date >= $s and .commit.author.date < $e) | .repository.fullName' >> "$repos_file"
+gh api "users/$USERNAME/events?per_page=100" --paginate | jq -r --arg s "$START_UTC" --arg e "$END_UTC" '.[] | select(.type == "PushEvent" and .created_at >= $s and .created_at < $e) | [.repo.name, (.payload.ref // "")] | @tsv' >> "$push_refs"
+cut -f1 "$push_refs" >> "$repos_file"
+sort -u "$repos_file" -o "$repos_file"
+sort -u "$push_refs" -o "$push_refs"
 
-cut -f1 "$all_rows" | sort -u | while IFS= read -r repo; do
+while IFS= read -r repo; do
   [[ -z "$repo" ]] && continue
 
-  default_branch=$(gh api "repos/$repo" --jq '.default_branch')
+  if ! default_branch=$(gh api "repos/$repo" --jq '.default_branch' 2>/dev/null); then
+    printf '%s\n' "$repo" >> "$skipped_repos"
+    continue
+  fi
+
+  branches_file="$tmp_dir/branches_$(echo "$repo" | tr '/' '_').txt"
+  awk -F '\t' -v r="$repo" '$1==r {sub(/^refs\/heads\//, "", $2); if ($2 != "") print $2}' "$push_refs" > "$branches_file"
+  printf '%s\n' "$default_branch" >> "$branches_file"
+  sort -u "$branches_file" -o "$branches_file"
+
+  while IFS= read -r branch; do
+    [[ -z "$branch" ]] && continue
+    gh api -X GET "repos/$repo/commits" \
+      -f "sha=$branch" \
+      -f "since=$START_UTC" \
+      -f "until=$END_UTC" \
+      -f "per_page=100" \
+      --paginate 2>/dev/null \
+      | jq -r --arg b "$branch" '.[] | [.sha, .commit.author.date, .commit.author.email, (.author.login // ""), (.commit.message | split("\n")[0] | gsub("\t"; " ") | gsub("\\|"; "/")), $b] | @tsv' \
+      | while IFS=$'\t' read -r sha _ _ _ msg br; do
+          [[ -z "$sha" ]] && continue
+          printf '%s\t%s\t%s\t%s\n' "$repo" "$sha" "$msg" "$br" >> "$candidate_rows"
+        done
+  done < "$branches_file"
+done < "$repos_file"
+
+sort -u "$candidate_rows" -o "$candidate_rows"
+awk -F '\t' '!seen[$1 FS $2]++ {print $1 "\t" $2 "\t" $3}' "$candidate_rows" | while IFS=$'\t' read -r repo sha msg; do
+  [[ -z "$repo" || -z "$sha" ]] && continue
+
+  if grep -F -q "$repo"$'\t'"$sha" "$pr_today_shas"; then
+    continue
+  fi
+
+  pulls_len=$(gh api "repos/$repo/commits/$sha/pulls" --jq 'length' 2>/dev/null || echo "0")
+  if [[ "$pulls_len" != "0" ]]; then
+    continue
+  fi
+
+  commit_json=$(gh api "repos/$repo/commits/$sha")
+  author_login=$(printf '%s' "$commit_json" | jq -r '.author.login // empty')
+  committer_login=$(printf '%s' "$commit_json" | jq -r '.committer.login // empty')
+  author_email=$(printf '%s' "$commit_json" | jq -r '.commit.author.email // empty')
+  committer_email=$(printf '%s' "$commit_json" | jq -r '.commit.committer.email // empty')
+
+  if [[ "$author_login" != "$USERNAME" && "$committer_login" != "$USERNAME" && "$author_email" != "$USER_EMAIL" && "$committer_email" != "$USER_EMAIL" ]]; then
+    continue
+  fi
+
+  a=$(printf '%s' "$commit_json" | jq -r '.stats.additions')
+  d=$(printf '%s' "$commit_json" | jq -r '.stats.deletions')
+
   def_shas_file="$tmp_dir/def_$(echo "$repo" | tr '/' '_').txt"
-  gh api -X GET "repos/$repo/commits" -f "sha=$default_branch" -f "since=$START_UTC" -f "until=$END_UTC" -f "per_page=100" --paginate --jq '.[].sha' | sort -u > "$def_shas_file"
+  if [[ ! -f "$def_shas_file" ]]; then
+    default_branch=$(gh api "repos/$repo" --jq '.default_branch')
+    gh api -X GET "repos/$repo/commits" -f "sha=$default_branch" -f "since=$START_UTC" -f "until=$END_UTC" -f "per_page=100" --paginate --jq '.[].sha' | sort -u > "$def_shas_file"
+  fi
 
-  awk -F '\t' -v r="$repo" '$1==r {print $0}' "$all_rows" | while IFS=$'\t' read -r _ sha msg; do
-    if grep -q "^$sha$" "$pr_today_shas"; then
-      continue
-    fi
+  bucket="branch_only"
+  if grep -q "^$sha$" "$def_shas_file"; then
+    bucket="default"
+  fi
 
-    pulls_len=$(gh api "repos/$repo/commits/$sha/pulls" --jq 'length')
-    if [[ "$pulls_len" != "0" ]]; then
-      continue
-    fi
+  branch_hint=$(awk -F '\t' -v r="$repo" -v s="$sha" '$1==r && $2==s {print $4}' "$candidate_rows" | sort -u | paste -sd ',' -)
+  if [[ -z "$branch_hint" ]]; then
+    branch_hint="unknown"
+  fi
 
-    commit_json=$(gh api "repos/$repo/commits/$sha")
-    author_login=$(printf '%s' "$commit_json" | jq -r '.author.login // empty')
-    committer_login=$(printf '%s' "$commit_json" | jq -r '.committer.login // empty')
-    author_email=$(printf '%s' "$commit_json" | jq -r '.commit.author.email // empty')
-    committer_email=$(printf '%s' "$commit_json" | jq -r '.commit.committer.email // empty')
-
-    if [[ "$author_login" != "$USERNAME" && "$committer_login" != "$USERNAME" && "$author_email" != "$USER_EMAIL" && "$committer_email" != "$USER_EMAIL" ]]; then
-      continue
-    fi
-
-    a=$(printf '%s' "$commit_json" | jq -r '.stats.additions')
-    d=$(printf '%s' "$commit_json" | jq -r '.stats.deletions')
-
-    bucket="branch_only"
-    if grep -q "^$sha$" "$def_shas_file"; then
-      bucket="default"
-    fi
-
-    branch_hint=$(gh api "repos/$repo/commits/$sha/branches-where-head" --jq '.[].name' 2>/dev/null | paste -sd ',' -)
-    if [[ -z "$branch_hint" ]]; then
-      branch_hint="unknown"
-    fi
-
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$repo" "$bucket" "$branch_hint" "$sha" "$a" "$d" "$msg" >> "$nonpr_rows"
-  done
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$repo" "$bucket" "$branch_hint" "$sha" "$a" "$d" "$msg" >> "$nonpr_rows"
 done
 
 sort -u "$pr_rows_file" -o "$pr_rows_file"
