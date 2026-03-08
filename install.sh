@@ -159,6 +159,14 @@ uninstall_gemini() {
   rm -rf "$HOME/.gemini"
 }
 
+uninstall_pi() {
+  if npm list -g @mariozechner/pi-coding-agent >/dev/null 2>&1; then
+    echo "Uninstalling pi (not allowed per .allowed-agents)..."
+    npm uninstall -g @mariozechner/pi-coding-agent
+  fi
+  rm -rf "$HOME/.pi"
+}
+
 # Aliases (work in both shells)
 add_to_rc "alias b=basedpyright" "alias b=basedpyright"
 remove_from_rc "claude()"
@@ -196,6 +204,11 @@ if _agent_allowed gemini; then
   add_to_rc "gemini()" 'gemini() { _check_agent_allowed gemini && command gemini "$@"; }'
 else
   remove_from_rc 'gemini()'
+fi
+if _agent_allowed pi; then
+  add_to_rc "pi()" 'pi() { _check_agent_allowed pi && command pi "$@"; }'
+else
+  remove_from_rc 'pi()'
 fi
 remove_from_rc 'codex --resume'
 if _agent_allowed codex; then
@@ -516,7 +529,7 @@ install_shell_alias_suggestions() {
 export -f verify_checksum
 export -f install_ripgrep install_jq install_gh install_zoxide install_pup install_nvm_and_node
 export -f install_claude_code install_shell_alias_suggestions
-export -f uninstall_claude_code uninstall_codex uninstall_gemini
+export -f uninstall_claude_code uninstall_codex uninstall_gemini uninstall_pi
 export HOME SCRIPT_DIR
 
 # Phase 1: Run independent installations in parallel
@@ -561,7 +574,7 @@ done
 for job_name in "${PHASE1_JOBS[@]}"; do
   output_file="${JOB_OUTPUT_FILES[$job_name]}"
   # Check if job_name exists in FAILED_JOBS array
-  if [ -f "$output_file" ] && ! [[ -v "FAILED_JOBS[$job_name]" ]]; then
+  if [ -f "$output_file" ] && [[ -z "${FAILED_JOBS[$job_name]+x}" ]]; then
     cat "$output_file"
   fi
 done
@@ -661,6 +674,19 @@ else
   echo "Skipping Gemini settings (not allowed per .allowed-agents)"
 fi
 
+# Configure pi settings
+if _agent_allowed pi; then
+  PI_AGENT_DIR="$HOME/.pi/agent"
+  mkdir -p "$PI_AGENT_DIR"
+  if [ -d "$SCRIPT_DIR/pi/agent" ]; then
+    ln -sf "$SCRIPT_DIR/pi/agent/settings.json" "$PI_AGENT_DIR/settings.json"
+    echo "pi settings installed"
+  fi
+else
+  uninstall_pi
+  echo "Skipping pi settings (not allowed per .allowed-agents)"
+fi
+
 # Configure Claude Code authentication if token is available
 if _agent_allowed claude_code; then
   if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
@@ -712,6 +738,25 @@ install_gws() {
   fi
 }
 
+install_pi() {
+  # Re-source nvm (needed in subshell)
+  if [ -s "/usr/local/share/nvm/nvm.sh" ]; then
+    export NVM_DIR="/usr/local/share/nvm"
+  else
+    export NVM_DIR="$HOME/.nvm"
+  fi
+  set +u
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  set -u
+
+  if npm list -g @mariozechner/pi-coding-agent >/dev/null 2>&1; then
+    echo "pi is already installed globally"
+  else
+    echo "Installing @mariozechner/pi-coding-agent globally..."
+    npm install -g @mariozechner/pi-coding-agent
+  fi
+}
+
 setup_gh_auth() {
   if [ -z "${GH_TOKEN:-}" ]; then
     echo "GH_TOKEN not set, skipping GitHub CLI authentication"
@@ -735,7 +780,7 @@ setup_gh_auth() {
   echo "GitHub CLI git credential helper configured"
 }
 
-export -f install_codex install_gws setup_gh_auth
+export -f install_codex install_gws install_pi setup_gh_auth
 
 # Phase 2: Run npm-dependent and gh-auth in parallel
 echo "Starting Phase 2 installations (parallel)..."
@@ -747,6 +792,11 @@ if _agent_allowed codex; then
 else
   PHASE2_JOBS+=(uninstall-codex)
 fi
+if _agent_allowed pi; then
+  PHASE2_JOBS+=(pi)
+else
+  PHASE2_JOBS+=(uninstall-pi)
+fi
 
 declare -A PHASE2_PIDS=()
 declare -A PHASE2_OUTPUT=()
@@ -757,6 +807,8 @@ for job_name in "${PHASE2_JOBS[@]}"; do
   case "$job_name" in
     codex)            install_codex > "$output_file" 2>&1 & ;;
     uninstall-codex)  uninstall_codex > "$output_file" 2>&1 & ;;
+    pi)               install_pi > "$output_file" 2>&1 & ;;
+    uninstall-pi)     uninstall_pi > "$output_file" 2>&1 & ;;
     gws)              install_gws > "$output_file" 2>&1 & ;;
     gh-auth)          setup_gh_auth > "$output_file" 2>&1 & ;;
   esac
@@ -775,7 +827,7 @@ done
 # Print output from Phase 2 jobs
 for job_name in "${PHASE2_JOBS[@]}"; do
   output_file="${PHASE2_OUTPUT[$job_name]}"
-  if [ -f "$output_file" ] && ! [[ -v "FAILED_JOBS[$job_name]" ]]; then
+  if [ -f "$output_file" ] && [[ -z "${FAILED_JOBS[$job_name]+x}" ]]; then
     cat "$output_file"
   fi
 done

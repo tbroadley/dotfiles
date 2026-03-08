@@ -14,6 +14,7 @@ Personal dotfiles for dev container setup. The `install.sh` script configures a 
 - nvm + Node.js LTS
 - Claude Code CLI
 - @openai/codex
+- @mariozechner/pi-coding-agent (`pi`)
 
 **Shell Configuration**:
 - inputrc: arrow-key history search
@@ -42,6 +43,7 @@ Personal dotfiles for dev container setup. The `install.sh` script configures a 
 | `devc.zsh` | Host-side function to launch containers with auth forwarding |
 | `claude/CLAUDE.md` | Global coding style rules (symlinked to `~/.claude/CLAUDE.md`) |
 | `claude/settings.json` | Claude Code permissions and hooks |
+| `pi/agent/settings.json` | pi defaults (symlinked to `~/.pi/agent/settings.json`) |
 | `bin/improve` | Todoist polling script for autonomous Claude Code tasks |
 
 ### Shell Aliases: Host vs Dev Container

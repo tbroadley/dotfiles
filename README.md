@@ -34,6 +34,25 @@ On the host, running `install.sh` will also link `~/.codex/config.toml` to `~/do
 
 Codex can store auth in `~/.codex/auth.json` when `cli_auth_credentials_store = "file"` is set. The `devc` functions forward that file into containers if it exists on the host, so Codex works without re-auth prompts inside dev containers. See the Codex authentication docs for details about file-based storage and copying `auth.json` to headless environments.
 
+## Pi Configuration in Dev Containers
+
+The `install.sh` script also configures pi inside dev containers:
+
+- Installs `@mariozechner/pi-coding-agent` globally.
+- Symlinks `pi/agent/settings.json` to `~/.pi/agent/settings.json`.
+- Reuses Claude skills by pointing pi at `~/.claude/skills` in the default settings.
+
+Pi can authenticate with forwarded API keys like `ANTHROPIC_API_KEY`, or you can run `pi` and use `/login` inside the container.
+
+### Host Pi Settings Symlink
+
+If you want the same pi settings on your host machine, run this once:
+
+```bash
+mkdir -p ~/.pi/agent
+ln -sfn ~/dotfiles/pi/agent/settings.json ~/.pi/agent/settings.json
+```
+
 ### Host Skills Symlink
 
 If you want Codex to use the Claude skills on your host machine, run this once:
