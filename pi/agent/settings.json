@@ -1,5 +1,5 @@
 {
-  "skills": ["~/.claude/skills"],
+  "skills": ["~/.claude/skills", "~/.codex/skills"],
   "packages": [
     "npm:pi-vim",
     "https://github.com/neevparikh/pi-hawk-provider"
