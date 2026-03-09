@@ -598,46 +598,57 @@ ln -sf "$SCRIPT_DIR/bin/wispr-add-dictionary-remote" "$HOME/.local/bin/wispr-add
 add_to_rc 'export BROWSER=open-url-on-host' 'export BROWSER=open-url-on-host'
 echo "Dotfiles bin added to PATH"
 
-# Configure Claude Code settings, hooks, and skills (fast, do immediately)
+CLAUDE_DIR="$HOME/.claude"
+CLAUDE_SKILLS_DIR="$CLAUDE_DIR/skills"
+
+sync_local_claude_skills() {
+  mkdir -p "$CLAUDE_SKILLS_DIR"
+
+  for skill_dir in "$SCRIPT_DIR/claude/skills"/*; do
+    [ -d "$skill_dir" ] || continue
+    ln -sfn "$skill_dir" "$CLAUDE_SKILLS_DIR/$(basename "$skill_dir")"
+  done
+}
+
+install_external_claude_skills() {
+  mkdir -p "$CLAUDE_SKILLS_DIR"
+
+  # List of external skills: "repo:skill_path:local_name"
+  local external_skills=(
+    "sjawhar/pivot:skills/writing-pivot-stages:writing-pivot-stages"
+  )
+
+  for spec in "${external_skills[@]}"; do
+    IFS=':' read -r repo skill_path local_name <<< "$spec"
+    local target_dir="$CLAUDE_SKILLS_DIR/$local_name"
+    mkdir -p "$target_dir"
+
+    if gh api "repos/$repo/contents/$skill_path/SKILL.md" 2>/dev/null | jq -r '.content' | base64 -d > "$target_dir/SKILL.md" 2>/dev/null; then
+      echo "Installed skill: $local_name (from $repo)"
+    else
+      echo "Warning: Failed to install skill $local_name from $repo"
+    fi
+  done
+}
+
+# Configure Claude Code settings and hooks when allowed
 if _agent_allowed claude_code; then
-  CLAUDE_DIR="$HOME/.claude"
   mkdir -p "$CLAUDE_DIR"
   cp -r "$SCRIPT_DIR/claude/"* "$CLAUDE_DIR/"
   chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
-
-  # Install external skills from GitHub repos
-  install_external_skills() {
-    local skills_dir="$CLAUDE_DIR/skills"
-    mkdir -p "$skills_dir"
-
-    # List of external skills: "repo:skill_path:local_name"
-    local external_skills=(
-      "sjawhar/pivot:skills/writing-pivot-stages:writing-pivot-stages"
-    )
-
-    for spec in "${external_skills[@]}"; do
-      IFS=':' read -r repo skill_path local_name <<< "$spec"
-      local target_dir="$skills_dir/$local_name"
-      mkdir -p "$target_dir"
-
-      if gh api "repos/$repo/contents/$skill_path/SKILL.md" 2>/dev/null | jq -r '.content' | base64 -d > "$target_dir/SKILL.md" 2>/dev/null; then
-        echo "Installed skill: $local_name (from $repo)"
-      else
-        echo "Warning: Failed to install skill $local_name from $repo"
-      fi
-    done
-  }
-
-  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-    install_external_skills
-  else
-    echo "Skipping external skills (gh CLI not authenticated)"
-  fi
-
-  echo "Claude Code settings, hooks, and skills installed"
+  echo "Claude Code settings and hooks installed"
 else
   echo "Skipping Claude Code settings (not allowed per .allowed-agents)"
 fi
+
+# Always configure Claude skills so Claude, pi, and Codex can reuse them
+sync_local_claude_skills
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  install_external_claude_skills
+else
+  echo "Skipping external Claude skills (gh CLI not authenticated)"
+fi
+echo "Claude skills installed"
 
 # Configure Codex settings + sync Claude skills into Codex
 if _agent_allowed codex; then
@@ -648,10 +659,10 @@ if _agent_allowed codex; then
     echo "Codex config installed"
   fi
 
-  if [ -d "$SCRIPT_DIR/claude/skills" ]; then
+  if [ -d "$CLAUDE_SKILLS_DIR" ]; then
     CODEX_SKILLS_DIR="$CODEX_DIR/skills"
     mkdir -p "$CODEX_SKILLS_DIR"
-    for skill_dir in "$SCRIPT_DIR/claude/skills"/*; do
+    for skill_dir in "$CLAUDE_SKILLS_DIR"/*; do
       [ -d "$skill_dir" ] || continue
       ln -sfn "$skill_dir" "$CODEX_SKILLS_DIR/$(basename "$skill_dir")"
     done
