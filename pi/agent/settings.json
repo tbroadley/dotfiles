@@ -1,15 +1,10 @@
 {
-  "skills": [
-    "~/.claude/skills",
-    "~/.codex/skills"
-  ],
+  "skills": ["~/.claude/skills", "~/.codex/skills"],
   "packages": [
     "npm:pi-vim",
-    "git:github.com/tbroadley/pi-hawk-provider@thomas/fix-startup-token-refresh"
+    "https://github.com/neevparikh/pi-hawk-provider"
   ],
   "defaultProvider": "hawk",
   "defaultModel": "gpt-5.4",
-  "lastChangelogVersion": "0.57.0",
-  "defaultThinkingLevel": "high",
-  "theme": "light"
+  "lastChangelogVersion": "0.57.0"
 }
