@@ -9,6 +9,8 @@ LOG_DIR="${HOME}/.local/log"
 LOG_FILE="${LOG_DIR}/apf.log"
 PID_FILE="${LOG_DIR}/apf-watchdog.pid"
 CHECK_INTERVAL=5
+RAPID_FAILURE_WINDOW=10
+MAX_RAPID_FAILURES=3
 
 mkdir -p "$LOG_DIR"
 
@@ -40,11 +42,34 @@ fi
 echo $$ > "$PID_FILE"
 log "Watchdog started for container $CONTAINER_ID (PID $$)"
 
+RAPID_FAILURE_COUNT=0
+LAST_START_TIME=0
+
 start_apf() {
+    LAST_START_TIME=$(date +%s)
     log "Starting apf for container $CONTAINER_ID"
     apf "$CONTAINER_ID" >> "$LOG_FILE" 2>&1 &
     APF_PID=$!
     log "apf started with PID $APF_PID"
+}
+
+record_apf_failure() {
+    local now runtime
+    now=$(date +%s)
+    runtime=$((now - LAST_START_TIME))
+
+    if (( runtime <= RAPID_FAILURE_WINDOW )); then
+        RAPID_FAILURE_COUNT=$((RAPID_FAILURE_COUNT + 1))
+        log "apf (PID $APF_PID) died after ${runtime}s (${RAPID_FAILURE_COUNT}/${MAX_RAPID_FAILURES} rapid failures)"
+    else
+        RAPID_FAILURE_COUNT=0
+        log "apf (PID $APF_PID) died after ${runtime}s, restarting..."
+    fi
+
+    if (( RAPID_FAILURE_COUNT >= MAX_RAPID_FAILURES )); then
+        log "apf failed too quickly ${RAPID_FAILURE_COUNT} times in a row. Stopping watchdog instead of retrying forever. It's probably blocked or otherwise cannot launch cleanly (for example by Santa)."
+        cleanup
+    fi
 }
 
 start_apf
@@ -60,7 +85,7 @@ while true; do
 
     # Check if apf is still running
     if ! kill -0 "$APF_PID" 2>/dev/null; then
-        log "apf (PID $APF_PID) died, restarting..."
+        record_apf_failure
         start_apf
     fi
 done
