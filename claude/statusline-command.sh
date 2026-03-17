@@ -8,8 +8,10 @@ git_info="${R:-$(basename "$(pwd)")} ${B:-???}"
 
 # Context usage
 used=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
-if [ -n "$used" ]; then
-    printf '%s | ctx: %s%%' "$git_info" "$used"
+size=$(echo "$input" | jq -r '.context_window.context_window_size // empty')
+if [ -n "$used" ] && [ -n "$size" ]; then
+    size_k=$((size / 1000))
+    printf '%s | %.1f%%/%dk' "$git_info" "$used" "$size_k"
 else
     printf '%s' "$git_info"
 fi
