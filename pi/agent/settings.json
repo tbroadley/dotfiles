@@ -4,11 +4,16 @@
     "~/.codex/skills"
   ],
   "packages": [
-    "npm:pi-vim",
     "https://github.com/neevparikh/pi-hawk-provider"
+  ],
+  "extensions": [
+    "~/dotfiles/pi/agent/extensions/hawk-only.ts"
   ],
   "defaultProvider": "hawk",
   "defaultModel": "gpt-5.4",
+  "enabledModels": [
+    "hawk/*"
+  ],
   "lastChangelogVersion": "0.59.0",
   "theme": "light"
 }

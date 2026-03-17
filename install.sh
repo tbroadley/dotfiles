@@ -760,11 +760,17 @@ install_pi() {
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
   set -u
 
-  if npm list -g @mariozechner/pi-coding-agent >/dev/null 2>&1; then
-    echo "pi is already installed globally"
+  echo "Ensuring latest @mariozechner/pi-coding-agent is installed globally..."
+  npm install -g @mariozechner/pi-coding-agent@latest
+
+  if pi list | grep -Fq "https://github.com/neevparikh/pi-hawk-provider"; then
+    pi update https://github.com/neevparikh/pi-hawk-provider
   else
-    echo "Installing @mariozechner/pi-coding-agent globally..."
-    npm install -g @mariozechner/pi-coding-agent
+    pi install https://github.com/neevparikh/pi-hawk-provider
+  fi
+
+  if pi list | grep -Fq "npm:pi-vim"; then
+    pi remove npm:pi-vim
   fi
 }
 
