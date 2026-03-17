@@ -1,10 +1,14 @@
 {
-  "skills": ["~/.claude/skills", "~/.codex/skills"],
+  "skills": [
+    "~/.claude/skills",
+    "~/.codex/skills"
+  ],
   "packages": [
     "npm:pi-vim",
     "https://github.com/neevparikh/pi-hawk-provider"
   ],
   "defaultProvider": "hawk",
   "defaultModel": "gpt-5.4",
-  "lastChangelogVersion": "0.57.0"
+  "lastChangelogVersion": "0.59.0",
+  "theme": "light"
 }
