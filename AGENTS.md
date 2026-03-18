@@ -5,3 +5,7 @@
 `~/.zshrc` is a symlink to `~/dotfiles/.zshrc`. Edit the dotfiles version directly.
 
 Secrets and machine-specific config go in `~/.zshrc.local` (not committed).
+
+## GitHub usernames
+
+- "Neev" refers to GitHub user `neevparikh`.
