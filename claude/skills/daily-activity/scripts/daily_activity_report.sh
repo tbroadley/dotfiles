@@ -76,6 +76,7 @@ skipped_repos="$tmp_dir/skipped_repos.txt"
 push_refs="$tmp_dir/push_refs.tsv"
 commit_details_file="$tmp_dir/commit_details.tsv"
 repo_default_branches="$tmp_dir/repo_default_branches.tsv"
+pivot_stage_rows="$tmp_dir/pivot_stage_rows.tsv"
 
 : > "$pr_rows_file"
 : > "$pr_today_shas"
@@ -86,6 +87,7 @@ repo_default_branches="$tmp_dir/repo_default_branches.tsv"
 : > "$push_refs"
 : > "$commit_details_file"
 : > "$repo_default_branches"
+: > "$pivot_stage_rows"
 
 repo_slug() {
   printf '%s' "$1" | tr '/' '_'
@@ -151,6 +153,49 @@ fetch_commit_details_for_repo() {
   fi
 }
 
+sum_pivot_stage_pr_lines() {
+  local repo="$1"
+  local number="$2"
+
+  gh api "repos/$repo/pulls/$number/files?per_page=100" --paginate --slurp | jq -r '
+    [.[ ][] | select(.filename | startswith(".pivot/stages/"))]
+    | [
+        (map(.additions) | add // 0),
+        (map(.deletions) | add // 0)
+      ]
+    | @tsv
+  '
+}
+
+sum_pivot_stage_commit_lines() {
+  local repo="$1"
+  local shas_file="$2"
+
+  local plus=0
+  local minus=0
+  local sha
+  local file_totals
+  local a
+  local d
+  while IFS= read -r sha; do
+    [[ -z "$sha" ]] && continue
+    file_totals=$(gh api "repos/$repo/commits/$sha" | jq -r '
+      [(.files // [])[] | select(.filename | startswith(".pivot/stages/"))]
+      | [
+          (map(.additions) | add // 0),
+          (map(.deletions) | add // 0)
+        ]
+      | @tsv
+    ')
+    a=$(printf '%s' "$file_totals" | cut -f1)
+    d=$(printf '%s' "$file_totals" | cut -f2)
+    plus=$((plus + a))
+    minus=$((minus + d))
+  done < "$shas_file"
+
+  printf '%s\t%s\n' "$plus" "$minus"
+}
+
 wait_for_available_slot() {
   if [[ ${#JOB_PIDS[@]} -lt $MAX_PARALLEL ]]; then
     return
@@ -214,6 +259,7 @@ printf '%s' "$prs_json" | jq -r '.[] | @base64' | while IFS= read -r pr_b64; do
     pr_totals=$(gh api "repos/$repo/pulls/$number" --jq '{additions: .additions, deletions: .deletions}')
     plus=$(printf '%s' "$pr_totals" | jq -r '.additions')
     minus=$(printf '%s' "$pr_totals" | jq -r '.deletions')
+    pivot_stage_totals=$(sum_pivot_stage_pr_lines "$repo" "$number")
   else
     repo_slug_value=$(repo_slug "$repo")
     pr_stats_shas="$tmp_dir/pr_${number}_${repo_slug_value}.txt"
@@ -222,7 +268,14 @@ printf '%s' "$prs_json" | jq -r '.[] | @base64' | while IFS= read -r pr_b64; do
     fetch_commit_details_for_repo "$repo" "$pr_stats_shas" > "$pr_stats_rows"
     plus=$(awk -F '\t' '{a += $3} END {print a + 0}' "$pr_stats_rows")
     minus=$(awk -F '\t' '{d += $4} END {print d + 0}' "$pr_stats_rows")
+    pivot_stage_totals=$(sum_pivot_stage_commit_lines "$repo" "$pr_stats_shas")
   fi
+
+  pivot_stage_add=$(printf '%s' "$pivot_stage_totals" | cut -f1)
+  pivot_stage_del=$(printf '%s' "$pivot_stage_totals" | cut -f2)
+  plus=$((plus - pivot_stage_add))
+  minus=$((minus - pivot_stage_del))
+  printf '%s\tpr\t%s\t%s\n' "$repo" "$pivot_stage_add" "$pivot_stage_del" >> "$pivot_stage_rows"
 
   printf '%s\n' "$repo" >> "$repos_file"
   printf '%s\t#%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$repo" "$number" "$title" "$url" "$created_today" "$plus" "$minus" "$basis" >> "$pr_rows_file"
@@ -365,6 +418,15 @@ awk -F '\t' '!seen[$1 FS $2]++ {print $1 "\t" $2 "\t" $3}' "$candidate_rows" | w
     branch_hint="unknown"
   fi
 
+  nonpr_sha_file="$tmp_dir/nonpr_$(repo_slug "$repo")_${sha}.txt"
+  printf '%s\n' "$sha" > "$nonpr_sha_file"
+  pivot_stage_totals=$(sum_pivot_stage_commit_lines "$repo" "$nonpr_sha_file")
+  pivot_stage_add=$(printf '%s' "$pivot_stage_totals" | cut -f1)
+  pivot_stage_del=$(printf '%s' "$pivot_stage_totals" | cut -f2)
+  a=$((a - pivot_stage_add))
+  d=$((d - pivot_stage_del))
+  printf '%s\tnonpr\t%s\t%s\n' "$repo" "$pivot_stage_add" "$pivot_stage_del" >> "$pivot_stage_rows"
+
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$repo" "$bucket" "$branch_hint" "$sha" "$a" "$d" "$msg" >> "$nonpr_rows"
 done
 
@@ -385,6 +447,12 @@ branch_commit_count=$(awk -F '\t' '$2=="branch_only" {c++} END {print c + 0}' "$
 
 grand_add=$((pr_total_add + default_total_add + branch_total_add))
 grand_del=$((pr_total_del + default_total_del + branch_total_del))
+pivot_stage_add=$(awk -F '\t' '{a += $3} END {print a + 0}' "$pivot_stage_rows")
+pivot_stage_del=$(awk -F '\t' '{d += $4} END {print d + 0}' "$pivot_stage_rows")
+grand_total_lines=$((grand_add + grand_del))
+pivot_stage_total_lines=$((pivot_stage_add + pivot_stage_del))
+overall_total_lines=$((grand_total_lines + pivot_stage_total_lines))
+pivot_stage_percent=$(awk -v pivot_stage="$pivot_stage_total_lines" -v total="$overall_total_lines" 'BEGIN { printf "%.1f", total ? (100 * pivot_stage / total) : 0 }')
 
 echo "Daily activity for $TARGET_DATE ($TIMEZONE)"
 echo "Window: $START_UTC to $END_UTC"
@@ -449,4 +517,5 @@ echo "Totals"
 echo "- Total PRs with activity: $pr_count"
 echo "- Total non-PR default-branch commits: $default_commit_count"
 echo "- Total non-PR branch-only commits: $branch_commit_count"
-echo "- Total lines changed: +$grand_add/-$grand_del"
+echo "- Total lines changed (excluding .pivot/stages): +$grand_add/-$grand_del"
+echo "- Lines in .pivot/stages: +$pivot_stage_add/-$pivot_stage_del ($pivot_stage_percent% of overall lines changed)"

@@ -36,7 +36,7 @@ If needed, pass overrides:
   --timezone America/Los_Angeles
 ```
 
-The script outputs a ready-to-send markdown summary with PR activity, non-PR default-branch commits, non-PR branch-only commits, and totals.
+The script outputs a ready-to-send markdown summary with PR activity, non-PR default-branch commits, non-PR branch-only commits, and totals. By default, the reported +/- excludes changes under `.pivot/stages/`; those lines are summarized separately under Totals.
 
 ## Workflow
 
@@ -159,6 +159,8 @@ Present results in structured format:
 |----|------------|-------|-----|
 | #N | org/repo | Title | +X/-Y |
 
+By default, +/- excludes changes under `.pivot/stages/`.
+
 Note: For PRs spanning multiple days, indicate whether +/- is today's commits only or total PR.
 
 **Direct Commits to Default Branch (non-PR):**
@@ -177,7 +179,8 @@ Optionally list individual commits with messages.
 - Total PRs with activity: N
 - Total non-PR default-branch commits: N
 - Total non-PR branch-only commits: N
-- Total lines changed: +X/-Y
+- Total lines changed (excluding `.pivot/stages`): +X/-Y
+- Lines in `.pivot/stages`: +X/-Y (Y% of overall lines changed)
 
 ### 5. Optional: Summarize Changes
 
