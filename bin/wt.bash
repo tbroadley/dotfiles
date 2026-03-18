@@ -236,8 +236,10 @@ EOF
         mkdir -p "$new_wt_dir/.pivot"
         # Copy existing config from root repo
         [ -f "$repo_root/.pivot/config.yaml" ] && cp "$repo_root/.pivot/config.yaml" "$new_wt_dir/.pivot/"
-        # Set cache dir to point to root repo's cache
+        # Set local Pivot config for the worktree
         (cd "$new_wt_dir" && pivot config set cache.dir "$repo_root/.pivot/cache") 2>/dev/null || true
+        (cd "$new_wt_dir" && pivot config set core.max_workers 6) 2>/dev/null || true
+        (cd "$new_wt_dir" && pivot config set cache.checkout_mode hardlink,copy) 2>/dev/null || true
     fi
 
     # Set up VS Code/Cursor settings to use worktree's venv for Python
