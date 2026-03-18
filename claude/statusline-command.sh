@@ -9,9 +9,23 @@ git_info="${R:-$(basename "$(pwd)")} ${B:-???}"
 # Context usage
 used=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 size=$(echo "$input" | jq -r '.context_window.context_window_size // empty')
-if [ -n "$used" ] && [ -n "$size" ]; then
-    size_k=$((size / 1000))
-    printf '%s | %.1f%%/%dk' "$git_info" "$used" "$size_k"
-else
-    printf '%s' "$git_info"
+
+# Cost
+cost=$(echo "$input" | jq -r '.cost.total_cost_usd // empty')
+
+output="$git_info"
+
+if [ -n "$cost" ]; then
+    output=$(printf '%s | $%.2f' "$output" "$cost")
 fi
+
+if [ -n "$used" ] && [ -n "$size" ]; then
+    if [ "$size" -ge 1000000 ]; then
+        size_label="$(awk "BEGIN{printf \"%.0f\", $size/1000000}")M"
+    else
+        size_label="$((size / 1000))k"
+    fi
+    output=$(printf '%s | %.1f%%/%s' "$output" "$used" "$size_label")
+fi
+
+printf '%s' "$output"

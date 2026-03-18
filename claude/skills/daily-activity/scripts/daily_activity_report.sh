@@ -120,19 +120,19 @@ printf '%s' "$prs_json" | jq -r '.[] | @base64' | while IFS= read -r pr_b64; do
 
   if [[ "$created_today" == "true" ]]; then
     basis="total_pr"
-    shas=$(printf '%s' "$pr_commits" | jq -r '.[].sha')
+    pr_totals=$(gh api "repos/$repo/pulls/$number" --jq '{additions: .additions, deletions: .deletions}')
+    plus=$(printf '%s' "$pr_totals" | jq -r '.additions')
+    minus=$(printf '%s' "$pr_totals" | jq -r '.deletions')
   else
-    shas="$today_shas"
+    while IFS= read -r sha; do
+      [[ -z "$sha" ]] && continue
+      stats=$(gh api "repos/$repo/commits/$sha" --jq '.stats')
+      a=$(printf '%s' "$stats" | jq -r '.additions')
+      d=$(printf '%s' "$stats" | jq -r '.deletions')
+      plus=$((plus + a))
+      minus=$((minus + d))
+    done < <(printf '%s\n' "$today_shas")
   fi
-
-  while IFS= read -r sha; do
-    [[ -z "$sha" ]] && continue
-    stats=$(gh api "repos/$repo/commits/$sha" --jq '.stats')
-    a=$(printf '%s' "$stats" | jq -r '.additions')
-    d=$(printf '%s' "$stats" | jq -r '.deletions')
-    plus=$((plus + a))
-    minus=$((minus + d))
-  done < <(printf '%s\n' "$shas")
 
   printf '%s\n' "$repo" >> "$repos_file"
   printf '%s\t#%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$repo" "$number" "$title" "$url" "$created_today" "$plus" "$minus" "$basis" >> "$pr_rows_file"
