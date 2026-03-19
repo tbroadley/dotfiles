@@ -769,6 +769,12 @@ install_pi() {
     pi install https://github.com/neevparikh/pi-hawk-provider
   fi
 
+  if pi list | grep -Fq "https://github.com/tbroadley/pi-btw"; then
+    pi update https://github.com/tbroadley/pi-btw
+  else
+    pi install https://github.com/tbroadley/pi-btw
+  fi
+
   if pi list | grep -Fq "npm:pi-vim"; then
     pi remove npm:pi-vim
   fi

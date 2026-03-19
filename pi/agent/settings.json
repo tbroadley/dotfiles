@@ -4,7 +4,8 @@
     "~/.codex/skills"
   ],
   "packages": [
-    "https://github.com/neevparikh/pi-hawk-provider"
+    "https://github.com/neevparikh/pi-hawk-provider",
+    "https://github.com/tbroadley/pi-btw"
   ],
   "extensions": [
     "~/dotfiles/pi/agent/extensions/hawk-only.ts"
