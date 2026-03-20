@@ -196,6 +196,18 @@ sum_pivot_stage_commit_lines() {
   printf '%s\t%s\n' "$plus" "$minus"
 }
 
+fetch_branch_commits_json() {
+  local repo="$1"
+  local branch="$2"
+
+  gh api -X GET "repos/$repo/commits" \
+    -f "sha=$branch" \
+    -f "since=$START_UTC" \
+    -f "until=$END_UTC" \
+    -f "per_page=100" \
+    --paginate 2>/dev/null
+}
+
 wait_for_available_slot() {
   if [[ ${#JOB_PIDS[@]} -lt $MAX_PARALLEL ]]; then
     return
@@ -320,13 +332,11 @@ while IFS= read -r repo; do
 
     while IFS= read -r branch; do
       [[ -z "$branch" ]] && continue
-      gh api -X GET "repos/$repo/commits" \
-        -f "sha=$branch" \
-        -f "since=$START_UTC" \
-        -f "until=$END_UTC" \
-        -f "per_page=100" \
-        --paginate 2>/dev/null \
-        | jq -r --arg b "$branch" '.[] | [.sha, .commit.author.date, .commit.author.email, (.author.login // ""), (.commit.message | split("\n")[0] | gsub("\t"; " ") | gsub("\\|"; "/")), $b] | @tsv' \
+      if ! branch_commits=$(fetch_branch_commits_json "$repo" "$branch"); then
+        continue
+      fi
+      printf '%s' "$branch_commits" \
+        | jq -r --arg b "$branch" 'if type == "array" then .[] else empty end | [.sha, .commit.author.date, .commit.author.email, (.author.login // ""), (.commit.message | split("\n")[0] | gsub("\t"; " ") | gsub("\\|"; "/")), $b] | @tsv' \
         | while IFS=$'\t' read -r sha _ _ _ msg br; do
             [[ -z "$sha" ]] && continue
             printf '%s\t%s\t%s\t%s\n' "$repo" "$sha" "$msg" "$br" >> "$repo_candidate_rows"
@@ -365,12 +375,13 @@ while IFS= read -r repo; do
   [[ -z "$default_branch" ]] && continue
   wait_for_available_slot
   {
-    gh api -X GET "repos/$repo/commits" \
-      -f "sha=$default_branch" \
-      -f "since=$START_UTC" \
-      -f "until=$END_UTC" \
-      -f "per_page=100" \
-      --paginate --jq '.[].sha' | sort -u > "$default_branch_shas_dir/${repo_slug_value}.txt"
+    if fetch_branch_commits_json "$repo" "$default_branch" \
+      | jq -r 'if type == "array" then .[].sha else empty end' \
+      | sort -u > "$default_branch_shas_dir/${repo_slug_value}.txt"; then
+      :
+    else
+      : > "$default_branch_shas_dir/${repo_slug_value}.txt"
+    fi
   } &
   register_job_pid "$!"
 done < "$repos_file"
