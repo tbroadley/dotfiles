@@ -1,6 +1,7 @@
 {
   "providers": {
     "hawk": {
+      "baseUrl": "https://middleman.internal.metr.org",
       "headers": {
         "x-middleman-priority": "high"
       }
