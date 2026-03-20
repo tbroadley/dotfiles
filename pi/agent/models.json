@@ -1,0 +1,9 @@
+{
+  "providers": {
+    "hawk": {
+      "headers": {
+        "x-middleman-priority": "high"
+      }
+    }
+  }
+}
