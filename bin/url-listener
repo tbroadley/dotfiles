@@ -3,6 +3,7 @@
 Simple HTTP server that listens for requests from dev containers.
 - Opens URLs in the default browser on the host
 - Opens files/directories in Cursor (attached to the dev container)
+- Opens files in Preview on the host
 - Clipboard forwarding (pbcopy/pbpaste) between container and host
 
 Usage: url-listener [--port PORT]
@@ -12,6 +13,7 @@ Default port: 7077
 import argparse
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -20,13 +22,53 @@ import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
+
 CURSOR_CONTAINER_CONFIG_DIR = Path.home() / "Library/Application Support/Cursor/User/globalStorage/anysphere.remote-containers/nameConfigs"
 
 # Environment for launching GUI apps - launchd has minimal PATH
 GUI_ENV = {
     **os.environ,
-    "PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
 }
+
+
+def executable_path(name: str) -> str:
+    path = shutil.which(name, path=GUI_ENV["PATH"])
+    assert path is not None, f"Could not find executable: {name}"
+    return path
+
+
+def map_container_path_to_host(container_name: str, container_path: str) -> Path:
+    result = subprocess.run(
+        [executable_path("docker"), "inspect", container_name],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=GUI_ENV,
+    )
+    inspect_data = json.loads(result.stdout)[0]
+
+    container_path_obj = Path(container_path)
+    mounts = inspect_data["Mounts"]
+    matching_mounts = sorted(
+        (
+            mount
+            for mount in mounts
+            if container_path_obj == Path(mount["Destination"])
+            or container_path_obj.is_relative_to(Path(mount["Destination"]))
+        ),
+        key=lambda mount: len(mount["Destination"]),
+        reverse=True,
+    )
+    assert matching_mounts, f"No mount found for container path {container_path}"
+
+    mount = matching_mounts[0]
+    destination = Path(mount["Destination"])
+    source = Path(mount["Source"])
+    relative_path = container_path_obj.relative_to(destination)
+    host_path = source / relative_path
+    assert host_path.exists(), f"Mapped host path does not exist: {host_path}"
+    return host_path
 
 
 def write_container_config(
@@ -78,18 +120,33 @@ class URLHandler(BaseHTTPRequestHandler):
             write_container_config(container_name, extensions, settings, remote_user)
             config = json.dumps({"containerName": f"/{container_name}"})
             hex_config = config.encode().hex()
+            cursor_path = executable_path("cursor")
             if is_file:
-                cmd = ["/usr/local/bin/cursor", "--new-window"]
+                cmd = [cursor_path, "--new-window"]
                 for p in paths:
                     cmd.extend(["--file-uri", f"vscode-remote://attached-container+{hex_config}{p}"])
                 subprocess.run(cmd, check=False, env=GUI_ENV)
             else:
                 uri = f"vscode-remote://attached-container+{hex_config}{paths[0]}"
-                subprocess.run(["/usr/local/bin/cursor", "--new-window", "--folder-uri", uri], check=False, env=GUI_ENV)
+                subprocess.run([cursor_path, "--new-window", "--folder-uri", uri], check=False, env=GUI_ENV)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(b"OK")
+        elif parsed.path == "/preview" and "container" in params and "path" in params:
+            try:
+                container_name = params["container"][0]
+                host_paths = [map_container_path_to_host(container_name, path) for path in params["path"]]
+                subprocess.run(["/usr/bin/open", "-a", "Preview", *[str(path) for path in host_paths]], check=False, env=GUI_ENV)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"OK")
+            except Exception as exc:
+                self.send_response(500)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(str(exc).encode())
         elif parsed.path == "/wispr-dictionary":
             phrase = params.get("phrase", [""])[0]
             replacement = params.get("replacement", [None])[0]

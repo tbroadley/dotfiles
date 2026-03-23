@@ -153,6 +153,7 @@ The `url-listener` is an HTTP server (port 7077) that enables dev containers to 
 
 - **Open URLs** in the host's default browser
 - **Open files/directories** in Cursor attached to the container
+- **Open files** in Preview on the host
 - **Clipboard forwarding** (pbcopy/pbpaste) between container and host
 - **Wispr dictionary** additions from within containers
 

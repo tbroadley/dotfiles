@@ -1,0 +1,37 @@
+#!/bin/bash
+# Opens files in Preview on the host, including from inside a dev container.
+# Usage: preview <file> [file...]
+
+if [ $# -eq 0 ]; then
+    echo "Usage: preview <file> [file...]" >&2
+    exit 1
+fi
+
+for TARGET in "$@"; do
+    if [ ! -e "$TARGET" ]; then
+        echo "Error: $TARGET does not exist" >&2
+        exit 1
+    fi
+    if [ -d "$TARGET" ]; then
+        echo "Error: $TARGET is a directory; preview only supports files" >&2
+        exit 1
+    fi
+done
+
+if [ -z "${DEVCONTAINER_NAME:-}" ]; then
+    exec /usr/bin/open -a Preview "$@"
+fi
+
+PORT="${URL_LISTENER_PORT:-7077}"
+ENCODED_NAME=$(printf '%s' "$DEVCONTAINER_NAME" | jq -sRr @uri)
+PATH_PARAMS=""
+for TARGET in "$@"; do
+    ABS_PATH=$(realpath "$TARGET")
+    ENCODED_PATH=$(printf '%s' "$ABS_PATH" | jq -sRr @uri)
+    PATH_PARAMS="${PATH_PARAMS}&path=${ENCODED_PATH}"
+done
+
+if ! curl -fsS "http://host.docker.internal:${PORT}/preview?container=${ENCODED_NAME}${PATH_PARAMS}" >/dev/null; then
+    echo "Error: Failed to open file(s) in Preview on host. Is url-listener running?" >&2
+    exit 1
+fi
