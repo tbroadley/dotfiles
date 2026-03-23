@@ -3,3 +3,4 @@
 claude/skills/middleman-logs/
 claude/skills/download-inspect-eval/
 claude/skills/devbox-setup/
+__pycache__
