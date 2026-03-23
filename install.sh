@@ -175,10 +175,8 @@ add_to_rc "alias g=git" "alias g=git"
 add_to_rc "alias ppl=" "alias ppl='pivot pull'"
 add_to_rc "alias pps=" "alias pps='pivot push'"
 add_to_rc "alias pco=" "alias pco='pivot checkout'"
-# pr: pivot repro (no stage names) or pivot run (with stage names)
-# Stage names are positional args that don't start with --
-remove_from_rc 'alias pr='
-add_to_rc "pr()" 'pr() { local has_stage=false; for arg in "$@"; do [[ "$arg" != --* ]] && has_stage=true && break; done; if $has_stage; then pivot run "$@"; else pivot repro "$@"; fi; }'
+remove_from_rc 'alias pr=' 'pr()'
+add_to_rc "alias pr=" "alias pr='pivot repro'"
 # pla/psa: detect pivot vs dvc and use the appropriate tool
 # Remove old alias versions that conflict with the function definitions
 remove_from_rc 'alias pla=' 'alias psa='
