@@ -775,6 +775,12 @@ install_pi() {
     pi install https://github.com/tbroadley/pi-btw
   fi
 
+  if pi list | grep -Fq "npm:@ogulcancelik/pi-handoff"; then
+    pi update npm:@ogulcancelik/pi-handoff
+  else
+    pi install npm:@ogulcancelik/pi-handoff
+  fi
+
   if pi list | grep -Fq "npm:pi-vim"; then
     pi remove npm:pi-vim
   fi

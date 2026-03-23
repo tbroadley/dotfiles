@@ -5,13 +5,14 @@
   ],
   "packages": [
     "https://github.com/neevparikh/pi-hawk-provider",
-    "https://github.com/tbroadley/pi-btw"
+    "https://github.com/tbroadley/pi-btw",
+    "npm:@ogulcancelik/pi-handoff"
   ],
   "extensions": [
     "~/dotfiles/pi/agent/extensions/hawk-only.ts"
   ],
   "defaultProvider": "hawk",
-  "defaultModel": "gpt-5.4",
+  "defaultModel": "claude-opus-4-6-fast",
   "enabledModels": [
     "hawk/*"
   ],
