@@ -169,7 +169,6 @@ uninstall_pi() {
 
 # Aliases (work in both shells)
 add_to_rc "alias b=basedpyright" "alias b=basedpyright"
-remove_from_rc "claude()"
 add_to_rc "alias dotfiles=" "alias dotfiles='git -C ~/dotfiles pull && ~/dotfiles/install.sh && exec \$SHELL'"
 add_to_rc "alias g=git" "alias g=git"
 add_to_rc "alias ppl=" "alias ppl='pivot pull'"
@@ -191,12 +190,13 @@ add_to_rc "alias awsl=" "alias awsl='aws sso login'"
 add_to_rc "source ~/dotfiles/bin/agent-gate.sh" "source ~/dotfiles/bin/agent-gate.sh"
 remove_from_rc 'alias cl=' 'alias clc=' 'alias clr=' 'alias codex=' 'alias cx='
 if _agent_allowed claude_code; then
+  add_to_rc "claude()" 'claude() { _check_agent_allowed claude_code && command claude "$@"; }'
   add_to_rc "cl()" 'cl() { _check_agent_allowed claude_code && claude "$@"; }'
   add_to_rc "clc()" 'clc() { _check_agent_allowed claude_code && claude --continue "$@"; }'
   add_to_rc "clr()" 'clr() { _check_agent_allowed claude_code && claude --resume "$@"; }'
   add_to_rc "export ANTHROPIC_MODEL=opus" "export ANTHROPIC_MODEL=opus"
 else
-  remove_from_rc 'cl()' 'clc()' 'clr()' 'export ANTHROPIC_MODEL=opus'
+  remove_from_rc 'claude()' 'cl()' 'clc()' 'clr()' 'export ANTHROPIC_MODEL=opus'
 fi
 if _agent_allowed gemini; then
   add_to_rc "gemini()" 'gemini() { _check_agent_allowed gemini && command gemini "$@"; }'

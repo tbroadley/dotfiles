@@ -45,9 +45,11 @@ alias awsl='aws sso login'
 
 # Agent gating: block agents not listed in .allowed-agents (if file exists)
 source ~/dotfiles/bin/agent-gate.sh
+claude() { _check_agent_allowed claude_code && command claude "$@"; }
 cl() { _check_agent_allowed claude_code && claude "$@"; }
 clc() { _check_agent_allowed claude_code && claude --continue "$@"; }
 clr() { _check_agent_allowed claude_code && claude --resume "$@"; }
+pi() { _check_agent_allowed pi && command pi "$@"; }
 gemini() { _check_agent_allowed gemini && command gemini "$@"; }
 codex() { _check_agent_allowed codex && command codex --add-dir /opt/python --add-dir "$HOME/.cache/uv" "$@"; }
 cx() { _check_agent_allowed codex && command codex --add-dir /opt/python --add-dir "$HOME/.cache/uv" "$@"; }
