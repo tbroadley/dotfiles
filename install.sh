@@ -594,6 +594,7 @@ set -u
 # Add dotfiles bin to PATH and create symlinks for renamed scripts
 add_to_rc 'export PATH="$HOME/dotfiles/bin:$PATH"' 'export PATH="$HOME/dotfiles/bin:$PATH"'
 ln -sf "$SCRIPT_DIR/bin/cursor-in-container" "$HOME/.local/bin/cursor"
+ln -sf "$SCRIPT_DIR/bin/preview-in-container" "$HOME/.local/bin/preview"
 ln -sf "$SCRIPT_DIR/bin/wispr-add-dictionary-remote" "$HOME/.local/bin/wispr-add-dictionary"
 add_to_rc 'export BROWSER=open-url-on-host' 'export BROWSER=open-url-on-host'
 echo "Dotfiles bin added to PATH"
@@ -691,6 +692,7 @@ if _agent_allowed pi; then
   mkdir -p "$PI_AGENT_DIR"
   if [ -d "$SCRIPT_DIR/pi/agent" ]; then
     ln -sf "$SCRIPT_DIR/pi/agent/settings.json" "$PI_AGENT_DIR/settings.json"
+    ln -sf "$SCRIPT_DIR/pi/agent/AGENTS.md" "$PI_AGENT_DIR/AGENTS.md"
     echo "pi settings installed"
   fi
 else
