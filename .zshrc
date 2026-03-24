@@ -36,6 +36,7 @@ export PATH="$HOME/dotfiles/bin:$PATH"
 alias c=clear
 alias d=docker
 alias g=git
+alias gdc=ghostty-container
 alias k=kubectl
 alias kc='kubectl config use-context'
 alias psa='dvc push && git push'

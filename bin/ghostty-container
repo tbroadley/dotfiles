@@ -1,0 +1,266 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Open a dedicated Ghostty window whose tabs/splits run inside an existing Docker container.
+
+Usage:
+  ghostty-container [container_name_or_id] [--cwd <host-path>] [--shell <command>] [--title <title>]
+
+Behavior:
+  - If no container is provided, tries DEVCONTAINER_NAME, then the running devcontainer
+    associated with the current directory (or one of its parents).
+  - If --cwd is omitted, tries to translate the current host directory into the matching
+    path inside the container using Docker mount information.
+  - By default, bash sessions are bootstrapped similarly to `dc`: source `~/.bashrc`,
+    source repo `.env` if present, and activate `/opt/python/bin/activate` if present.
+  - New tabs/splits in that Ghostty window will reuse the same `docker exec ...` command.
+
+Examples:
+  ghostty-container api
+  ghostty-container --shell 'zsh -il'
+  ghostty-container my-container --cwd ~/src/project
+EOF
+}
+
+shell_quote() {
+    printf '%q' "$1"
+}
+
+resolve_container_from_devcontainer_label() {
+    local dir="$1"
+    local container_id=""
+
+    while true; do
+        container_id=$(docker ps -q --filter "label=devcontainer.local_folder=$dir" | head -n 1)
+        if [[ -n "$container_id" ]]; then
+            docker inspect --format '{{.Name}}' "$container_id" | sed 's#^/##'
+            return 0
+        fi
+
+        if [[ "$dir" == "/" ]]; then
+            break
+        fi
+        dir=$(dirname "$dir")
+    done
+
+    return 1
+}
+
+find_devcontainer_workspace() {
+    local dir="$1"
+
+    while true; do
+        if [[ -d "$dir/.devcontainer" || -f "$dir/.devcontainer.json" ]]; then
+            printf '%s\n' "$dir"
+            return 0
+        fi
+
+        if [[ "$dir" == "/" ]]; then
+            break
+        fi
+        dir=$(dirname "$dir")
+    done
+
+    return 1
+}
+
+run_dc_setup() {
+    local workspace="$1"
+    local devc_script="$HOME/dotfiles/devc.zsh"
+
+    if [[ ! -f "$devc_script" ]]; then
+        echo "Missing devcontainer helper: $devc_script" >&2
+        return 1
+    fi
+
+    echo "Running dc-style setup for $workspace" >&2
+    (
+        cd "$workspace"
+        # shellcheck source=/dev/null
+        source "$devc_script"
+        devc --no-enter
+    )
+}
+
+translate_host_path_to_container() {
+    local container="$1"
+    local host_path="$2"
+    local best_source=""
+    local best_dest=""
+    local source=""
+    local dest=""
+
+    while IFS=$'\t' read -r source dest; do
+        [[ -n "$source" && -n "$dest" ]] || continue
+        if [[ "$host_path" == "$source" || "$host_path" == "$source/"* ]]; then
+            if [[ ${#source} -gt ${#best_source} ]]; then
+                best_source="$source"
+                best_dest="$dest"
+            fi
+        fi
+    done < <(docker inspect --format '{{range .Mounts}}{{printf "%s\t%s\n" .Source .Destination}}{{end}}' "$container")
+
+    if [[ -z "$best_source" ]]; then
+        return 1
+    fi
+
+    local suffix="${host_path#$best_source}"
+    printf '%s\n' "$best_dest$suffix"
+}
+
+detect_container_user() {
+    local container="$1"
+    local user=""
+
+    user=$(docker exec "$container" awk -F: '$3 >= 1000 && $3 < 65534 { print $1; exit }' /etc/passwd 2>/dev/null || true)
+    if [[ -n "$user" ]]; then
+        printf '%s\n' "$user"
+        return 0
+    fi
+
+    user=$(docker inspect --format '{{.Config.User}}' "$container" 2>/dev/null || true)
+    if [[ -n "$user" && "$user" != "<no value>" && "$user" != "0" && "$user" != "root" ]]; then
+        printf '%s\n' "$user"
+        return 0
+    fi
+
+    return 1
+}
+
+container="${DEVCONTAINER_NAME:-}"
+host_cwd="$PWD"
+container_cwd=""
+container_shell=""
+container_user=""
+custom_shell=false
+title=""
+
+if [[ $# -gt 0 && "$1" != --* ]]; then
+    container="$1"
+    shift
+fi
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --cwd)
+            [[ $# -ge 2 ]] || { echo "Missing value for --cwd" >&2; exit 1; }
+            host_cwd="$2"
+            shift 2
+            ;;
+        --shell)
+            [[ $# -ge 2 ]] || { echo "Missing value for --shell" >&2; exit 1; }
+            container_shell="$2"
+            custom_shell=true
+            shift 2
+            ;;
+        --title)
+            [[ $# -ge 2 ]] || { echo "Missing value for --title" >&2; exit 1; }
+            title="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+host_cwd=$(cd "$host_cwd" && pwd)
+
+workspace_root=""
+if workspace_root=$(find_devcontainer_workspace "$host_cwd" 2>/dev/null); then
+    run_dc_setup "$workspace_root"
+fi
+
+if [[ -z "$container" ]]; then
+    if ! container=$(resolve_container_from_devcontainer_label "$host_cwd"); then
+        echo "Could not determine a container. Pass one explicitly or run from a devcontainer workspace." >&2
+        exit 1
+    fi
+fi
+
+if ! docker inspect "$container" >/dev/null 2>&1; then
+    echo "Container not found: $container" >&2
+    exit 1
+fi
+
+if [[ -z "$title" ]]; then
+    title="🐳 $container"
+fi
+
+if container_user=$(detect_container_user "$container" 2>/dev/null); then
+    echo "Using container user: $container_user" >&2
+else
+    container_user=""
+    echo "Could not determine a non-root container user; falling back to container default." >&2
+fi
+
+if container_cwd=$(translate_host_path_to_container "$container" "$host_cwd" 2>/dev/null); then
+    echo "Using container working directory: $container_cwd" >&2
+else
+    container_cwd=""
+    echo "No matching container mount for $host_cwd; opening at container default directory." >&2
+fi
+
+shell_exec_user=()
+if [[ -n "$container_user" ]]; then
+    shell_exec_user=(-u "$container_user")
+fi
+
+if [[ -z "$container_shell" ]]; then
+    detected_shell=$(docker exec "${shell_exec_user[@]}" "$container" sh -lc 'if command -v bash >/dev/null 2>&1; then printf bash; elif command -v zsh >/dev/null 2>&1; then printf zsh; else printf sh; fi')
+    case "$detected_shell" in
+        bash)
+            container_shell='rcfile=$(mktemp)
+cat > "$rcfile" <<'"'"'RCEOF'"'"'
+[ -f ~/.bashrc ] && . ~/.bashrc
+set -a
+[ -f .env ] && . .env
+set +a
+[ -f /opt/python/bin/activate ] && . /opt/python/bin/activate
+RCEOF
+bash --rcfile "$rcfile"
+rm -f "$rcfile"'
+            ;;
+        zsh)
+            container_shell='exec zsh -il'
+            ;;
+        *)
+            container_shell='exec sh -l'
+            ;;
+    esac
+fi
+
+command="docker exec -it"
+if [[ -n "$container_user" ]]; then
+    command+=" -u $(shell_quote "$container_user")"
+fi
+if [[ -n "$container_cwd" ]]; then
+    command+=" -w $(shell_quote "$container_cwd")"
+fi
+if [[ "$custom_shell" == true ]]; then
+    command+=" $(shell_quote "$container") sh -lc $(shell_quote "exec $container_shell")"
+else
+    command+=" $(shell_quote "$container") sh -lc $(shell_quote "$container_shell")"
+fi
+
+case "$(uname)" in
+    Darwin)
+        open -na Ghostty.app --args "--title=$title" "--command=shell:$command"
+        ;;
+    Linux)
+        ghostty --gtk-single-instance=false "--title=$title" "--command=shell:$command" >/dev/null 2>&1 &
+        disown
+        ;;
+    *)
+        echo "Unsupported platform: $(uname)" >&2
+        exit 1
+        ;;
+esac
