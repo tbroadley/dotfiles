@@ -13,10 +13,8 @@
     "~/dotfiles/pi/agent/extensions/hawk-only.ts"
   ],
   "defaultProvider": "hawk",
-  "defaultModel": "claude-opus-4-6-fast",
   "enabledModels": [
     "hawk/*"
   ],
-  "lastChangelogVersion": "0.59.0",
   "theme": "light"
 }
