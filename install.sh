@@ -794,10 +794,10 @@ install_pi() {
     pi install npm:@ogulcancelik/pi-handoff
   fi
 
-  if pi list | grep -Fq "npm:pi-manage-todo-list"; then
-    pi update "npm:pi-manage-todo-list@github:tbroadley/pi-manage-todo-list"
+  if pi list | grep -Fq "https://github.com/tbroadley/pi-manage-todo-list"; then
+    pi update "https://github.com/tbroadley/pi-manage-todo-list"
   else
-    pi install "npm:pi-manage-todo-list@github:tbroadley/pi-manage-todo-list"
+    pi install "https://github.com/tbroadley/pi-manage-todo-list"
   fi
 
   if pi list | grep -Fq "npm:pi-vim"; then

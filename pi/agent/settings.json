@@ -7,7 +7,7 @@
     "https://github.com/neevparikh/pi-hawk-provider",
     "https://github.com/tbroadley/pi-btw",
     "npm:@ogulcancelik/pi-handoff",
-    "npm:pi-manage-todo-list@github:tbroadley/pi-manage-todo-list"
+    "https://github.com/tbroadley/pi-manage-todo-list"
   ],
   "extensions": [
     "~/dotfiles/pi/agent/extensions/hawk-only.ts"
