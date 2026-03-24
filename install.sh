@@ -691,17 +691,17 @@ if _agent_allowed pi; then
   if [ -d "$SCRIPT_DIR/pi/agent" ]; then
     # Merge dotfiles settings into local settings, preserving local-only keys
     # (e.g. defaultModel set by user, lastChangelogVersion set by pi)
-    local dotfiles_settings="$SCRIPT_DIR/pi/agent/settings.json"
-    local local_settings="$PI_AGENT_DIR/settings.json"
-    if [ -f "$local_settings" ] && [ ! -L "$local_settings" ] && command -v jq >/dev/null 2>&1; then
+    _pi_dotfiles_settings="$SCRIPT_DIR/pi/agent/settings.json"
+    _pi_local_settings="$PI_AGENT_DIR/settings.json"
+    if [ -f "$_pi_local_settings" ] && [ ! -L "$_pi_local_settings" ] && command -v jq >/dev/null 2>&1; then
       # Local file exists and is not a symlink: merge dotfiles on top of local
       # dotfiles keys win, but local-only keys are preserved
-      jq -s '.[0] * .[1]' "$local_settings" "$dotfiles_settings" > "$local_settings.tmp" \
-        && mv "$local_settings.tmp" "$local_settings"
+      jq -s '.[0] * .[1]' "$_pi_local_settings" "$_pi_dotfiles_settings" > "$_pi_local_settings.tmp" \
+        && mv "$_pi_local_settings.tmp" "$_pi_local_settings"
     else
       # No local file or it's a stale symlink: copy from dotfiles
-      rm -f "$local_settings"
-      cp "$dotfiles_settings" "$local_settings"
+      rm -f "$_pi_local_settings"
+      cp "$_pi_dotfiles_settings" "$_pi_local_settings"
     fi
     ln -sf "$SCRIPT_DIR/pi/agent/AGENTS.md" "$PI_AGENT_DIR/AGENTS.md"
     echo "pi settings installed"
