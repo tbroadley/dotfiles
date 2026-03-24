@@ -5,7 +5,7 @@ devc() {
 
     local no_enter=false
 
-    while [[ "$1" == -* ]]; do
+    while [[ $# -gt 0 && "$1" == -* ]]; do
         case "$1" in
             --rebuild|-r)
                 rebuild_flag="--remove-existing-container"
