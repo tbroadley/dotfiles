@@ -16,6 +16,5 @@
   "enabledModels": [
     "hawk/*"
   ],
-  "theme": "light",
-  "lastChangelogVersion": "0.57.0"
+  "theme": "light"
 }
