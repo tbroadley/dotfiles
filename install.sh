@@ -781,6 +781,12 @@ install_pi() {
     pi install npm:@ogulcancelik/pi-handoff
   fi
 
+  if pi list | grep -Fq "npm:pi-manage-todo-list"; then
+    pi update "npm:pi-manage-todo-list@github:tbroadley/pi-manage-todo-list"
+  else
+    pi install "npm:pi-manage-todo-list@github:tbroadley/pi-manage-todo-list"
+  fi
+
   if pi list | grep -Fq "npm:pi-vim"; then
     pi remove npm:pi-vim
   fi
