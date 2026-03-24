@@ -69,6 +69,21 @@ PROMPT='%1~ %# '
 
 # Run install.sh in all dev containers (parallel)
 dotfiles-sync() {
+    # Merge host pi settings (dotfiles keys win, local-only keys preserved)
+    local _pi_dotfiles=~/dotfiles/pi/agent/settings.json
+    local _pi_local=~/.pi/agent/settings.json
+    if [[ -f "$_pi_dotfiles" ]]; then
+        mkdir -p ~/.pi/agent
+        if [[ -f "$_pi_local" && ! -L "$_pi_local" ]]; then
+            jq -s '.[0] * .[1]' "$_pi_local" "$_pi_dotfiles" > "$_pi_local.tmp" \
+                && mv "$_pi_local.tmp" "$_pi_local"
+        else
+            rm -f "$_pi_local"
+            cp "$_pi_dotfiles" "$_pi_local"
+        fi
+        echo "pi settings merged"
+    fi
+
     # Restart url-listener to pick up any changes
     echo "Restarting url-listener..."
     pkill -f "url-listener" 2>/dev/null
