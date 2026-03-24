@@ -776,6 +776,19 @@ install_pi() {
   echo "Ensuring latest @mariozechner/pi-coding-agent is installed globally..."
   npm install -g @mariozechner/pi-coding-agent@latest
 
+  local pi_handoff_fork_repo="https://github.com/tbroadley/pi-extensions.git"
+  local pi_handoff_fork_checkout="$HOME/.local/share/pi-packages/pi-extensions"
+  local pi_handoff_fork_package="$pi_handoff_fork_checkout/packages/pi-handoff"
+
+  mkdir -p "$(dirname "$pi_handoff_fork_checkout")"
+  if [ -d "$pi_handoff_fork_checkout/.git" ]; then
+    git -C "$pi_handoff_fork_checkout" remote set-url origin "$pi_handoff_fork_repo"
+    git -C "$pi_handoff_fork_checkout" fetch origin main --depth 1
+    git -C "$pi_handoff_fork_checkout" checkout -B main origin/main
+  else
+    git clone --depth 1 "$pi_handoff_fork_repo" "$pi_handoff_fork_checkout"
+  fi
+
   if pi list | grep -Fq "https://github.com/neevparikh/pi-hawk-provider"; then
     pi update https://github.com/neevparikh/pi-hawk-provider
   else
@@ -789,9 +802,14 @@ install_pi() {
   fi
 
   if pi list | grep -Fq "npm:@ogulcancelik/pi-handoff"; then
-    pi update npm:@ogulcancelik/pi-handoff
-  else
-    pi install npm:@ogulcancelik/pi-handoff
+    pi remove npm:@ogulcancelik/pi-handoff
+  fi
+  if npm list -g @ogulcancelik/pi-handoff >/dev/null 2>&1; then
+    npm uninstall -g @ogulcancelik/pi-handoff
+  fi
+
+  if ! pi list | grep -Fq "$pi_handoff_fork_package"; then
+    pi install "$pi_handoff_fork_package"
   fi
 
   if pi list | grep -Fq "https://github.com/tbroadley/pi-manage-todo-list"; then

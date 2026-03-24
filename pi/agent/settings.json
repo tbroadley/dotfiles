@@ -6,7 +6,7 @@
   "packages": [
     "https://github.com/neevparikh/pi-hawk-provider",
     "https://github.com/tbroadley/pi-btw",
-    "npm:@ogulcancelik/pi-handoff",
+    "~/.local/share/pi-packages/pi-extensions/packages/pi-handoff",
     "https://github.com/tbroadley/pi-manage-todo-list"
   ],
   "extensions": [
