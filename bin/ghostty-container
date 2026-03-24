@@ -253,7 +253,70 @@ fi
 
 case "$(uname)" in
     Darwin)
-        open -na Ghostty.app --args "--title=$title" "--command=shell:$command"
+        launch_input_mac="exec $command"
+        launch_input_b64=$(printf '%s' "$launch_input_mac" | base64 | tr -d '\n')
+        if ! GHOSTTY_LAUNCH_INPUT_B64="$launch_input_b64" osascript -l JavaScript <<'JXA'
+ObjC.import('stdlib');
+ObjC.import('Foundation');
+
+const app = Application('Ghostty');
+const launchInputB64 = ObjC.unwrap($.getenv('GHOSTTY_LAUNCH_INPUT_B64'));
+const launchInputData = $.NSData.alloc.initWithBase64EncodedStringOptions($(launchInputB64), 0);
+const launchInput = ObjC.unwrap($.NSString.alloc.initWithDataEncoding(launchInputData, $.NSUTF8StringEncoding));
+const wasRunning = app.running();
+const beforeIds = new Set(app.windows().map(w => w.id()));
+
+function findNewWindow() {
+    return app.windows().find(w => !beforeIds.has(w.id())) || null;
+}
+
+app.activate();
+delay(0.3);
+
+let targetWindow = null;
+
+if (wasRunning) {
+    app.newWindow();
+    for (let i = 0; i < 20; i++) {
+        targetWindow = findNewWindow();
+        if (targetWindow) break;
+        delay(0.1);
+    }
+} else {
+    for (let i = 0; i < 20; i++) {
+        if (app.windows().length > 0) {
+            targetWindow = app.frontWindow();
+            break;
+        }
+        delay(0.1);
+    }
+
+    if (!targetWindow) {
+        app.newWindow();
+        for (let i = 0; i < 20; i++) {
+            if (app.windows().length > 0) {
+                targetWindow = app.frontWindow();
+                break;
+            }
+            delay(0.1);
+        }
+    }
+}
+
+if (!targetWindow) {
+    targetWindow = app.frontWindow();
+}
+
+delay(0.3);
+const terminal = targetWindow.selectedTab().focusedTerminal();
+app.inputText(launchInput, {to: terminal});
+delay(0.1);
+app.sendKey('enter', {to: terminal});
+JXA
+        then
+            echo "Ghostty scripting launch failed." >&2
+            exit 1
+        fi
         ;;
     Linux)
         ghostty --gtk-single-instance=false "--title=$title" "--command=shell:$command" >/dev/null 2>&1 &
