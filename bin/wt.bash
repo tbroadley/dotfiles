@@ -119,6 +119,13 @@ _wt_home_dir() {
     echo "$HOME/.worktrees/$(basename "$repo_root")"
 }
 
+# Get the shared Pivot cache directory.
+# Keeping this under $HOME puts it on the same filesystem as ~/.worktrees,
+# so Pivot can use hardlinks there while sharing one cache across worktrees.
+_wt_pivot_cache_dir() {
+    echo "$HOME/.pivot-cache"
+}
+
 wt() {
     local branch="$1"
 
@@ -233,11 +240,13 @@ EOF
 
     # Set up Pivot cache sharing if Pivot is used
     if [ -d "$repo_root/.pivot" ]; then
-        mkdir -p "$new_wt_dir/.pivot"
+        local pivot_cache_dir
+        pivot_cache_dir="$(_wt_pivot_cache_dir)"
+        mkdir -p "$new_wt_dir/.pivot" "$pivot_cache_dir"
         # Copy existing config from root repo
         [ -f "$repo_root/.pivot/config.yaml" ] && cp "$repo_root/.pivot/config.yaml" "$new_wt_dir/.pivot/"
         # Set local Pivot config for the worktree
-        (cd "$new_wt_dir" && pivot config set cache.dir "$repo_root/.pivot/cache") 2>/dev/null || true
+        (cd "$new_wt_dir" && pivot config set cache.dir "$pivot_cache_dir") 2>/dev/null || true
         (cd "$new_wt_dir" && pivot config set core.max_workers 6) 2>/dev/null || true
         (cd "$new_wt_dir" && pivot config set cache.checkout_mode hardlink,copy) 2>/dev/null || true
     fi
