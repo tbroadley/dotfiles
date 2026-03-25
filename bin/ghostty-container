@@ -239,6 +239,7 @@ rm -f "$rcfile"'
 fi
 
 command="docker exec -it"
+command+=" -e DEVCONTAINER_NAME=$(shell_quote "$container")"
 if [[ -n "$container_user" ]]; then
     command+=" -u $(shell_quote "$container_user")"
 fi
