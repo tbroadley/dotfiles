@@ -6,11 +6,8 @@
   "packages": [
     "https://github.com/tbroadley/pi-hawk-provider",
     "https://github.com/tbroadley/pi-btw",
-    {
-      "source": "https://github.com/tbroadley/pi-extensions",
-      "extensions": ["packages/pi-handoff/handoff.ts"]
-    },
-    "https://github.com/tbroadley/pi-manage-todo-list"
+    "https://github.com/tbroadley/pi-manage-todo-list",
+    "https://github.com/tbroadley/pi-extensions"
   ],
   "extensions": [
     "~/dotfiles/pi/agent/extensions/hawk-only.ts"
