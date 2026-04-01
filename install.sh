@@ -788,16 +788,26 @@ install_pi() {
     pi install https://github.com/tbroadley/pi-btw
   fi
 
-  # Clean up old local pi-handoff checkout if present
-  if [ -d "$HOME/.local/share/pi-packages/pi-extensions" ]; then
-    rm -rf "$HOME/.local/share/pi-packages/pi-extensions"
+  # Migrate from npm pi-handoff to fork (with handoff fix)
+  if pi list | grep -Fq "npm:@ogulcancelik/pi-handoff"; then
+    pi remove npm:@ogulcancelik/pi-handoff
   fi
 
-  if pi list | grep -Fq "npm:@ogulcancelik/pi-handoff"; then
-    pi update npm:@ogulcancelik/pi-handoff
-  else
-    pi install npm:@ogulcancelik/pi-handoff
+  # Remove old full-repo pi-extensions package if installed (replaced by local path to sub-package)
+  if pi list | grep -Fq "https://github.com/tbroadley/pi-extensions"; then
+    pi remove https://github.com/tbroadley/pi-extensions
   fi
+
+  # Clone/update pi-extensions repo manually so the local path in settings.json works
+  local _pi_ext_dir="$HOME/.pi/agent/git/github.com/tbroadley/pi-extensions"
+  if [ -d "$_pi_ext_dir/.git" ]; then
+    git -C "$_pi_ext_dir" pull --ff-only 2>/dev/null || true
+  else
+    rm -rf "$_pi_ext_dir"
+    mkdir -p "$(dirname "$_pi_ext_dir")"
+    git clone https://github.com/tbroadley/pi-extensions "$_pi_ext_dir"
+  fi
+  (cd "$_pi_ext_dir" && npm install --ignore-scripts 2>/dev/null || true)
 
   if pi list | grep -Fq "https://github.com/tbroadley/pi-manage-todo-list"; then
     pi update "https://github.com/tbroadley/pi-manage-todo-list"
