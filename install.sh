@@ -229,6 +229,15 @@ add_to_rc "export DD_TOKEN_STORAGE=" "export DD_TOKEN_STORAGE=file"
 add_to_rc "export LANG=en_US.UTF-8" "export LANG=en_US.UTF-8"
 add_to_rc "export LC_ALL=en_US.UTF-8" "export LC_ALL=en_US.UTF-8"
 add_to_rc 'export PATH="$HOME/.local/bin:$PATH"' 'export PATH="$HOME/.local/bin:$PATH"'
+
+# Supply chain hardening: only install packages published >7 days ago
+# To bypass: unset UV_EXCLUDE_NEWER npm_config_before
+add_to_rc '_supply_chain_date=' '_supply_chain_date=$(date -d "7 days ago" +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d 2>/dev/null)
+if [ -n "$_supply_chain_date" ]; then
+  export UV_EXCLUDE_NEWER="$_supply_chain_date"
+  export npm_config_before="$_supply_chain_date"
+fi
+unset _supply_chain_date'
 add_to_rc 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi' 'if [[ "$TERM_PROGRAM" == "vscode" && -f ".env" ]]; then set -a; source .env; set +a; fi'
 
 # Set PYTHONPATH to git root (updates on directory change, useful for worktrees)
