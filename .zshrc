@@ -29,20 +29,6 @@ export PATH="$PATH:$HOME/.orbstack/bin"
 # Local binaries (apf, etc.)
 export PATH="$HOME/.local/bin:$PATH"
 
-# Supply chain hardening: only install packages published >7 days ago
-# Protects against compromised packages that typically get caught within a week
-# To bypass: unset UV_EXCLUDE_NEWER npm_config_before
-if command -v date >/dev/null 2>&1; then
-  if [[ "$(uname)" == "Darwin" ]]; then
-    _supply_chain_date=$(date -v-7d +%Y-%m-%d)
-  else
-    _supply_chain_date=$(date -d '7 days ago' +%Y-%m-%d)
-  fi
-  export UV_EXCLUDE_NEWER="$_supply_chain_date"  # uv/pip
-  export npm_config_before="$_supply_chain_date"  # npm
-  unset _supply_chain_date
-fi
-
 # Dotfiles scripts (iterate)
 export PATH="$HOME/dotfiles/bin:$PATH"
 
