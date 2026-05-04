@@ -26,6 +26,7 @@ To persist changes: commit and push from the dotfiles repo.
 ## Environment
 - AWS CLI: explicitly use production or staging profile
 - Use `uv` for Python dependency management, not `pip`. Use `uv pip install`, `uv add`, `uv run`, etc.
+- Don't re-open files with `cursor` that are already open (e.g. don't re-run `cursor plot.png` after regenerating a plot you already opened earlier).
 
 ## Iteration Speed
 - If a script takes more than a few seconds to run, optimize it before running it repeatedly
