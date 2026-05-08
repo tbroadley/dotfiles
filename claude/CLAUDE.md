@@ -24,7 +24,7 @@ To persist changes: commit and push from the dotfiles repo.
 - When asked to push to an existing PR, push to that PR's branch—don't create a new branch/PR
 
 ## Environment
-- AWS CLI: explicitly use production or staging profile
+- AWS CLI: use the `default` profile unless explicitly instructed otherwise
 - Use `uv` for Python dependency management, not `pip`. Use `uv pip install`, `uv add`, `uv run`, etc.
 - Don't re-open files with `cursor` that are already open (e.g. don't re-run `cursor plot.png` after regenerating a plot you already opened earlier).
 
