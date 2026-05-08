@@ -51,7 +51,7 @@
       "~/.worktrees"
     ]
   },
-  "model": "opus[1m]",
+  "model": "claude-opus-4-6[1m]",
   "hooks": {
     "SessionStart": [
       {
@@ -86,5 +86,8 @@
     "hugging-face-cli@huggingface-skills": true,
     "hugging-face-datasets@huggingface-skills": true
   },
-  "skipDangerousModePermissionPrompt": true
+  "effortLevel": "medium",
+  "fastMode": true,
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "light"
 }

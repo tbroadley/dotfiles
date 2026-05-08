@@ -1,6 +1,7 @@
 .DS_Store
 .claude/
 claude/skills/middleman-logs/
+claude/skills/middleman-proxy/
 claude/skills/download-inspect-eval/
 claude/skills/devbox-setup/
 __pycache__
