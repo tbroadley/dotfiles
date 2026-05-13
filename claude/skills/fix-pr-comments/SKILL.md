@@ -13,7 +13,7 @@ Handle PR review comments by choosing the appropriate response for each comment.
 For each PR comment, choose one of these responses:
 
 1. **Address and resolve**: Fix the issue, push the changes, and resolve the thread
-2. **Explain**: If the comment doesn't make sense, leave a comment explaining why. Only resolve the thread if the comment is from a bot user.
+2. **Explain**: If the comment doesn't make sense, leave a comment explaining why. Only resolve the thread if the comment is from a bot user. Don't minimize bot comments—resolving the thread is sufficient.
 3. **Ask for clarification**: If unclear, leave a question asking for clarification
 
 ## Comment Prefix
