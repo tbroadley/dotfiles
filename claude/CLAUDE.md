@@ -25,6 +25,7 @@ To persist changes: commit and push from the dotfiles repo.
 
 ## Environment
 - AWS CLI: use the `default` profile unless explicitly instructed otherwise
+- You may run `aws sso login --profile <profile>` yourself when credentials are expired—I'll complete the login in the browser when the page pops up. No need to ask me to run it.
 - Use `uv` for Python dependency management, not `pip`. Use `uv pip install`, `uv add`, `uv run`, etc.
 - Don't re-open files with `cursor` that are already open (e.g. don't re-run `cursor plot.png` after regenerating a plot you already opened earlier).
 
