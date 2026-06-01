@@ -51,7 +51,7 @@
       "~/.worktrees"
     ]
   },
-  "model": "claude-opus-4-6[1m]",
+  "model": "opus",
   "hooks": {
     "SessionStart": [
       {
@@ -84,7 +84,8 @@
   "enabledPlugins": {
     "warehouse-query@metr-eval-execution": true,
     "hugging-face-cli@huggingface-skills": true,
-    "hugging-face-datasets@huggingface-skills": true
+    "hugging-face-datasets@huggingface-skills": true,
+    "slack@claude-plugins-official": true
   },
   "effortLevel": "medium",
   "fastMode": true,
