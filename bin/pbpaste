@@ -3,4 +3,8 @@
 # Used in dev containers to forward clipboard operations to macOS host.
 
 PORT="${URL_LISTENER_PORT:-7077}"
-curl -sf "http://host.docker.internal:${PORT}/paste"
+if [ -f /.dockerenv ] || [ -n "$REMOTE_CONTAINERS" ]; then
+  curl -fsS --connect-timeout 2 --max-time 5 "http://host.docker.internal:${PORT}/paste"
+else
+  exec /usr/bin/pbpaste
+fi

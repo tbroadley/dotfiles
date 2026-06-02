@@ -3,4 +3,8 @@
 # Used in dev containers to forward clipboard operations to macOS host.
 
 PORT="${URL_LISTENER_PORT:-7077}"
-curl -sf --data-binary @- "http://host.docker.internal:${PORT}/copy" >/dev/null 2>&1
+if [ -f /.dockerenv ] || [ -n "$REMOTE_CONTAINERS" ]; then
+  curl -fsS --connect-timeout 2 --max-time 5 --data-binary @- "http://host.docker.internal:${PORT}/copy" >/dev/null
+else
+  exec /usr/bin/pbcopy
+fi
