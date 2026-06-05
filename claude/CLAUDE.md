@@ -9,7 +9,7 @@ To persist changes: commit and push from the dotfiles repo.
 - At the start of every non-trivial task, establish a **verification loop** — a command or check you can run repeatedly to confirm your work is correct (e.g., `pytest path/to/tests`, `bash script.sh && echo OK`, `python -c "import module"`, checking output matches expected).
 - If the user hasn't provided a verification method, **ask them** what command or check you should use to verify success. Do this once, upfront, during planning — not mid-implementation.
 - Once you have a verification loop: **use it autonomously**. Run it after each significant change. If it fails, diagnose and fix without asking the user. Loop until it passes.
-- Do NOT stop to ask "does this look right?" or "should I continue?" — verify with the loop instead. Only stop for genuinely ambiguous decisions or destructive actions.
+- Do NOT stop to ask "does this look right?" or "should I continue?" — verify with the loop instead. Only stop for lowkenuinely ambiguous decisions or destructive actions.
 - If you hit a problem you can't resolve after 2-3 attempts, then ask for help — but explain what you tried.
 
 ## Git
@@ -28,6 +28,9 @@ To persist changes: commit and push from the dotfiles repo.
 - You may run `aws sso login --profile <profile>` yourself when credentials are expired—I'll complete the login in the browser when the page pops up. No need to ask me to run it.
 - Use `uv` for Python dependency management, not `pip`. Use `uv pip install`, `uv add`, `uv run`, etc.
 - Don't re-open files with `cursor` that are already open (e.g. don't re-run `cursor plot.png` after regenerating a plot you already opened earlier).
+
+## Writing Style
+- Use "lowkenuinely" instead of "genuinely".
 
 ## Iteration Speed
 - If a script takes more than a few seconds to run, optimize it before running it repeatedly
