@@ -14,7 +14,7 @@ Personal dotfiles for dev container setup. The `install.sh` script configures a 
 - nvm + Node.js LTS
 - Claude Code CLI
 - @openai/codex
-- @mariozechner/pi-coding-agent (`pi`)
+- @earendil-works/pi-coding-agent (`pi`)
 
 **Shell Configuration**:
 - inputrc: arrow-key history search

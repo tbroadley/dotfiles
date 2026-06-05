@@ -90,5 +90,6 @@
   "effortLevel": "medium",
   "fastMode": true,
   "skipDangerousModePermissionPrompt": true,
-  "theme": "light"
+  "theme": "light",
+  "tui": "fullscreen"
 }

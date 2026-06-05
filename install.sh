@@ -160,10 +160,12 @@ uninstall_gemini() {
 }
 
 uninstall_pi() {
-  if npm list -g @mariozechner/pi-coding-agent >/dev/null 2>&1; then
-    echo "Uninstalling pi (not allowed per .allowed-agents)..."
-    npm uninstall -g @mariozechner/pi-coding-agent
-  fi
+  for pkg in @mariozechner/pi-coding-agent @earendil-works/pi-coding-agent; do
+    if npm list -g "$pkg" >/dev/null 2>&1; then
+      echo "Uninstalling pi (not allowed per .allowed-agents)..."
+      npm uninstall -g "$pkg"
+    fi
+  done
   rm -rf "$HOME/.pi"
 }
 
@@ -774,8 +776,14 @@ install_pi() {
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
   set -u
 
-  echo "Ensuring latest @mariozechner/pi-coding-agent is installed globally..."
-  npm install -g @mariozechner/pi-coding-agent@latest
+  # Migrate from deprecated @mariozechner package to @earendil-works (same `pi` binary)
+  if npm list -g @mariozechner/pi-coding-agent >/dev/null 2>&1; then
+    echo "Removing deprecated @mariozechner/pi-coding-agent..."
+    npm uninstall -g @mariozechner/pi-coding-agent
+  fi
+
+  echo "Ensuring latest @earendil-works/pi-coding-agent is installed globally..."
+  npm install -g --ignore-scripts --force @earendil-works/pi-coding-agent@latest
 
   if pi list | grep -Fq "https://github.com/neevparikh/pi-hawk-provider"; then
     pi update https://github.com/neevparikh/pi-hawk-provider
