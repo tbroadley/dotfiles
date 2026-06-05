@@ -82,7 +82,7 @@ The skill loader treats Markdown files inside `claude/skills/` as skills, so set
 | bitwarden | CLI + vault login | `BW_SESSION` |
 | gws-calendar / gws-gmail / gws-drive | gws CLI + auth | `GOOGLE_WORKSPACE_CLI_CLIENT_ID`, `GOOGLE_WORKSPACE_CLI_CLIENT_SECRET` |
 | read-inspect-eval | Python package | `uv pip install inspect-ai` |
-| download-inspect-eval | AWS CLI + profile | `AWS_PROFILE=production` |
+| download-inspect-eval | AWS CLI + SSO | default profile (downloads); `prd` profile for listing |
 | hawk-monitoring / hawk-view-results | hawk CLI | `uv pip install hawk-cli` |
 
 ### Common setup
@@ -116,7 +116,7 @@ source ~/.zshrc.local
 - `bitwarden`: install `bitwarden-cli`, run `bw login`, then `bw unlock` and export `BW_SESSION`
 - Google Workspace skills: install `@googleworkspace/cli`, create a desktop OAuth client in the `metr-pub` project, export the client ID/secret, then run `gws auth login`
 - `read-inspect-eval`: `uv pip install inspect-ai`
-- `download-inspect-eval`: verify access with `AWS_PROFILE=production aws s3 ls s3://production-metr-inspect-data/`
+- `download-inspect-eval`: requires an authenticated AWS SSO session (run `aws sso login` first). The skill handles the specific access point and bucket.
 - `hawk-monitoring` / `hawk-view-results`: `uv pip install hawk-cli`
 
 ### Smoke tests
