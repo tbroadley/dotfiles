@@ -174,6 +174,7 @@ add_to_rc "alias g=git" "alias g=git"
 add_to_rc "alias ppl=" "alias ppl='pivot pull'"
 add_to_rc "alias pps=" "alias pps='pivot push'"
 add_to_rc "alias pco=" "alias pco='pivot checkout'"
+add_to_rc "alias pcof=" "alias pcof='pivot checkout --force'"
 remove_from_rc 'alias pr=' 'pr()'
 add_to_rc "alias pr=" "alias pr='pivot repro'"
 # pla/psa: detect pivot vs dvc and use the appropriate tool
