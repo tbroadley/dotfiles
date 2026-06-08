@@ -14,8 +14,6 @@
       "Edit(~/dotfiles/**)",
       "Write(~/dotfiles/**)",
       "NotebookEdit",
-      "mcp__linear__list_*",
-      "mcp__linear__get_*",
       "mcp__linear__search_documentation",
       "mcp__linear__create_issue",
       "mcp__linear__create_comment",
