@@ -272,7 +272,7 @@ EOF
 # Usage: wtd [branch-name]
 #
 # wtd          - delete the current worktree (if inside a worktree directory)
-# wtd <branch> - delete the worktree for <branch>
+# wtd <branch> - delete the worktree whose checked-out branch is <branch>
 #
 # Also deletes the local branch that was backing the worktree.
 wtd() {
@@ -317,19 +317,27 @@ wtd() {
             return 1
         fi
     else
-        # Replace forward slashes with dashes for directory name (e.g., user/feature -> user-feature)
-        local dir_name="${branch//\//-}"
-        local home_wt_dir="$home_wt_base/$dir_name"
-        local legacy_wt_dir="$repo_root/.worktrees/$dir_name"
-        if [ -d "$home_wt_dir" ]; then
-            worktree_dir="$home_wt_dir"
-        elif [ -d "$legacy_wt_dir" ]; then
-            worktree_dir="$legacy_wt_dir"
-        else
-            echo "Error: worktree does not exist in either:"
-            echo "  $home_wt_dir"
-            echo "  $legacy_wt_dir"
-            return 1
+        # Look up the worktree whose checked-out branch matches the given name
+        worktree_dir=$(git worktree list --porcelain 2>/dev/null | \
+            awk -v branch="refs/heads/$branch" '/^worktree /{path=$2} /^branch /{if ($2 == branch) print path}')
+
+        if [ -z "$worktree_dir" ]; then
+            # Fall back to locating by directory name (orphaned/legacy worktrees
+            # whose backing branch git no longer tracks)
+            local dir_name="${branch//\//-}"
+            local home_wt_dir="$home_wt_base/$dir_name"
+            local legacy_wt_dir="$repo_root/.worktrees/$dir_name"
+            if [ -d "$home_wt_dir" ]; then
+                worktree_dir="$home_wt_dir"
+            elif [ -d "$legacy_wt_dir" ]; then
+                worktree_dir="$legacy_wt_dir"
+            else
+                echo "Error: no worktree found for branch: $branch"
+                echo ""
+                echo "Existing worktrees:"
+                git worktree list 2>/dev/null
+                return 1
+            fi
         fi
     fi
 
@@ -398,16 +406,14 @@ _wt_branches() {
     echo "$branches"
 }
 
-# Helper to get existing worktree names for wtd completion
-_wtd_worktrees() {
+# Helper to get branch names backing existing worktrees for wtd completion
+_wtd_branches() {
     local repo_root
     repo_root="$(_wt_repo_root)" || return
 
-    local home_wt_base="$(_wt_home_dir "$repo_root")"
-    {
-        [ -d "$home_wt_base" ] && ls -1 "$home_wt_base" 2>/dev/null
-        [ -d "$repo_root/.worktrees" ] && ls -1 "$repo_root/.worktrees" 2>/dev/null
-    } | sort -u
+    git -C "$repo_root" worktree list --porcelain 2>/dev/null | \
+        awk '/^branch /{sub(/^refs\/heads\//, "", $2); if ($2 != "main" && $2 != "master") print $2}' | \
+        sort -u
 }
 
 # Shell-specific completion setup
@@ -422,7 +428,7 @@ if [ -n "$BASH_VERSION" ]; then
     # Bash completion for wtd
     _wtd_completion() {
         local cur="${COMP_WORDS[COMP_CWORD]}"
-        COMPREPLY=($(compgen -W "$(_wtd_worktrees)" -- "$cur"))
+        COMPREPLY=($(compgen -W "$(_wtd_branches)" -- "$cur"))
     }
     complete -F _wtd_completion wtd
 elif [ -n "$ZSH_VERSION" ]; then
@@ -435,9 +441,9 @@ elif [ -n "$ZSH_VERSION" ]; then
 
     # Zsh completion for wtd
     _wtd_completion() {
-        local worktrees
-        worktrees=("${(@f)$(_wtd_worktrees)}")
-        _describe 'worktree' worktrees
+        local branches
+        branches=("${(@f)$(_wtd_branches)}")
+        _describe 'branch' branches
     }
 
     # compdef requires compinit to have been run first.
