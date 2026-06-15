@@ -5,7 +5,11 @@ description: Manage tasks, projects, and productivity in Todoist. View tasks, ad
 
 # Todoist Task Management
 
-This skill provides access to Todoist via the REST API.
+This skill provides access to Todoist via the REST API (v1).
+
+> **API version:** Use the **`/api/v1/`** endpoints. The older `/rest/v2/` (and
+> `/sync/v9/`) endpoints are **deprecated** and now return a notice telling you to
+> migrate to `/api/v1/` instead of data.
 
 ## Setup Required
 
@@ -31,7 +35,7 @@ Use this skill when the user:
 
 ## API Endpoints
 
-Base URL: `https://api.todoist.com/rest/v2`
+Base URL: `https://api.todoist.com/api/v1`
 
 All requests need:
 ```bash
@@ -40,30 +44,80 @@ All requests need:
 
 **Important:** Use `$(printenv TODOIST_TOKEN)` to ensure the token expands correctly in all shell contexts (zsh eval can lose variable values).
 
+### Response shape & pagination
+
+List endpoints (`/tasks`, `/projects`, `/sections`, `/labels`, `/comments`, and
+`/tasks/filter`) wrap results in a `results` array with a cursor, **not** a bare
+JSON array like the old v2 API did:
+
+```json
+{ "results": [ ... ], "next_cursor": "abc123" }
+```
+
+- Page with `?limit=200&cursor=<next_cursor>`; keep fetching while `next_cursor`
+  is non-null. Without a cursor you only get the first page.
+- Access items as `.results[]` in `jq` (the v2-era `.[]` no longer works).
+
+### ⚠️ Control characters in JSON (parsing gotcha)
+
+The v1 API returns task `content`/`description` with **literal, unescaped control
+characters** (raw newlines/tabs inside string values). This is technically
+invalid JSON, so strict parsers reject it:
+
+- `jq` fails with `Invalid string: control characters from U+0000 through U+001F must be escaped`.
+- Python's `json.loads` fails with `Invalid control character at: ...`.
+
+**Fix:** parse leniently in Python with `strict=False`. Prefer this over `curl | jq`
+whenever you read task/comment text:
+
+```python
+import json, os, urllib.request
+
+token = os.environ["TODOIST_TOKEN"]
+
+def get(url):
+    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token})
+    return json.loads(urllib.request.urlopen(req).read().decode(), strict=False)
+
+# Fetch every task across all pages, then search.
+tasks, cursor = [], None
+while True:
+    url = "https://api.todoist.com/api/v1/tasks?limit=200" + (f"&cursor={cursor}" if cursor else "")
+    d = get(url)
+    tasks += d["results"]
+    cursor = d.get("next_cursor")
+    if not cursor:
+        break
+
+for t in tasks:
+    if "keyword" in t["content"].lower():
+        print(t["id"], repr(t["content"]))
+```
+
 ### Tasks
 
-**Get All Tasks**:
+**Get All Tasks** (first page; paginate via `next_cursor`):
 ```bash
-curl -s "https://api.todoist.com/rest/v2/tasks" \
+curl -s "https://api.todoist.com/api/v1/tasks?limit=200" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
-**Get Tasks by Filter**:
+**Get Tasks by Filter** (note: dedicated `/tasks/filter` endpoint with `query=`):
 ```bash
-curl -s -G "https://api.todoist.com/rest/v2/tasks" \
-  --data-urlencode "filter=today" \
+curl -s -G "https://api.todoist.com/api/v1/tasks/filter" \
+  --data-urlencode "query=today" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Get Single Task**:
 ```bash
-curl -s "https://api.todoist.com/rest/v2/tasks/{TASK_ID}" \
+curl -s "https://api.todoist.com/api/v1/tasks/{TASK_ID}" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Create Task**:
 ```bash
-curl -s -X POST "https://api.todoist.com/rest/v2/tasks" \
+curl -s -X POST "https://api.todoist.com/api/v1/tasks" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" \
   -H "Content-Type: application/json" \
   -d '{
@@ -73,9 +127,9 @@ curl -s -X POST "https://api.todoist.com/rest/v2/tasks" \
   }'
 ```
 
-**Complete Task**:
+**Complete Task** (returns `204 No Content`):
 ```bash
-curl -s -X POST "https://api.todoist.com/rest/v2/tasks/{TASK_ID}/close" \
+curl -s -X POST "https://api.todoist.com/api/v1/tasks/{TASK_ID}/close" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
@@ -83,13 +137,13 @@ curl -s -X POST "https://api.todoist.com/rest/v2/tasks/{TASK_ID}/close" \
 
 **Get All Projects**:
 ```bash
-curl -s "https://api.todoist.com/rest/v2/projects" \
+curl -s "https://api.todoist.com/api/v1/projects?limit=200" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Get Project**:
 ```bash
-curl -s "https://api.todoist.com/rest/v2/projects/{PROJECT_ID}" \
+curl -s "https://api.todoist.com/api/v1/projects/{PROJECT_ID}" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
@@ -97,13 +151,13 @@ curl -s "https://api.todoist.com/rest/v2/projects/{PROJECT_ID}" \
 
 **Get Sections**:
 ```bash
-curl -s "https://api.todoist.com/rest/v2/sections" \
+curl -s "https://api.todoist.com/api/v1/sections?limit=200" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Get Sections in Project**:
 ```bash
-curl -s "https://api.todoist.com/rest/v2/sections?project_id={PROJECT_ID}" \
+curl -s "https://api.todoist.com/api/v1/sections?project_id={PROJECT_ID}" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
@@ -111,7 +165,7 @@ curl -s "https://api.todoist.com/rest/v2/sections?project_id={PROJECT_ID}" \
 
 **Get All Labels**:
 ```bash
-curl -s "https://api.todoist.com/rest/v2/labels" \
+curl -s "https://api.todoist.com/api/v1/labels?limit=200" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
@@ -119,13 +173,13 @@ curl -s "https://api.todoist.com/rest/v2/labels" \
 
 **Get Comments on Task**:
 ```bash
-curl -s "https://api.todoist.com/rest/v2/comments?task_id={TASK_ID}" \
+curl -s "https://api.todoist.com/api/v1/comments?task_id={TASK_ID}" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 **Add Comment**:
 ```bash
-curl -s -X POST "https://api.todoist.com/rest/v2/comments" \
+curl -s -X POST "https://api.todoist.com/api/v1/comments" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" \
   -H "Content-Type: application/json" \
   -d '{
@@ -136,7 +190,7 @@ curl -s -X POST "https://api.todoist.com/rest/v2/comments" \
 
 ## Filter Syntax
 
-The `filter` parameter accepts Todoist filter syntax:
+The `/tasks/filter` `query` parameter accepts Todoist filter syntax:
 
 | Filter | Description |
 |--------|-------------|
@@ -157,21 +211,23 @@ The `filter` parameter accepts Todoist filter syntax:
 
 ### Get Today's Tasks
 ```bash
-curl -s -G "https://api.todoist.com/rest/v2/tasks" \
-  --data-urlencode "filter=today" \
-  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.[] | {content, due: .due.string, priority}'
+curl -s -G "https://api.todoist.com/api/v1/tasks/filter" \
+  --data-urlencode "query=today" \
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" \
+  | jq '.results[] | {content, due: .due.string, priority}'
 ```
+(If `jq` errors on control characters, switch to the Python `strict=False` snippet above.)
 
 ### Get Overdue Tasks
 ```bash
-curl -s -G "https://api.todoist.com/rest/v2/tasks" \
-  --data-urlencode "filter=overdue" \
+curl -s -G "https://api.todoist.com/api/v1/tasks/filter" \
+  --data-urlencode "query=overdue" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 ### Add a Task for Tomorrow
 ```bash
-curl -s -X POST "https://api.todoist.com/rest/v2/tasks" \
+curl -s -X POST "https://api.todoist.com/api/v1/tasks" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" \
   -H "Content-Type: application/json" \
   -d '{
@@ -184,25 +240,25 @@ curl -s -X POST "https://api.todoist.com/rest/v2/tasks" \
 ### Get All Tasks in a Project
 ```bash
 # First, find project ID
-curl -s "https://api.todoist.com/rest/v2/projects" \
-  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.[] | {name, id}'
+curl -s "https://api.todoist.com/api/v1/projects?limit=200" \
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.results[] | {name, id}'
 
 # Then get tasks
-curl -s "https://api.todoist.com/rest/v2/tasks?project_id={PROJECT_ID}" \
+curl -s "https://api.todoist.com/api/v1/tasks?project_id={PROJECT_ID}" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 ### Get High Priority Tasks
 ```bash
-curl -s -G "https://api.todoist.com/rest/v2/tasks" \
-  --data-urlencode "filter=p1 | p2" \
+curl -s -G "https://api.todoist.com/api/v1/tasks/filter" \
+  --data-urlencode "query=p1 | p2" \
   -H "Authorization: Bearer $(printenv TODOIST_TOKEN)"
 ```
 
 ### List Projects with Task Counts
 ```bash
-curl -s "https://api.todoist.com/rest/v2/projects" \
-  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.[] | {name, id}'
+curl -s "https://api.todoist.com/api/v1/projects?limit=200" \
+  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.results[] | {name, id}'
 ```
 
 ## Task Properties
@@ -221,6 +277,9 @@ When creating tasks:
 
 ## Notes
 
+- Use the `/api/v1/` endpoints — `/rest/v2/` and `/sync/v9/` are deprecated.
+- List responses are `{ "results": [...], "next_cursor": ... }`; paginate with `cursor`/`limit` and read `.results[]`.
+- Task/comment text contains unescaped control characters — parse with Python `json.loads(..., strict=False)` if `jq` chokes.
 - API rate limit: 1000 requests per 15 minutes per user
 - Priority in API: 1 = urgent (p1 in UI), 4 = normal
 - Due strings support natural language in multiple languages
@@ -228,5 +287,5 @@ When creating tasks:
 
 ## Sources
 
-- [Todoist REST API Reference](https://developer.todoist.com/rest/v2/)
+- [Todoist API Reference (v1)](https://developer.todoist.com/api/v1/)
 - [Find your API token](https://www.todoist.com/help/articles/find-your-api-token-Jpzx9IIlB)
