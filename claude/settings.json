@@ -1,7 +1,6 @@
 {
   "cleanupPeriodDays": 999999,
   "permissions": {
-    "defaultMode": "auto",
     "allow": [
       "Bash",
       "Edit",
@@ -44,6 +43,7 @@
       "Bash(truncate:*)",
       "Bash(sudo:*)"
     ],
+    "defaultMode": "auto",
     "additionalDirectories": [
       "~/app",
       "~/dotfiles",
@@ -84,11 +84,20 @@
     "warehouse-query@metr-eval-execution": true,
     "hugging-face-cli@huggingface-skills": true,
     "hugging-face-datasets@huggingface-skills": true,
-    "slack@claude-plugins-official": true
+    "slack@claude-plugins-official": true,
+    "metr-security@metr-claude-code": true
+  },
+  "extraKnownMarketplaces": {
+    "metr-claude-code": {
+      "source": {
+        "source": "github",
+        "repo": "METR/claude-code"
+      }
+    }
   },
   "effortLevel": "medium",
   "fastMode": true,
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
-  "theme": "light",
-  "tui": "fullscreen"
+  "theme": "light"
 }

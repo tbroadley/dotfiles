@@ -618,6 +618,7 @@ install_external_claude_skills() {
   # List of external skills: "repo:skill_path:local_name"
   local external_skills=(
     "sjawhar/pivot:skills/writing-pivot-stages:writing-pivot-stages"
+    "METR/claude-code:plugins/metr-security/skills/metr-security:metr-security"
   )
 
   for spec in "${external_skills[@]}"; do
@@ -910,8 +911,10 @@ echo "Phase 2 installations completed"
 if _agent_allowed claude_code && [ -n "${GH_TOKEN:-}" ] && command -v claude >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   echo "Installing Claude Code plugins..."
   GITHUB_TOKEN="$GH_TOKEN" claude plugin marketplace add METR/eval-execution-claude 2>/dev/null || true
+  GITHUB_TOKEN="$GH_TOKEN" claude plugin marketplace add METR/claude-code 2>/dev/null || true
   GITHUB_TOKEN="$GH_TOKEN" claude plugin marketplace add huggingface/skills 2>/dev/null || true
   claude plugin install warehouse-query 2>/dev/null || true
+  claude plugin install metr-security@metr-claude-code 2>/dev/null || true
   claude plugin install hugging-face-cli@huggingface-skills 2>/dev/null || true
   claude plugin install hugging-face-datasets@huggingface-skills 2>/dev/null || true
   echo "Claude Code plugins installed"
