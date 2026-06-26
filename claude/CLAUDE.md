@@ -23,6 +23,19 @@ To persist changes: commit and push from the dotfiles repo.
 - Don't assume GitHub usernames—look them up via `gh api repos/{owner}/{repo}/collaborators --jq '.[].login'`
 - When asked to push to an existing PR, push to that PR's branch—don't create a new branch/PR
 
+## Cross-Repo Privacy (prevent private→public leaks)
+Context from a private repo often bleeds into work on a public one. Treat the conversation history as potentially private and any public target as untrusted.
+
+Applies whenever authoring text that lands in a repo other than where the source material came from: PR titles/descriptions, commit messages, issue/PR comments, code comments, file contents, branch names.
+
+Before creating or editing a PR, issue, or comment on GitHub:
+1. Check the target's visibility: `gh repo view <owner>/<repo> --json visibility -q .visibility`
+2. If it is PUBLIC (or you can't confirm it's private), write the description ONLY from the diff itself — what the changed files do and why. Do not pull in details from the conversation, other repos, or the working environment.
+3. Never put in public text (unless the exact term already appears in that public repo): eval set / task / dataset names, internal hostnames or URLs (`*.internal.*`, internal dashboards), private repo names or paths, customer/partner names, ticket/Linear IDs, file paths from another repo, run or model identifiers, internal terminology.
+4. If a private detail is truly needed to explain the change, generalize it ("an internal eval set", not its name) or ask first.
+
+When unsure whether something is private, leave it out and say so.
+
 ## Environment
 - AWS CLI: use the `default` profile unless explicitly instructed otherwise
 - You may run `aws sso login --profile <profile>` yourself when credentials are expired—I'll complete the login in the browser when the page pops up. No need to ask me to run it.
