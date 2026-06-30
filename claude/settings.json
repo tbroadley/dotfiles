@@ -82,9 +82,9 @@
   },
   "enabledPlugins": {
     "warehouse-query@metr-eval-execution": true,
-    "hugging-face-cli@huggingface-skills": true,
-    "hugging-face-datasets@huggingface-skills": true,
-    "slack@claude-plugins-official": true,
+    "hugging-face-cli@huggingface-skills": false,
+    "hugging-face-datasets@huggingface-skills": false,
+    "slack@claude-plugins-official": false,
     "metr-security@metr-claude-code": true
   },
   "extraKnownMarketplaces": {
