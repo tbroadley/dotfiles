@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""Upgrade brew packages, skipping any whose candidate version is younger than a
+cooldown window (default 7 days) -- a supply-chain guard mirroring uv's
+`exclude-newer`.
+
+Age = the date the candidate version landed in the Homebrew tap git repo
+(homebrew-core for formulae, homebrew-cask for casks). Version-bump commits are
+titled `<name> <version>`, so we find the newest commit whose subject mentions
+the candidate version and use its date. Fallback: the most recent commit that
+touched the formula/cask file (conservative -- errs toward waiting).
+
+Report mode by default. Pass --upgrade to actually run `brew upgrade`.
+"""
+
+import argparse
+import concurrent.futures
+import datetime as dt
+import json
+import subprocess
+import sys
+
+
+def sh(*args: str) -> str:
+    return subprocess.run(args, capture_output=True, text=True, check=True).stdout
+
+
+def outdated() -> tuple[list[dict], list[dict]]:
+    d = json.loads(sh("brew", "outdated", "--json=v2"))
+    return d.get("formulae", []), d.get("casks", [])
+
+
+def landing_date(name: str, version: str, kind: str) -> tuple[dt.datetime | None, str]:
+    """Return (utc datetime the candidate version landed, source-note)."""
+    if "/" in name:  # third-party tap -- we can't resolve it against core
+        return None, "non-core tap"
+    repo = "Homebrew/homebrew-core" if kind == "formula" else "Homebrew/homebrew-cask"
+    top = "Formula" if kind == "formula" else "Casks"
+    shard = "lib" if name.startswith("lib") else name[0].lower()
+    path = f"{top}/{shard}/{name}.rb"
+    try:
+        commits = json.loads(
+            sh("gh", "api", f"repos/{repo}/commits?path={path}&per_page=40")
+        )
+    except subprocess.CalledProcessError:
+        return None, "file not found"
+    if not commits:
+        return None, "no history"
+
+    def when(c: dict) -> dt.datetime:
+        return dt.datetime.fromisoformat(c["commit"]["committer"]["date"])
+
+    matches = [c for c in commits if version in c["commit"]["message"].split("\n")[0]]
+    if matches:  # newest commit mentioning this exact version
+        return max(when(c) for c in matches), "version bump"
+    return when(commits[0]), "last file change (fallback)"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--days", type=int, default=7, help="cooldown window (default 7)")
+    ap.add_argument("--upgrade", action="store_true", help="actually upgrade eligible")
+    ap.add_argument("--update", action="store_true", help="run `brew update` first")
+    args = ap.parse_args()
+
+    if args.update:
+        print("brew update ...", file=sys.stderr)
+        subprocess.run(["brew", "update"], check=True)
+
+    now = dt.datetime.now(dt.timezone.utc)
+    cutoff = now - dt.timedelta(days=args.days)
+
+    formulae, casks = outdated()
+    items = [(f, "formula") for f in formulae] + [(c, "cask") for c in casks]
+    if not items:
+        print("Nothing outdated.")
+        return 0
+
+    def resolve(item):
+        pkg, kind = item
+        name, ver = pkg["name"], pkg["current_version"]
+        landed, note = landing_date(name, ver, kind)
+        return kind, name, pkg["installed_versions"][0], ver, landed, note
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as ex:
+        rows = list(ex.map(resolve, items))
+
+    eligible, held = [], []
+    for kind, name, cur, ver, landed, note in sorted(rows, key=lambda r: r[1]):
+        if landed is None:
+            age = None
+            held.append((kind, name))
+            status = f"HELD  ({note})"
+        else:
+            age = (now - landed).days
+            if landed <= cutoff:
+                eligible.append((kind, name))
+                status = f"ok    {age:>3}d  ({note})"
+            else:
+                held.append((kind, name))
+                status = f"HELD  {age:>3}d  ({note})"
+        print(f"  [{kind:7}] {name:28} {cur:>14} -> {ver:<14} {status}")
+
+    print(f"\n{len(eligible)} eligible (>= {args.days}d), {len(held)} held back.")
+
+    if not args.upgrade:
+        print("\n(report only -- rerun with --upgrade to apply)")
+        return 0
+
+    # Pin held-back formulae so they aren't dragged in as transitive dependency
+    # upgrades (brew upgrade <f> also upgrades f's outdated deps). Pins are
+    # respected during dependency resolution; unpin in a finally so a failed
+    # upgrade never leaves them stuck.
+    already_pinned = set(sh("brew", "list", "--pinned").split())
+    held_formulae = [n for k, n in held if k == "formula" and n not in already_pinned]
+    if held_formulae:
+        print(f"\n==> pinning {len(held_formulae)} held formulae during upgrade")
+        subprocess.run(["brew", "pin", *held_formulae], check=False)
+    try:
+        for kind, group in (("formula", "formulae"), ("cask", "casks")):
+            names = [n for k, n in eligible if k == kind]
+            if names:
+                print(f"\n==> brew upgrade {group}: {' '.join(names)}")
+                flag = ["--cask"] if kind == "cask" else []
+                subprocess.run(["brew", "upgrade", *flag, *names], check=True)
+    finally:
+        if held_formulae:
+            print(f"\n==> unpinning {len(held_formulae)} formulae")
+            subprocess.run(["brew", "unpin", *held_formulae], check=False)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
