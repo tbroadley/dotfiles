@@ -75,6 +75,14 @@ cp "$SCRIPT_DIR/gitconfig" "$HOME/.gitconfig"
 cp "$SCRIPT_DIR/gitignore" "$HOME/.gitignore"
 echo "gitconfig and gitignore installed"
 
+# Allowed signers file so `git log --show-signature` / verify-commit recognize
+# our own SSH-signed commits. Kept in sync with the signing key in gitconfig.
+mkdir -p "$HOME/.config/git"
+cat > "$HOME/.config/git/allowed_signers" <<'EOF'
+thomas@metr.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIo7VV2U23o1YBYa2i2yUytDi/Z6ek/8Yu+yeHH5Ris7
+EOF
+echo "git allowed_signers installed"
+
 # Setup shell rc additions (works with both bash and zsh)
 add_to_rc() {
   local pattern="$1"

@@ -99,6 +99,16 @@ devc() {
         exec_opts+=(--remote-env "TZ=$host_tz")
     fi
 
+    # Forward the host SSH agent so agents in the container can sign commits with
+    # our SSH signing key (private key stays on the host; see gitconfig). Both
+    # Docker Desktop and OrbStack expose the host agent at this magic socket path.
+    # NOTE: the bind mount is applied at container creation, so an existing
+    # container must be rebuilt (devc -r) to pick up agent forwarding.
+    local ssh_agent_sock="/ssh-agent.sock"
+    up_opts+=(--mount "type=bind,source=/run/host-services/ssh-auth.sock,target=$ssh_agent_sock")
+    up_opts+=(--remote-env "SSH_AUTH_SOCK=$ssh_agent_sock")
+    exec_opts+=(--remote-env "SSH_AUTH_SOCK=$ssh_agent_sock")
+
     # Check if container already exists (to know if we need dotfiles setup)
     local container_existed=false
     if docker ps -a -q --filter "label=devcontainer.local_folder=$workspace" | grep -q .; then
@@ -160,6 +170,7 @@ devc() {
         [ -n "${LINEAR_API_KEY:-}" ] && echo "export LINEAR_API_KEY=\"$LINEAR_API_KEY\"" >> "$env_file"
         [ -n "${BW_SESSION:-}" ] && echo "export BW_SESSION=\"$BW_SESSION\"" >> "$env_file"
         [ -n "${TZ:-}" ] && echo "export TZ=\"$TZ\"" >> "$env_file"
+        [ -n "${SSH_AUTH_SOCK:-}" ] && echo "export SSH_AUTH_SOCK=\"$SSH_AUTH_SOCK\"" >> "$env_file"
 
         # Source from shell rc files if not already configured
         if ! grep -q "devcontainer_env" "$HOME/.bashrc" 2>/dev/null; then

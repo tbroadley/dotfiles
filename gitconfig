@@ -1,6 +1,11 @@
 [user]
 	name = Thomas Broadley
 	email = thomas@metr.org
+	# SSH commit signing. Literal key:: form so it works without the .pub file
+	# present (e.g. in dev containers that only have the ssh-agent forwarded).
+	# The private key must be reachable via ssh-agent (host) or a forwarded
+	# agent socket (dev containers, see devc.zsh).
+	signingkey = key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIo7VV2U23o1YBYa2i2yUytDi/Z6ek/8Yu+yeHH5Ris7
 [alias]
 	a = add
 	aa = commit --amend --no-edit -a
@@ -85,3 +90,11 @@
 [credential "https://gist.github.com"]
 	helper =
 	helper = !/usr/bin/gh auth git-credential
+[gpg]
+	format = ssh
+[gpg "ssh"]
+	allowedSignersFile = ~/.config/git/allowed_signers
+[commit]
+	gpgsign = true
+[tag]
+	gpgsign = true
