@@ -12,7 +12,6 @@
       "Read(~/.claude/**)",
       "Read(~/dotfiles/**)",
       "Edit(~/dotfiles/**)",
-      "Write(~/dotfiles/**)",
       "NotebookEdit",
       "mcp__linear__search_documentation",
       "mcp__linear__create_issue",
