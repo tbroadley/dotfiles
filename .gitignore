@@ -5,4 +5,5 @@ claude/skills/middleman-proxy/
 claude/skills/download-inspect-eval/
 claude/skills/devbox-setup/
 claude/skills/metr-security/
+claude/skills/advanced-review/
 __pycache__
