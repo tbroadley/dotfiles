@@ -4,7 +4,20 @@
       "baseUrl": "https://middleman.prd.metr.org",
       "headers": {
         "x-middleman-priority": "high"
-      }
+      },
+      "extraModels": [
+        {
+          "id": "openrouter/moonshotai/kimi-k3",
+          "name": "Kimi K3 (Hawk)",
+          "backend": "openai",
+          "openaiApi": "openai-completions",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "cost": { "input": 3, "output": 15, "cacheRead": 0.3, "cacheWrite": 0 }
+        }
+      ]
     }
   }
 }

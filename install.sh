@@ -716,6 +716,15 @@ if _agent_allowed pi; then
       cp "$_pi_dotfiles_settings" "$_pi_local_settings"
     fi
     ln -sf "$SCRIPT_DIR/pi/agent/AGENTS.md" "$PI_AGENT_DIR/AGENTS.md"
+    # Deploy models.json only when there is no local one. The dotfiles copy holds
+    # public model entries only; a local models.json may carry additional
+    # private/internal model aliases, so we never overwrite or merge it (a jq
+    # array-merge would drop those local entries).
+    _pi_dotfiles_models="$SCRIPT_DIR/pi/agent/models.json"
+    _pi_local_models="$PI_AGENT_DIR/models.json"
+    if [ -f "$_pi_dotfiles_models" ] && [ ! -e "$_pi_local_models" ]; then
+      cp "$_pi_dotfiles_models" "$_pi_local_models"
+    fi
     echo "pi settings installed"
   fi
 else
@@ -794,10 +803,15 @@ install_pi() {
   echo "Ensuring latest @earendil-works/pi-coding-agent is installed globally..."
   npm install -g --ignore-scripts --force @earendil-works/pi-coding-agent@latest
 
+  # Use the tbroadley fork (adds extra-models support incl. compat/adaptive
+  # thinking); upstream neevparikh lacks that feature until the PR lands.
   if pi list | grep -Fq "https://github.com/neevparikh/pi-hawk-provider"; then
-    pi update https://github.com/neevparikh/pi-hawk-provider
+    pi remove https://github.com/neevparikh/pi-hawk-provider 2>/dev/null || true
+  fi
+  if pi list | grep -Fq "https://github.com/tbroadley/pi-hawk-provider"; then
+    pi update https://github.com/tbroadley/pi-hawk-provider
   else
-    pi install https://github.com/neevparikh/pi-hawk-provider
+    pi install https://github.com/tbroadley/pi-hawk-provider
   fi
 
   if pi list | grep -Fq "https://github.com/tbroadley/pi-btw"; then
