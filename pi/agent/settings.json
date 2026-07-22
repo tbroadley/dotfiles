@@ -9,7 +9,8 @@
     "https://github.com/tbroadley/pi-manage-todo-list"
   ],
   "extensions": [
-    "~/dotfiles/pi/agent/extensions/hawk-only.ts"
+    "~/dotfiles/pi/agent/extensions/hawk-only.ts",
+    "~/dotfiles/pi/agent/extensions/agent-tokens.ts"
   ],
   "defaultProvider": "hawk",
   "enabledModels": [

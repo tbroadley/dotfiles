@@ -5,3 +5,4 @@
 .worktrees
 .pivot_restore_lock_*
 .allowed-agents
+pi/agent/agent-tokens.env

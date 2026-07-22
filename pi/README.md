@@ -10,6 +10,8 @@ Config for [pi](https://github.com/earendil-works/pi-coding-agent) lives in
   additional (e.g. private/internal) model entries that are not committed here.
 - `AGENTS.md` — symlinked.
 - `extensions/hawk-only.ts` — restricts model selection to the `hawk` provider.
+- `extensions/agent-tokens.ts` — injects static skill API tokens into every
+  agent's environment (see [Skill tokens](#skill-tokens) below).
 
 ## Hawk provider
 
@@ -59,3 +61,35 @@ must be declared under `providers.hawk.extraModels`:
   `"thinking.type.enabled" is not supported for this model`.
 - **Change thinking level** at runtime with `Shift+Tab` (cycle) or `/thinking`;
   set the persistent default via `defaultThinkingLevel` in `settings.json`.
+
+## Skill tokens
+
+`settings.json` loads `~/.claude/skills` (and `~/.codex/skills`) into pi, so
+agents can use those skills. Several skills authenticate with a single static
+token read from an env var (e.g. `TODOIST_TOKEN`, `AIRTABLE_TOKEN`,
+`LINEAR_API_KEY`, `DD_API_KEY`). `extensions/agent-tokens.ts` makes those tokens
+available to every agent without per-agent setup: at load it reads
+`~/.pi/agent/agent-tokens.env` and sets each `KEY=VALUE` in the process
+environment (only if unset). Agents run in-process, and their bash tool inherits
+the process env, so any shell/`curl` they run sees the tokens. The extension
+registers nothing (no tools/commands/prompts), so it is silent.
+
+Setup:
+
+```sh
+cp pi/agent/agent-tokens.env.example ~/.pi/agent/agent-tokens.env
+$EDITOR ~/.pi/agent/agent-tokens.env      # fill in real values
+chmod 600 ~/.pi/agent/agent-tokens.env
+# restart the pi host so the extension reloads (pirouette systemd host):
+#   sudo systemctl restart pirouette
+```
+
+`agent-tokens.env` holds secrets and is **gitignored** — only the
+`.env.example` (key names, no values) is committed. See
+[`agent-tokens.env.example`](agent/agent-tokens.env.example) for the managed
+keys.
+
+Only put single, static, env-var tokens here. Skills that use interactive
+logins or refreshing credentials — bitwarden (`bw unlock`), gws-* (Google
+OAuth), and anything on hawk / AWS SSO / `gh` — are handled by their own
+login flows, not this file.
