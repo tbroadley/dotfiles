@@ -68,10 +68,12 @@ const CLASSIFIER_MODEL_ID: Record<Family, string> = {
 
 const STATUS_KEY = "auto-mode";
 
-// Built-in tools that only read state. They are allowed without a classifier
-// call unless `classifyReadOnlyTools` is set. bash/write/edit and unknown
-// custom tools are always classified.
-const READ_ONLY_TOOLS = new Set(["read", "list", "glob", "grep", "manage_todo_list"]);
+// Tools that only read state (or mutate ephemeral session state). They are
+// allowed without a classifier call unless `classifyReadOnlyTools` is set.
+// pi's built-in read-only tools are read/ls/grep/find; manage_todo_list only
+// touches the in-session todo list. The mutating built-ins bash/write/edit and
+// any unknown custom tool are always classified.
+const READ_ONLY_TOOLS = new Set(["read", "ls", "grep", "find", "manage_todo_list"]);
 
 interface AutoModeConfig {
 	environment: string[];
