@@ -34,7 +34,10 @@
  *     "soft_deny":   ["$defaults", "Never run migrations outside the migrations CLI"],
  *     "hard_deny":   ["$defaults", "Never send repo contents to third-party APIs"],
  *     "classifyReadOnlyTools": false,   // classify read-only tools too (default: skip them)
- *     "failClosed": true                // block mutating tools if the classifier errors (default: true)
+ *     "failClosed": true,               // block mutating tools if the classifier errors (default: true)
+ *     "enabled": "pirouette"            // turn auto mode ON by default. true = every pi session
+ *                                       // on this host; "pirouette" = only agents started by the
+ *                                       // pirouette server; false/omitted = off (use --auto-mode)
  *   }
  *
  * Include the literal "$defaults" in a list to keep the built-in rules and add
@@ -77,6 +80,8 @@ interface AutoModeConfig {
 	hard_deny: string[];
 	classifyReadOnlyTools: boolean;
 	failClosed: boolean;
+	/** Turn auto mode on by default: true = host-wide, "pirouette" = only under the pirouette server. */
+	enabled: boolean | "pirouette";
 }
 
 export const DEFAULTS = {
@@ -104,6 +109,16 @@ export const DEFAULTS = {
 		"Disabling, bypassing, or reconfiguring auto mode or its safety checks.",
 	],
 };
+
+/** True when this process was started by the pirouette server (in-process agents inherit its env). */
+function isUnderPirouette(): boolean {
+	return Boolean(
+		process.env.PIROUETTE_DATA_DIR ||
+			process.env.PIROUETTE_PORT ||
+			process.env.PIROUETTE_HOST ||
+			process.env.PIROUETTE_PACKAGE,
+	);
+}
 
 /** Detect the running agent's model family, or undefined if unsupported. */
 export function detectFamily(model: Model<any>): Family | undefined {
@@ -161,6 +176,8 @@ function loadConfig(ctx: ExtensionContext): AutoModeConfig {
 		const v = pick(key);
 		return typeof v === "boolean" ? v : fallback;
 	};
+	const rawEnabled = pick("enabled");
+	const enabled: boolean | "pirouette" = rawEnabled === true ? true : rawEnabled === "pirouette" ? "pirouette" : false;
 	return {
 		environment: spliceDefaults(pick("environment"), DEFAULTS.environment),
 		allow: spliceDefaults(pick("allow"), DEFAULTS.allow),
@@ -168,6 +185,7 @@ function loadConfig(ctx: ExtensionContext): AutoModeConfig {
 		hard_deny: spliceDefaults(pick("hard_deny"), DEFAULTS.hard_deny),
 		classifyReadOnlyTools: bool("classifyReadOnlyTools", false),
 		failClosed: bool("failClosed", true),
+		enabled,
 	};
 }
 
@@ -350,7 +368,9 @@ export default function autoMode(pi: ExtensionAPI): void {
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
-		enabled = Boolean(pi.getFlag("auto-mode"));
+		const cfg = loadConfig(ctx);
+		const defaultOn = cfg.enabled === true || (cfg.enabled === "pirouette" && isUnderPirouette());
+		enabled = Boolean(pi.getFlag("auto-mode")) || defaultOn;
 		if (enabled) {
 			try {
 				const { family, model } = classifierModelFor(ctx);
