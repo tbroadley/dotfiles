@@ -26,9 +26,9 @@ Config for [pi](https://github.com/earendil-works/pi-coding-agent) lives in
     infrastructure and `allow`/`soft_deny`/`hard_deny` rules (with `"$defaults"`
     splicing) can be set in `~/.pi/agent/auto-mode.json` or a trusted project's
     `.pi/auto-mode.json`; inspect them with `/auto-mode config` and `/auto-mode
-    defaults`. Note: the gate is active in interactive/RPC sessions (how
-    pirouette runs agents), not in `-p` print mode, which auto-runs tools
-    without the hook.
+    defaults`. The gate runs in every mode the agent uses tools (interactive,
+    RPC, and `-p` print); in non-interactive modes there's no status line or
+    notifications, but blocked tool calls still come back with the reason.
 
 ## Hawk provider
 
