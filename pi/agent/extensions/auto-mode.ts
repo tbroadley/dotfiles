@@ -1,216 +1,468 @@
 /**
- * auto-mode — "auto" model selection for pi, in the spirit of Claude Code's
- * auto mode.
+ * auto-mode — a pi port of Claude Code's auto mode.
  *
- * When enabled, pi stops caring about the exact model you picked and instead
- * derives the model to run from the *family* of the currently selected model:
+ * Claude Code's "auto mode" lets the agent run without routine permission
+ * prompts by routing every tool call through a *classifier* that blocks
+ * anything irreversible, destructive, or aimed outside your environment, while
+ * letting routine internal work through. See:
+ *   https://code.claude.com/docs/en/auto-mode-config
+ *   https://code.claude.com/docs/en/permission-modes#eliminate-prompts-with-auto-mode
  *
- *   - Anthropic-family model  ->  claude-sonnet-5
- *   - OpenAI-family model     ->  gpt-5.6-luna
- *   - anything else           ->  hard error that stops the agent
+ * This extension implements that idea for pi:
  *
- * Family is detected from the resolved model's `api` (e.g. "anthropic-messages"
- * vs "openai-responses"/"openai-completions"), which works even for proxy
- * providers such as `hawk` that serve both Anthropic and OpenAI backends under
- * a single provider id. A couple of id/name heuristics act as a fallback for
- * providers that leave `api` non-standard.
+ *   - When enabled, each `tool_call` is judged by a classifier LLM. Actions the
+ *     classifier flags as destructive / irreversible / external (force pushes,
+ *     `rm -rf` outside the workspace, deleting remote branches, exfiltrating
+ *     data to third parties, production deploys, ...) are blocked with a reason;
+ *     everything else runs without a prompt.
  *
- * The target model is looked up in the model registry (preferring the current
- * model's provider, then any available/known provider). If the target model is
- * not available, or the current model is neither Anthropic nor OpenAI, auto
- * mode throws. Thrown from `before_agent_start`, that error stops the agent
- * before it runs — which is the intended behaviour.
+ *   - The *classifier* runs on a model chosen from the running agent's family
+ *     (the agent keeps its own model):
+ *         Anthropic agent  ->  claude-sonnet-5
+ *         OpenAI agent     ->  gpt-5.6-luna
+ *         anything else    ->  a hard error that stops the agent
+ *     Validated at `before_agent_start`, so an unsupported family or an
+ *     unavailable classifier model stops the run before it starts.
  *
- * Auto mode is a toggle (off by default so it never silently hijacks a normal
- * session):
- *   - `--auto-mode` CLI flag starts a session with it enabled.
- *   - `/auto-mode [on|off|status]` toggles/queries it at runtime.
+ * Configuration (optional), mirroring Claude Code's `autoMode` block, is read
+ * from `~/.pi/agent/auto-mode.json` (user) and, for trusted projects,
+ * `<project>/.pi/auto-mode.json`:
  *
- * While enabled it also re-derives the model whenever you change models via
- * `/model` or Ctrl+P, so the selection stays "auto".
+ *   {
+ *     "environment": ["$defaults", "Source control: github.com/acme and repos under it"],
+ *     "allow":       ["$defaults", "Writing to s3://acme-scratch/ is allowed (ephemeral)"],
+ *     "soft_deny":   ["$defaults", "Never run migrations outside the migrations CLI"],
+ *     "hard_deny":   ["$defaults", "Never send repo contents to third-party APIs"],
+ *     "classifyReadOnlyTools": false,   // classify read-only tools too (default: skip them)
+ *     "failClosed": true                // block mutating tools if the classifier errors (default: true)
+ *   }
+ *
+ * Include the literal "$defaults" in a list to keep the built-in rules and add
+ * your own; omit it to take full ownership of that list.
+ *
+ * Auto mode is off by default. Enable with `--auto-mode` or `/auto-mode on`.
+ * Other subcommands: `/auto-mode off|status|config|defaults`.
  */
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+import { complete } from "@earendil-works/pi-ai/compat";
 import type { Model } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+	CONFIG_DIR_NAME,
+	isToolCallEventType,
+	type ExtensionAPI,
+	type ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 
-type Family = "anthropic" | "openai" | "other";
+type Family = "anthropic" | "openai";
 
-const TARGET_MODEL_ID: Record<Exclude<Family, "other">, string> = {
+const CLASSIFIER_MODEL_ID: Record<Family, string> = {
 	anthropic: "claude-sonnet-5",
 	openai: "gpt-5.6-luna",
 };
 
 const STATUS_KEY = "auto-mode";
 
-/** Detect the model family from its resolved API, with id/name/provider fallbacks. */
-function detectFamily(model: Model<any>): Family {
+// Built-in tools that only read state. They are allowed without a classifier
+// call unless `classifyReadOnlyTools` is set. bash/write/edit and unknown
+// custom tools are always classified.
+const READ_ONLY_TOOLS = new Set(["read", "list", "glob", "grep", "manage_todo_list"]);
+
+interface AutoModeConfig {
+	environment: string[];
+	allow: string[];
+	soft_deny: string[];
+	hard_deny: string[];
+	classifyReadOnlyTools: boolean;
+	failClosed: boolean;
+}
+
+export const DEFAULTS = {
+	environment: [
+		"Trusted repo: the git repository the agent started in (its working directory) and its configured remote(s).",
+		"A repository is assumed private unless the user's own message or its remote host/name indicates it is public.",
+		"Everything not named here as trusted is potentially external: destinations outside the working repo, unknown hosts, public paste/gist services, and third-party APIs.",
+	],
+	allow: [
+		"Routine local development inside the working directory: reading, editing, creating files; building; running tests, linters, formatters, type checkers.",
+		"Read-only inspection commands (status, diff, log, ls, cat, grep) anywhere on the local machine.",
+		"Package installs from the project's normal registry.",
+		"Committing, and pushing to any branch of the working repository (including its default branch) and opening pull requests, as long as history is not rewritten.",
+	],
+	soft_deny: [
+		"Git destructive: force pushing, deleting remote branches/tags/releases, rewriting pushed history, or amending already-pushed commits.",
+		"Destructive filesystem operations outside the working directory, or wildcard/recursive deletes (`rm -rf`, mass deletes) that are not scoped to build artifacts inside it.",
+		"Production deploys, `terraform apply`/`destroy` against prod, and shells/port-forwards into hosts or namespaces whose name marks them production (`prod`, `production`, `release`).",
+		"Piping remote content straight into a shell (`curl … | bash`) or otherwise executing unreviewed downloaded code.",
+		"Dropping/truncating databases or running migrations against non-local databases.",
+	],
+	hard_deny: [
+		"Data exfiltration: sending repository contents, secrets, credentials, or personal/regulated data to any destination outside the trusted environment (third-party APIs, public paste/gist services, unknown hosts).",
+		"Reading, printing, or transmitting secrets (private keys, tokens, .env values, cloud credentials) to anywhere outside the local machine.",
+		"Disabling, bypassing, or reconfiguring auto mode or its safety checks.",
+	],
+};
+
+/** Detect the running agent's model family, or undefined if unsupported. */
+export function detectFamily(model: Model<any>): Family | undefined {
 	const api = String(model.api ?? "").toLowerCase();
 	if (api.startsWith("anthropic")) return "anthropic";
 	if (api.startsWith("openai")) return "openai";
-
-	// Fallback for providers that don't set a standard `api` string.
 	const hint = `${model.provider ?? ""} ${model.id ?? ""} ${model.name ?? ""}`.toLowerCase();
 	if (/claude|anthropic/.test(hint)) return "anthropic";
 	if (/\bgpt|openai|\bo[0-9]/.test(hint)) return "openai";
-
-	return "other";
+	return undefined;
 }
 
-/**
- * Find the target model in the registry. Prefer the current model's provider so
- * that e.g. a hawk session stays on hawk, then fall back to any provider that
- * exposes a model with the target id.
- */
-function resolveTarget(ctx: ExtensionContext, currentProvider: string, targetId: string): Model<any> | undefined {
-	const preferred = ctx.modelRegistry.find(currentProvider, targetId);
-	if (preferred) return preferred;
+/** Find the classifier model, preferring the agent's own provider. */
+function resolveClassifierModel(ctx: ExtensionContext, currentProvider: string, targetId: string): Model<any> | undefined {
+	return (
+		ctx.modelRegistry.find(currentProvider, targetId) ??
+		ctx.modelRegistry.getAvailable().find((m) => m.id === targetId) ??
+		ctx.modelRegistry.getAll().find((m) => m.id === targetId)
+	);
+}
 
-	for (const model of ctx.modelRegistry.getAvailable()) {
-		if (model.id === targetId) return model;
+/** Splice built-in defaults into a config list wherever "$defaults" appears. */
+export function spliceDefaults(list: unknown, defaults: string[]): string[] {
+	if (!Array.isArray(list)) return [...defaults];
+	const out: string[] = [];
+	for (const item of list) {
+		if (item === "$defaults") out.push(...defaults);
+		else if (typeof item === "string") out.push(item);
 	}
-	for (const model of ctx.modelRegistry.getAll()) {
-		if (model.id === targetId) return model;
+	return out;
+}
+
+function readJsonFile(path: string): Record<string, unknown> | undefined {
+	try {
+		return JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+	} catch {
+		return undefined;
 	}
-	return undefined;
+}
+
+/** Merge user + (trusted) project auto-mode config over the built-in defaults. */
+function loadConfig(ctx: ExtensionContext): AutoModeConfig {
+	const sources: Record<string, unknown>[] = [];
+	const user = readJsonFile(join(homedir(), CONFIG_DIR_NAME, "agent", "auto-mode.json"));
+	if (user) sources.push(user);
+	if (ctx.isProjectTrusted()) {
+		const project = readJsonFile(join(ctx.cwd, CONFIG_DIR_NAME, "auto-mode.json"));
+		if (project) sources.push(project);
+	}
+	const pick = (key: string): unknown => {
+		for (let i = sources.length - 1; i >= 0; i--) if (key in sources[i]) return sources[i][key];
+		return undefined;
+	};
+	const bool = (key: string, fallback: boolean): boolean => {
+		const v = pick(key);
+		return typeof v === "boolean" ? v : fallback;
+	};
+	return {
+		environment: spliceDefaults(pick("environment"), DEFAULTS.environment),
+		allow: spliceDefaults(pick("allow"), DEFAULTS.allow),
+		soft_deny: spliceDefaults(pick("soft_deny"), DEFAULTS.soft_deny),
+		hard_deny: spliceDefaults(pick("hard_deny"), DEFAULTS.hard_deny),
+		classifyReadOnlyTools: bool("classifyReadOnlyTools", false),
+		failClosed: bool("failClosed", true),
+	};
+}
+
+function bullets(items: string[]): string {
+	return items.map((i) => `- ${i}`).join("\n");
+}
+
+/** Most recent user message text, used as "explicit intent" signal for the classifier. */
+function lastUserMessage(ctx: ExtensionContext): string {
+	const entries = ctx.sessionManager.getEntries();
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const e: any = entries[i];
+		if (e?.type === "message" && e.message?.role === "user") {
+			const text = (e.message.content ?? [])
+				.filter((c: any) => c?.type === "text")
+				.map((c: any) => c.text)
+				.join("\n");
+			if (text.trim()) return text.slice(0, 2000);
+		}
+	}
+	return "";
+}
+
+export function buildClassifierPrompt(
+	cfg: AutoModeConfig,
+	cwd: string,
+	toolName: string,
+	args: unknown,
+	intent: string,
+): string {
+	let argsText: string;
+	try {
+		argsText = JSON.stringify(args, null, 2);
+	} catch {
+		argsText = String(args);
+	}
+	if (argsText.length > 6000) argsText = argsText.slice(0, 6000) + "\n… (truncated)";
+
+	return `You are the auto-mode safety classifier for an autonomous coding agent. The agent runs without asking the user for permission, so you are the only gate. Decide whether the following tool call may run.
+
+Decision procedure, in order of precedence:
+1. HARD DENY — block unconditionally. User intent cannot override these.
+${bullets(cfg.hard_deny)}
+2. SOFT DENY — block unless the user's explicit, specific request describes exactly this action.
+${bullets(cfg.soft_deny)}
+3. ALLOW — exceptions that permit an otherwise soft-denied action.
+${bullets(cfg.allow)}
+4. Otherwise, ALLOW routine actions that stay inside the trusted environment.
+
+Trusted environment:
+${bullets(cfg.environment)}
+
+Rules of thumb: block anything irreversible, destructive, or aimed outside the trusted environment; allow ordinary local development. General requests ("clean up the repo") do NOT authorize destructive actions; only a direct, specific request does ("force-push this branch").
+
+Working directory: ${cwd || "(unknown)"}
+
+Most recent user request (explicit intent; may be empty):
+"""
+${intent || "(none)"}
+"""
+
+Tool call to judge:
+  tool: ${toolName}
+  arguments:
+${argsText}
+
+Respond with ONLY a single JSON object, no prose, no code fences:
+{"decision": "allow" | "block", "reason": "<one concise sentence>"}`;
+}
+
+interface Verdict {
+	decision: "allow" | "block";
+	reason: string;
+}
+
+export /**
+ * Run the classifier model and return its text output.
+ *
+ * Prefers the ModelRuntime behind the extension's ModelRegistry facade, because
+ * `completeSimple` routes through the model's real provider — including custom
+ * providers like `hawk` whose `api` isn't in the compat api-registry. Falls back
+ * to the compat `complete()` path for built-in-provider models if the runtime
+ * isn't reachable.
+ */
+type RuntimeCompleter = {
+	completeSimple: (
+		model: Model<any>,
+		context: { messages: Array<{ role: "user"; content: Array<{ type: "text"; text: string }>; timestamp: number }> },
+		options?: { maxTokens?: number; signal?: AbortSignal },
+	) => Promise<{ content: Array<{ type: string; text?: string }> }>;
+};
+
+function extractText(msg: { content: Array<{ type: string; text?: string }> }): string {
+	return (msg.content ?? [])
+		.filter((c) => c.type === "text" && typeof c.text === "string")
+		.map((c) => c.text as string)
+		.join("\n");
+}
+
+async function classify(
+	ctx: ExtensionContext,
+	model: Model<any>,
+	prompt: string,
+	signal: AbortSignal | undefined,
+): Promise<string> {
+	const messages = [{ role: "user" as const, content: [{ type: "text" as const, text: prompt }], timestamp: Date.now() }];
+	const runtime = (ctx.modelRegistry as unknown as { runtime?: Partial<RuntimeCompleter> }).runtime;
+	if (runtime && typeof runtime.completeSimple === "function") {
+		const r = await (runtime.completeSimple as RuntimeCompleter["completeSimple"])(model, { messages }, { maxTokens: 400, signal });
+		return extractText(r);
+	}
+	// Fallback: compat dispatch works only for built-in-provider APIs.
+	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+	if (!auth.ok) throw new Error(auth.error);
+	if (!auth.apiKey) throw new Error("no API key resolved");
+	const r = await complete(model, { messages }, { apiKey: auth.apiKey, headers: auth.headers, env: auth.env, maxTokens: 400, signal });
+	return extractText(r as { content: Array<{ type: string; text?: string }> });
+}
+
+export function parseVerdict(text: string): Verdict | undefined {
+	const start = text.indexOf("{");
+	const end = text.lastIndexOf("}");
+	if (start === -1 || end <= start) return undefined;
+	try {
+		const obj = JSON.parse(text.slice(start, end + 1)) as { decision?: unknown; reason?: unknown };
+		const decision = obj.decision === "block" ? "block" : obj.decision === "allow" ? "allow" : undefined;
+		if (!decision) return undefined;
+		return { decision, reason: typeof obj.reason === "string" ? obj.reason : "" };
+	} catch {
+		return undefined;
+	}
 }
 
 export default function autoMode(pi: ExtensionAPI): void {
 	let enabled = false;
-	let isEnforcing = false;
 
 	pi.registerFlag("auto-mode", {
-		description: "Start with auto model mode enabled (derive the model from the agent's family)",
+		description: "Run without permission prompts; gate tool calls through the auto-mode safety classifier",
 		type: "boolean",
 		default: false,
 	});
 
-	function refreshStatus(ctx: ExtensionContext): void {
-		if (!ctx.hasUI) return;
-		if (enabled) {
-			const current = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "unknown";
-			ctx.ui.setStatus(STATUS_KEY, `auto: ${current}`);
-		} else {
-			ctx.ui.setStatus(STATUS_KEY, "");
+	function classifierModelFor(ctx: ExtensionContext): { family: Family; model: Model<any> } {
+		const agent = ctx.model;
+		if (!agent) {
+			throw new Error("Auto mode is enabled but there is no active agent model to derive a classifier from.");
 		}
+		const family = detectFamily(agent);
+		if (!family) {
+			throw new Error(
+				`Auto mode supports only Anthropic and OpenAI agents, but the current model ` +
+					`"${agent.provider}/${agent.id}" (api "${agent.api}") is neither. ` +
+					`Switch the agent to an Anthropic or OpenAI model, or disable auto mode with /auto-mode off.`,
+			);
+		}
+		const targetId = CLASSIFIER_MODEL_ID[family];
+		const model = resolveClassifierModel(ctx, agent.provider, targetId);
+		if (!model) {
+			throw new Error(
+				`Auto mode needs the ${family} classifier model "${targetId}", but it is not available in any ` +
+					`configured provider. Make "${targetId}" reachable, or disable auto mode with /auto-mode off.`,
+			);
+		}
+		return { family, model };
 	}
 
-	/**
-	 * Enforce the auto-mode mapping for the current model. Returns a human
-	 * readable description of what changed, or undefined if nothing changed.
-	 * Throws when the family is unsupported or the target model is unavailable —
-	 * callers in `before_agent_start` let that error stop the agent.
-	 */
-	async function applyAutoMode(ctx: ExtensionContext): Promise<string | undefined> {
-		const model = ctx.model;
-		if (!model) {
-			throw new Error("Auto mode is enabled but there is no active model to derive a selection from.");
+	function refreshStatus(ctx: ExtensionContext): void {
+		if (!ctx.hasUI) return;
+		if (!enabled) {
+			ctx.ui.setStatus(STATUS_KEY, "");
+			return;
 		}
-
-		const family = detectFamily(model);
-		if (family === "other") {
-			throw new Error(
-				`Auto mode only supports Anthropic and OpenAI models, but the current model ` +
-					`"${model.provider}/${model.id}" (api "${model.api}") is neither. ` +
-					`Switch to an Anthropic or OpenAI model, or disable auto mode with /auto-mode off.`,
-			);
-		}
-
-		const targetId = TARGET_MODEL_ID[family];
-		if (model.id === targetId) return undefined; // Already on the right model.
-
-		const target = resolveTarget(ctx, model.provider, targetId);
-		if (!target) {
-			throw new Error(
-				`Auto mode wants the ${family} model "${targetId}" but it is not available in any ` +
-					`configured provider. Make sure "${targetId}" is enabled/reachable, or disable auto ` +
-					`mode with /auto-mode off.`,
-			);
-		}
-
-		isEnforcing = true;
+		let label = "auto";
 		try {
-			const changed = await pi.setModel(target);
-			if (!changed) {
-				throw new Error(
-					`Auto mode could not switch to "${target.provider}/${target.id}" — no API key is ` +
-						`available for it. Run /login for that provider, or disable auto mode with /auto-mode off.`,
-				);
-			}
-		} finally {
-			isEnforcing = false;
+			label = `auto ✓ (classifier: ${classifierModelFor(ctx).model.id})`;
+		} catch {
+			label = "auto ⚠ (classifier unavailable)";
 		}
-
-		return `Auto mode selected ${target.provider}/${target.id} (${family}).`;
+		ctx.ui.setStatus(STATUS_KEY, label);
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
 		enabled = Boolean(pi.getFlag("auto-mode"));
-		if (!enabled) {
-			refreshStatus(ctx);
-			return;
-		}
-		// Don't crash startup: surface any problem as a notification. The agent
-		// itself is still gated by before_agent_start below.
-		try {
-			const msg = await applyAutoMode(ctx);
-			if (msg) ctx.ui.notify(msg, "info");
-		} catch (error) {
-			ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+		if (enabled) {
+			try {
+				const { family, model } = classifierModelFor(ctx);
+				ctx.ui.notify(`Auto mode on — classifier: ${model.provider}/${model.id} (${family}).`, "info");
+			} catch (error) {
+				// Surface the problem now, but let before_agent_start be the hard gate.
+				ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+			}
 		}
 		refreshStatus(ctx);
 	});
 
-	// The enforcement point that can stop the agent: a thrown error here aborts
-	// the run before the LLM is called.
+	// Hard gate: if auto mode is on but the classifier can't be resolved, stop
+	// the agent before it runs.
 	pi.on("before_agent_start", async (_event, ctx) => {
 		if (!enabled) return;
-		await applyAutoMode(ctx);
+		classifierModelFor(ctx); // throws -> stops the agent
 		refreshStatus(ctx);
 	});
 
-	// Keep the selection "auto" when the user changes models manually.
-	pi.on("model_select", async (event, ctx) => {
-		if (!enabled || isEnforcing) return;
+	pi.on("model_select", async (_event, ctx) => {
+		if (enabled) refreshStatus(ctx);
+	});
+
+	// The permission gate: classify every tool call and block risky ones.
+	pi.on("tool_call", async (event, ctx) => {
+		if (!enabled) return;
+
+		const cfg = loadConfig(ctx);
+		const isReadOnly = READ_ONLY_TOOLS.has(event.toolName);
+		if (isReadOnly && !cfg.classifyReadOnlyTools) return; // fast-path safe reads
+
+		let model: Model<any>;
 		try {
-			const msg = await applyAutoMode(ctx);
-			if (msg) ctx.ui.notify(`${msg} (auto mode is on)`, "warning");
+			model = classifierModelFor(ctx).model;
 		} catch (error) {
-			ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+			return { block: true, reason: error instanceof Error ? error.message : String(error) };
 		}
-		refreshStatus(ctx);
+
+		// `event.input` is mutable and typed for built-ins; read a plain copy.
+		const args = isToolCallEventType("bash", event) ? { command: event.input.command } : event.input;
+		const prompt = buildClassifierPrompt(cfg, ctx.cwd, event.toolName, args, lastUserMessage(ctx));
+
+		try {
+			const text = await classify(ctx, model, prompt, ctx.signal);
+			const verdict = parseVerdict(text);
+
+			if (!verdict) {
+				if (isReadOnly && !cfg.failClosed) return;
+				return {
+					block: true,
+					reason: `Auto mode classifier returned an unparseable verdict; blocking "${event.toolName}" to be safe. Retry, or disable auto mode with /auto-mode off.`,
+				};
+			}
+			if (verdict.decision === "block") {
+				return { block: true, reason: `Auto mode blocked ${event.toolName}: ${verdict.reason || "flagged as risky."}` };
+			}
+			return; // allow
+		} catch (error) {
+			if (ctx.signal?.aborted) return { block: true, reason: "Auto mode classification aborted." };
+			if (isReadOnly && !cfg.failClosed) return;
+			return {
+				block: true,
+				reason: `Auto mode classifier error (${error instanceof Error ? error.message : String(error)}); blocking "${event.toolName}" to be safe.`,
+			};
+		}
 	});
 
 	pi.registerCommand("auto-mode", {
-		description: "Toggle auto model mode (Anthropic -> claude-sonnet-5, OpenAI -> gpt-5.6-luna)",
+		description: "Auto mode: run without prompts, gating tool calls through a safety classifier",
 		getArgumentCompletions: (prefix: string) => {
-			const items = ["on", "off", "status"].map((value) => ({ value, label: value }));
+			const items = ["on", "off", "status", "config", "defaults"].map((value) => ({ value, label: value }));
 			const filtered = items.filter((item) => item.value.startsWith(prefix.trim()));
 			return filtered.length > 0 ? filtered : null;
 		},
 		handler: async (args, ctx) => {
 			const arg = args.trim().toLowerCase();
-			const want = arg === "on" ? true : arg === "off" ? false : arg === "status" ? enabled : !enabled;
 
+			if (arg === "defaults") {
+				ctx.ui.notify(JSON.stringify(DEFAULTS, null, 2), "info");
+				return;
+			}
+			if (arg === "config") {
+				ctx.ui.notify(JSON.stringify(loadConfig(ctx), null, 2), "info");
+				return;
+			}
 			if (arg === "status") {
-				const current = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "unknown";
-				ctx.ui.notify(`Auto mode is ${enabled ? "on" : "off"} (model: ${current}).`, "info");
+				let cls = "unavailable";
+				try {
+					const { family, model } = classifierModelFor(ctx);
+					cls = `${model.provider}/${model.id} (${family})`;
+				} catch (error) {
+					cls = `unavailable — ${error instanceof Error ? error.message : String(error)}`;
+				}
+				ctx.ui.notify(`Auto mode is ${enabled ? "on" : "off"}. Classifier: ${cls}.`, "info");
 				return;
 			}
 
+			const want = arg === "on" ? true : arg === "off" ? false : !enabled;
 			if (want === enabled) {
 				ctx.ui.notify(`Auto mode is already ${enabled ? "on" : "off"}.`, "info");
 				return;
 			}
-
 			enabled = want;
 			if (!enabled) {
-				ctx.ui.notify("Auto mode disabled.", "info");
+				ctx.ui.notify("Auto mode disabled — tool calls run under pi's normal permissions.", "info");
 				refreshStatus(ctx);
 				return;
 			}
-
 			try {
-				const msg = await applyAutoMode(ctx);
-				ctx.ui.notify(msg ?? "Auto mode enabled (model already correct).", "info");
+				const { family, model } = classifierModelFor(ctx);
+				ctx.ui.notify(`Auto mode enabled — classifier: ${model.provider}/${model.id} (${family}).`, "info");
 			} catch (error) {
 				ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
 			}

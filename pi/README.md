@@ -14,10 +14,21 @@ Config for [pi](https://github.com/earendil-works/pi-coding-agent) lives in
   - `hawk-only.ts` — restricts model selection to the `hawk` provider.
   - `agent-tokens.ts` — injects static skill API tokens into every agent's
     environment (see [Skill tokens](#skill-tokens) below).
-  - `auto-mode.ts` — Claude-Code-style "auto" model mode. Off by default; enable
-    with `--auto-mode` or `/auto-mode on`. When on, the model is derived from the
-    current model's family: Anthropic → `claude-sonnet-5`, OpenAI →
-    `gpt-5.6-luna`, anything else → a hard error that stops the agent.
+  - `auto-mode.ts` — a port of [Claude Code's auto
+    mode](https://code.claude.com/docs/en/auto-mode-config). Off by default;
+    enable with `--auto-mode` or `/auto-mode on`. It runs tool calls without
+    permission prompts but routes each one through a *safety classifier* that
+    blocks anything irreversible, destructive, or aimed outside your environment
+    (force pushes, `rm -rf` outside the workspace, exfiltration, prod deploys,
+    …) while letting routine work through. The classifier runs on
+    `claude-sonnet-5` for Anthropic agents and `gpt-5.6-luna` for OpenAI agents;
+    any other agent family raises a hard error that stops the agent. Trusted
+    infrastructure and `allow`/`soft_deny`/`hard_deny` rules (with `"$defaults"`
+    splicing) can be set in `~/.pi/agent/auto-mode.json` or a trusted project's
+    `.pi/auto-mode.json`; inspect them with `/auto-mode config` and `/auto-mode
+    defaults`. Note: the gate is active in interactive/RPC sessions (how
+    pirouette runs agents), not in `-p` print mode, which auto-runs tools
+    without the hook.
 
 ## Hawk provider
 
