@@ -9,9 +9,15 @@ Config for [pi](https://github.com/earendil-works/pi-coding-agent) lives in
   exists**. It is never overwritten or merged, so a local `models.json` may hold
   additional (e.g. private/internal) model entries that are not committed here.
 - `AGENTS.md` — symlinked.
-- `extensions/hawk-only.ts` — restricts model selection to the `hawk` provider.
-- `extensions/agent-tokens.ts` — injects static skill API tokens into every
-  agent's environment (see [Skill tokens](#skill-tokens) below).
+- `extensions/*.ts` — symlinked into `~/.pi/agent/extensions/` (extension files
+  that exist only in the target dir and are not tracked here are left untouched):
+  - `hawk-only.ts` — restricts model selection to the `hawk` provider.
+  - `agent-tokens.ts` — injects static skill API tokens into every agent's
+    environment (see [Skill tokens](#skill-tokens) below).
+  - `auto-mode.ts` — Claude-Code-style "auto" model mode. Off by default; enable
+    with `--auto-mode` or `/auto-mode on`. When on, the model is derived from the
+    current model's family: Anthropic → `claude-sonnet-5`, OpenAI →
+    `gpt-5.6-luna`, anything else → a hard error that stops the agent.
 
 ## Hawk provider
 

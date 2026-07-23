@@ -716,6 +716,16 @@ if _agent_allowed pi; then
       cp "$_pi_dotfiles_settings" "$_pi_local_settings"
     fi
     ln -sf "$SCRIPT_DIR/pi/agent/AGENTS.md" "$PI_AGENT_DIR/AGENTS.md"
+    # Symlink dotfiles-managed pi extensions. Only files tracked in this repo
+    # are (re)linked; extension files that exist only in the target dir (not
+    # tracked here) are left untouched.
+    if [ -d "$SCRIPT_DIR/pi/agent/extensions" ]; then
+      mkdir -p "$PI_AGENT_DIR/extensions"
+      for _pi_ext in "$SCRIPT_DIR/pi/agent/extensions/"*.ts; do
+        [ -e "$_pi_ext" ] || continue
+        ln -sf "$_pi_ext" "$PI_AGENT_DIR/extensions/$(basename "$_pi_ext")"
+      done
+    fi
     # Deploy models.json only when there is no local one. The dotfiles copy holds
     # public model entries only; a local models.json may carry additional
     # private/internal model aliases, so we never overwrite or merge it (a jq
