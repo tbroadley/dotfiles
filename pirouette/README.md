@@ -32,6 +32,11 @@ host:
   [`pi-btw`](https://github.com/tbroadley/pi-btw) (`/btw` side questions), and
   [`pi-manage-todo-list`](https://github.com/tbroadley/pi-manage-todo-list)
   (structured todo list).
+- **Auto mode** — `extensions/auto-mode.ts` gates every tool call through a
+  classifier LLM instead of prompting, since an unattended agent has nobody to
+  answer a permission prompt. `~/.pi/agent/auto-mode.json` holds
+  `{"enabled": "pirouette"}`, so it is on for agents the server starts and off
+  for plain `pi` sessions on the host. See [Auto mode](../pi/README.md#auto-mode).
 - **Skill tokens for all agents** — `extensions/agent-tokens.ts` reads
   `~/.pi/agent/agent-tokens.env` (gitignored) and injects each token into the
   server environment, so every agent (current and future) can use token-based

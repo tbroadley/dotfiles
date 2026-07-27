@@ -14,25 +14,12 @@ Config for [pi](https://github.com/earendil-works/pi-coding-agent) lives in
   - `hawk-only.ts` — restricts model selection to the `hawk` provider.
   - `agent-tokens.ts` — injects static skill API tokens into every agent's
     environment (see [Skill tokens](#skill-tokens) below).
-  - `auto-mode.ts` — a port of [Claude Code's auto
-    mode](https://code.claude.com/docs/en/auto-mode-config). Off by default;
-    enable with `--auto-mode` or `/auto-mode on`. It runs tool calls without
-    permission prompts but routes each one through a *safety classifier* that
-    blocks anything irreversible, destructive, or aimed outside your environment
-    (force pushes, `rm -rf` outside the workspace, exfiltration, prod deploys,
-    …) while letting routine work through. The classifier runs on
-    `claude-sonnet-5` for Anthropic agents and `gpt-5.6-luna` for OpenAI agents;
-    any other agent family raises a hard error that stops the agent. Trusted
-    infrastructure and `allow`/`soft_deny`/`hard_deny` rules (with `"$defaults"`
-    splicing) can be set in `~/.pi/agent/auto-mode.json` or a trusted project's
-    `.pi/auto-mode.json`; inspect them with `/auto-mode config` and `/auto-mode
-    defaults`. To turn it on by default (instead of per-session with
-    `--auto-mode`), set `"enabled"` in that JSON: `true` enables it for every pi
-    session on the host, `"pirouette"` enables it only for agents launched by
-    the pirouette server (detected via its `PIROUETTE_*` env). The gate runs in
-    every mode the agent uses tools (interactive,
-    RPC, and `-p` print); in non-interactive modes there's no status line or
-    notifications, but blocked tool calls still come back with the reason.
+  - `auto-mode.ts` — a port of Claude Code's auto mode: run without permission
+    prompts, with a classifier LLM gating each tool call (see
+    [Auto mode](#auto-mode) below).
+
+Tests for the extensions live in [`pi/tests`](tests): `cd pi/tests && npm
+install && npx vitest run`.
 
 ## Hawk provider
 
@@ -82,6 +69,98 @@ must be declared under `providers.hawk.extraModels`:
   `"thinking.type.enabled" is not supported for this model`.
 - **Change thinking level** at runtime with `Shift+Tab` (cycle) or `/thinking`;
   set the persistent default via `defaultThinkingLevel` in `settings.json`.
+
+## Auto mode
+
+`extensions/auto-mode.ts` ports [Claude Code's auto
+mode](https://code.claude.com/docs/en/auto-mode-config) to pi: instead of
+prompting for permission, every `tool_call` is judged by a classifier LLM, which
+blocks irreversible, destructive or externally-aimed actions and lets routine
+work through. It is meant for unattended agents (a pirouette host), where a
+permission prompt has nobody to answer it.
+
+- **Classifier model** follows the agent's family — Anthropic agent →
+  `claude-sonnet-5`, OpenAI agent → `gpt-5.6-luna`, anything else is a hard
+  error at `before_agent_start`. The agent keeps its own model.
+- **Off by default.** Turn on per session with `--auto-mode` or `/auto-mode on`;
+  other subcommands are `off`, `status`, `config`, `defaults`.
+- **On by default** via `~/.pi/agent/auto-mode.json`: `{"enabled": true}` for
+  every pi session on the host, or `{"enabled": "pirouette"}` for only the
+  agents the pirouette server starts (detected from `PIROUETTE_*` env vars).
+- **The gate runs in every mode the agent uses tools** (interactive, RPC and
+  `-p` print). In non-interactive modes there is no status line or
+  notification, but blocked tool calls still come back with the reason.
+
+### Configuration
+
+`~/.pi/agent/auto-mode.json`, plus `<project>/.pi/auto-mode.json` for trusted
+projects. All keys optional; include the literal `"$defaults"` in a rule list to
+keep the built-in rules and add to them, or omit it to take full ownership.
+
+```jsonc
+{
+  "environment": ["$defaults", "Source control: github.com/acme and repos under it"],
+  "allow":       ["$defaults", "Writing to s3://acme-scratch/ is allowed (ephemeral)"],
+  "soft_deny":   ["$defaults", "Never run migrations outside the migrations CLI"],
+  "hard_deny":   ["$defaults", "Never send repo contents to third-party APIs"],
+  "trustedPaths": ["/data/scratch"],  // extra roots that count as "this machine"
+  "classifyReadOnlyTools": false,     // also classify read/ls/grep/find (default: false)
+  "readOnlyBashFastPath": true,       // skip the classifier for provably read-only shell
+  "failClosed": true,                 // block mutating tools if the classifier errors
+  "enabled": "pirouette"
+}
+```
+
+`/auto-mode config` prints the merged config along with the resolved trusted
+roots, so the boundary is inspectable from inside a session.
+
+### Design notes
+
+The first version blocked far too much — in an audit of a few days of session
+logs, roughly 45 of ~50 blocks were false positives, and two agents never
+recovered. The two dominant causes and their fixes:
+
+- **Trust was scoped to `cwd`.** A sibling worktree of the *same repo on the
+  same disk* read as "external", as did `/tmp`. The trust boundary is now the
+  machine and the user's own repos and dev boxes: `trustedRoots()` computes
+  concrete paths (cwd, the parent of `git rev-parse --git-common-dir` so every
+  worktree of the repo counts, `$TMPDIR`, `/tmp`,
+  `$PIROUETTE_DATA_DIR/{worktrees,repos}`, plus `trustedPaths`) and injects them
+  into the prompt. Multi-worktree, multi-repo work is the normal mode of
+  operation, not a red flag.
+- **Authorization was thrown away.** Only the single latest user message was
+  passed, so backward-referring approvals ("yes, go ahead with both of those")
+  lost their referent and read as vague. `recentConversation()` now passes the
+  last 8 user *and* assistant turns, with auto mode's own block notices filtered
+  out so they can't feed back in as intent.
+
+Also: the prompt is allow-by-default with an explicit "these are NOT reasons to
+block" list (path outside cwd, short/absent/apologetic last message,
+pronoun-shaped authorization, risky-sounding *words* without a risky effect,
+plain uncertainty); the verdict JSON puts `reason` before `decision` so the
+model reasons before it labels; the hard deny on reconfiguring auto mode is
+narrowed to *weakening it to get an action past it*, so the extension stays
+maintainable by an agent; an unparseable verdict is retried once before
+blocking; and `isReadOnlyBash()` skips the classifier entirely for shell whose
+every segment is provably read-only (quote-aware, so a `|` inside a grep regex
+isn't a pipe), which removes both the latency and a false-positive roll on every
+`git log`.
+
+Not loosened: third-party exfiltration, publishing secrets, force pushes and
+history rewriting, production writes, `curl | bash` from unknown sources, DB
+drops, and fail-closed behaviour on classifier errors.
+
+### Deploying to a pirouette host
+
+The pirouette host does not run `install.sh`, and pi auto-loads every `.ts` in
+`~/.pi/agent/extensions/`, so deploy by copying the file and restarting the
+service (extensions load with the host process, so a restart is what picks up a
+new version for both running and future agents):
+
+```sh
+scp pi/agent/extensions/auto-mode.ts <host>:~/.pi/agent/extensions/auto-mode.ts
+ssh <host> 'sudo systemctl restart pirouette'
+```
 
 ## Skill tokens
 

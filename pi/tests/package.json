@@ -1,0 +1,14 @@
+{
+  "name": "pi-extension-tests",
+  "private": true,
+  "type": "module",
+  "description": "Tests for the pi extensions in ../agent/extensions. Run: npm install && npx vitest run",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "vitest": "^3.2.4"
+  }
+}
