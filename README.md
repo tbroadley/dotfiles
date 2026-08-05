@@ -231,6 +231,7 @@ python3 -c 'import secrets; print(secrets.token_urlsafe(32))'   # the shared tok
 
 cat > ~/.config/credential-broker.env <<'CONF'
 CREDENTIAL_BROKER_TOKEN=<the token you just generated>
+DD_SITE=<datadog site>
 CONF
 chmod 600 ~/.config/credential-broker.env
 
@@ -243,8 +244,12 @@ tail -f ~/Library/Logs/credential-broker.log
 ```
 
 It binds this machine's tailnet address, never `0.0.0.0`, and refuses to start
-if it cannot work out what that is. `DD_SITE` in the environment enables the
-`curl` rule for the Datadog API host; without it, `pup` only.
+if it cannot work out what that is.
+
+`DD_SITE` is what enables the `curl` rule for the Datadog API host; without it,
+`pup` only, and `--check` says so. Put it in the config file rather than the
+plist: launchd does not inherit a login shell's environment, and the plist is
+in this public repo while the config file is not.
 
 `--test-field` reads one field and reports its length, never its value, which is
 the quick way to confirm the vault item actually has the field before an agent

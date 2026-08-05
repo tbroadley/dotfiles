@@ -15,6 +15,7 @@ import os
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -416,6 +417,112 @@ class TestEndToEnd(unittest.TestCase):
     def test_the_wrong_bearer_token_exits_3(self):
         result = self.with_secret("DD_PAT", "--", "echo", "hi", token="w" * 40)
         self.assertEqual(result.returncode, 3)
+
+
+class TestVault(unittest.TestCase):
+    """Reading one field, and what happens when the session is no good.
+
+    The case that matters is a *stale* BW_SESSION inherited from the shell that
+    started the broker, which is the normal first run for anyone whose shell
+    exports one. bw exits 0 and writes something that is not an item, so the
+    obvious code raises a JSON parse error the user cannot act on instead of
+    asking them to unlock.
+    """
+
+    ITEM = json.dumps({"fields": [{"name": "DD_PAT", "value": "a-real-looking-token"},
+                                  {"name": "OTHER", "value": ""}]})
+
+    class Result:
+        def __init__(self, returncode=0, stdout="", stderr=""):
+            self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
+
+    def vault(self, *results, password="hunter2"):
+        """A vault whose bw returns the given results in order."""
+        vault = cb.Vault("An item", session_ttl=900)
+        vault.bw = "/fake/bw"
+        vault._session = "stale-session"
+        vault._touched = time.monotonic()   # a session it has no reason to doubt yet
+        self.calls = []
+        pending = list(results)
+
+        def fake_run(argv, **kwargs):
+            self.calls.append((argv, kwargs.get("env", {})))
+            return pending.pop(0)
+
+        original = cb.subprocess.run
+        cb.subprocess.run = fake_run
+        self.addCleanup(lambda: setattr(cb.subprocess, "run", original))
+        self.prompted = []
+        original_ask = cb.ask_password
+        cb.ask_password = lambda title, body: self.prompted.append(title) or password
+        self.addCleanup(lambda: setattr(cb, "ask_password", original_ask))
+        return vault
+
+    def test_a_field_is_read_out_of_the_item(self):
+        vault = self.vault(self.Result(stdout=self.ITEM))
+        self.assertEqual(vault.field("DD_PAT", "title"), "a-real-looking-token")
+        self.assertEqual(self.prompted, [])
+
+    def test_bw_is_told_never_to_prompt(self):
+        vault = self.vault(self.Result(stdout=self.ITEM))
+        vault.field("DD_PAT", "title")
+        argv, env = self.calls[0]
+        self.assertIn("--nointeraction", argv)
+        self.assertEqual(env.get("BW_NOINTERACTION"), "1")
+        self.assertEqual(env.get("BW_SESSION"), "stale-session")
+
+    def test_the_session_key_is_never_in_argv(self):
+        vault = self.vault(self.Result(stdout=self.ITEM))
+        vault.field("DD_PAT", "title")
+        argv, _ = self.calls[0]
+        self.assertNotIn("stale-session", " ".join(argv))
+
+    def test_a_stale_session_asks_for_the_password_instead_of_erroring(self):
+        # bw exits 0 having written a prompt, not an item.
+        vault = self.vault(
+            self.Result(stdout="? Master password: [hidden]"),
+            self.Result(stdout="fresh-session\n"),      # bw unlock
+            self.Result(stdout=self.ITEM),               # the retry
+        )
+        self.assertEqual(vault.field("DD_PAT", "please unlock"), "a-real-looking-token")
+        self.assertEqual(self.prompted, ["please unlock"])
+        self.assertEqual(self.calls[2][1]["BW_SESSION"], "fresh-session")
+
+    def test_a_locked_vault_that_says_so_also_asks(self):
+        vault = self.vault(
+            self.Result(returncode=1, stderr="Vault is locked."),
+            self.Result(stdout="fresh-session\n"),
+            self.Result(stdout=self.ITEM),
+        )
+        self.assertEqual(vault.field("DD_PAT", "title"), "a-real-looking-token")
+
+    def test_refusing_the_unlock_prompt_is_a_permission_error_not_a_hang(self):
+        vault = self.vault(self.Result(stdout="? Master password:"), password=None)
+        with self.assertRaises(PermissionError):
+            vault.field("DD_PAT", "title")
+
+    def test_a_missing_or_empty_field_is_reported_clearly(self):
+        vault = self.vault(self.Result(stdout=self.ITEM))
+        with self.assertRaises(RuntimeError) as caught:
+            vault.field("NOT_THERE", "title")
+        self.assertIn("no field named NOT_THERE", str(caught.exception))
+
+        vault = self.vault(self.Result(stdout=self.ITEM))
+        with self.assertRaises(RuntimeError) as caught:
+            vault.field("OTHER", "title")
+        self.assertIn("is empty", str(caught.exception))
+
+    def test_the_master_password_goes_through_the_environment_not_argv(self):
+        vault = self.vault(
+            self.Result(stdout="? Master password:"),
+            self.Result(stdout="fresh-session\n"),
+            self.Result(stdout=self.ITEM),
+        )
+        vault.field("DD_PAT", "title")
+        unlock_argv, unlock_env = self.calls[1]
+        self.assertIn("--passwordenv", unlock_argv)
+        self.assertNotIn("hunter2", " ".join(unlock_argv))
+        self.assertEqual(unlock_env.get("BW_PASSWORD"), "hunter2")
 
 
 class TestConfirmDialog(unittest.TestCase):
