@@ -8,3 +8,12 @@ claude/skills/metr-security/
 claude/skills/advanced-review/
 __pycache__
 pi/tests/node_modules/
+
+# Host-local pi agent state. These hold live credentials or host-specific
+# security rules and must never be committed to this (public) repo. Only the
+# .example variants belong here. Belt and braces: the real files live in
+# ~/.pi/agent and not in this tree, but the deploy direction for AGENTS.md is
+# repo -> home, so a stray copy back the other way is a plausible accident.
+pi/agent/agent-tokens.env
+pi/agent/auto-mode.json
+pi/agent/auth.json

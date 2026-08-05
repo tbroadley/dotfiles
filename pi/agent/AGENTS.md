@@ -37,6 +37,30 @@ env | grep '^PI_'   # PI_MODEL, PI_PROVIDER, PI_REASONING_LEVEL, PI_SESSION_ID
 from memory or from your training data; you will get it wrong, usually by
 naming an older model than the one you are.
 
+## Handing work to another agent
+
+`pru launch <name> --project <project>` starts another agent on this box and
+`pru send <id> "<brief>"` gives it its task. Two things go wrong every time:
+
+**Don't pass `--model` unless you know the provider.** This host is logged
+into exactly one provider, and it is not the one you would guess from your
+own model name. `--model anthropic/claude-opus-5` names a provider with no
+credentials here; older builds accepted it, the child showed up as `running`,
+and it never processed a word of your brief. Omit the flag and the child
+inherits the host default. If you need to be explicit, read the answer from
+the environment rather than memory:
+
+```sh
+pru launch helper --project <project> --model "$PI_PROVIDER/$PI_MODEL"
+```
+
+**Confirm the child actually started.** `pru send` prints "✓ message sent"
+when the *server* accepted the message, not when the agent began work. Check
+a minute later — `pru list` should show it out of `idle` with non-zero tokens
+and cost. A child sitting at zero cost, or in `error`, never got your brief:
+read its error (`pru list`, or the dashboard) and relaunch instead of waiting
+for a report that isn't coming.
+
 ## Default flow for feature work
 
 Unless told otherwise, every code change follows:

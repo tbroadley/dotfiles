@@ -1,0 +1,51 @@
+// ~/.pi/agent/auto-mode.json — host-local auto-mode configuration.
+//
+// Copy to ~/.pi/agent/auto-mode.json and edit. The real file is gitignored: it
+// describes one machine's security posture, which is not something to publish.
+// Strip the comments when copying — the loader parses strict JSON.
+//
+// Every list supports the literal "$defaults": include it to keep the built-in
+// rules and add your own, omit it to take full ownership of that list. The
+// built-ins already cover exfiltration, publishing secrets, dumping the
+// environment, printing credential stores, and disabling auto mode itself — so
+// what belongs here is only what is specific to *this* host.
+//
+// Rules are read by the classifier, not by the agent, so write them as
+// instructions to a reviewer deciding whether to allow a tool call. Be concrete
+// about the thing to refuse and explicit about the legitimate case next door,
+// or you will block ordinary work.
+{
+  // true = every pi session on this host; "pirouette" = only agents started by
+  // the pirouette server; false/omitted = off (use --auto-mode per run).
+  "enabled": "pirouette",
+
+  "hard_deny": [
+    "$defaults",
+
+    // Elevated cloud roles. Name the roles this host is *allowed* to use, so
+    // the classifier can judge anything else, and say where that work belongs
+    // instead. Deleting profiles from ~/.aws/config is not enough on its own —
+    // a cached SSO token still grants every role the session is entitled to.
+    "Obtaining or using cloud credentials for any role other than <least-privileged role this host needs>. That includes `aws sso get-role-credentials`, re-creating removed profile stanzas in ~/.aws/config, and passing an elevated `--profile`. Production and staging work happens from <where it belongs>, not from an unattended agent.",
+
+    // Datasets that should not be on this machine at all. Naming the repo and
+    // the backing stores is what lets the classifier catch a re-clone.
+    "Re-cloning, re-creating or restoring <private repo> on this host, and querying its <database / object store> directly. It was removed deliberately; that work belongs on a host scoped for it."
+  ],
+
+  "soft_deny": [
+    "$defaults"
+
+    // Things that are usually wrong here but occasionally right: the agent can
+    // still do them by asking. Deploys, migrations and self-upgrades fit well.
+  ],
+
+  // Extra filesystem roots to treat as "this machine" rather than external.
+  "trustedPaths": [],
+
+  // Defaults shown for reference. classifyReadOnlyTools costs a classifier
+  // round-trip on every read; credential stores bypass the fast path anyway.
+  "classifyReadOnlyTools": false,
+  "readOnlyBashFastPath": true,
+  "failClosed": true
+}

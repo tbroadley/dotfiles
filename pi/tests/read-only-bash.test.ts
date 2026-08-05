@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { isReadOnlyBash, trustedRoots } from "../agent/extensions/auto-mode.js";
+import { isReadOnlyBash, touchesCredentialStore, trustedRoots } from "../agent/extensions/auto-mode.js";
 
 describe("isReadOnlyBash — shapes that used to be false positives", () => {
 	const allowed = [
@@ -72,6 +72,47 @@ describe("isReadOnlyBash — must still reach the classifier", () => {
 	for (const command of classify) {
 		it(`does not fast-path: ${command.slice(0, 60).replace(/\n/g, " ⏎ ")}…`, () => {
 			expect(isReadOnlyBash(command)).toBe(false);
+		});
+	}
+});
+
+describe("credential stores are never fast-pathed", () => {
+	// Reading a secret mutates nothing, so every one of these looks read-only.
+	// For a credential, reading *is* the risk: the bytes land in the transcript.
+	// They must reach the classifier so the hard_deny rules can act.
+	const mustClassify = [
+		"cat /home/ubuntu/.pi/agent/agent-tokens.env",
+		"cat ~/.aws/credentials",
+		"head -c 200 ~/.ssh/id_ed25519",
+		"rg . /home/ubuntu/.aws/sso/cache/",
+		"grep oauth_token ~/.config/gh/hosts.yml",
+		"jq . ~/.pi/agent/auth.json",
+		"cat ~/.docker/config.json",
+		"cat ~/.kube/config | head -40",
+		"cat ~/.npmrc",
+		// still caught when hidden mid-pipeline behind innocuous commands
+		"ls -la /tmp && cat /home/ubuntu/.aws/sso/cache/token.json | jq -r .accessToken",
+	];
+	for (const command of mustClassify) {
+		it(`does not fast-path: ${command.slice(0, 60)}…`, () => {
+			expect(touchesCredentialStore(command)).toBe(true);
+			expect(isReadOnlyBash(command)).toBe(false);
+		});
+	}
+
+	// The list is narrow on purpose: ordinary reads must not start paying for a
+	// classifier round-trip just because a path looks vaguely credential-ish.
+	const stillFastPathed = [
+		"cat ~/.pi/agent/settings.json",
+		"cat package.json",
+		"cat .env.example",
+		"git -C ~/dotfiles diff --stat",
+		"rg -n 'ssh' README.md",
+	];
+	for (const command of stillFastPathed) {
+		it(`still fast-paths: ${command}`, () => {
+			expect(touchesCredentialStore(command)).toBe(false);
+			expect(isReadOnlyBash(command)).toBe(true);
 		});
 	}
 });

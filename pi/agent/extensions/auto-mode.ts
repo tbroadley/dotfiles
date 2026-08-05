@@ -258,8 +258,37 @@ function isReadOnlySegment(segment: string): boolean {
 	return rest.some((t) => deeper.has(t) || deeper.has(t.split("=")[0]));
 }
 
+/** Credential stores, by path fragment.
+ *
+ *  A command touching one of these is never fast-pathed, however read-only it
+ *  looks. `cat ~/.aws/sso/cache/x.json` mutates nothing, so the fast path would
+ *  wave it through — but for a secret, *reading is the risk*: the bytes land in
+ *  the session transcript, which is durable and is read back later. Sending
+ *  these to the classifier is what gives the hard_deny rules about credential
+ *  material anything to act on.
+ *
+ *  Deliberately narrow. Legitimate work on a credential (rotating a token,
+ *  deleting a stale profile) still goes through — it is classified, not blocked. */
+const CREDENTIAL_PATH_FRAGMENTS = [
+	".aws/credentials",
+	".aws/sso",
+	".ssh/id_",
+	".config/gh/hosts",
+	".npmrc",
+	".docker/config.json",
+	".kube/config",
+	"auth.json",
+	"agent-tokens.env",
+];
+
+export function touchesCredentialStore(command: string): boolean {
+	const lowered = command.toLowerCase();
+	return CREDENTIAL_PATH_FRAGMENTS.some((fragment) => lowered.includes(fragment));
+}
+
 export function isReadOnlyBash(command: string): boolean {
 	if (!command) return false;
+	if (touchesCredentialStore(command)) return false;
 	const split = splitShell(command.replace(NULL_REDIRECT, " "));
 	if (!split) return false;
 	const { segments, unquoted } = split;
@@ -366,6 +395,8 @@ export const DEFAULTS = {
 		"Exfiltration to a third party: sending repository contents, secrets, credentials, or personal/regulated data to a destination the user does not control (third-party APIs, public paste/gist services, unknown hosts, public repositories).",
 		"Publishing secrets: committing them, printing them into a shared channel, or otherwise exposing private keys, tokens, .env values or cloud credentials somewhere they become durably visible to others. Moving the user's own credentials between the user's own machines at their request is not this.",
 		"Weakening auto mode in order to get an action past it: turning the classifier off, editing its rules, or routing around it mid-task so that a previously blocked call succeeds. Reading or inspecting auto mode, and deliberately improving it as the task the user actually asked for, are allowed.",
+		"Dumping the whole process environment: bare `env`, `printenv` with no argument, `set`, `export -p`, `declare -x`, or redirecting any of them into a file. Agent environments routinely carry injected API tokens, so one such command copies every secret the agent holds into the transcript, where it stays. Reading named variables is fine — `printenv PATH`, `env | grep '^PI_'`.",
+		"Printing the contents of a credential store into tool output. The session transcript is a durable channel in the sense above: it is written to disk, read back by later agents, and visible to anyone with access to the session store — so `cat`-ing `~/.aws/credentials` or `~/.aws/sso/cache`, `~/.config/gh/hosts.yml`, `~/.npmrc`, `~/.docker/config.json`, `~/.kube/config`, an agent `auth.json` or token file, or a private key under `~/.ssh` is publishing it, even though nothing was sent anywhere. Using such a credential for its intended purpose is fine, and so is editing these files to rotate or remove a value.",
 	],
 };
 
