@@ -75,7 +75,6 @@ The skill loader treats Markdown files inside `claude/skills/` as skills, so set
 |-------|---------------|------------|
 | alfred-clipboard | None | - |
 | learn | None | - |
-| todoist | API token | `TODOIST_TOKEN` |
 | linear | API key | `LINEAR_API_KEY` |
 | datadog | API + app keys | `DD_API_KEY`, `DD_APP_KEY`, `DD_SITE` |
 | airtable | Personal access token | `AIRTABLE_TOKEN` |
@@ -90,7 +89,6 @@ The skill loader treats Markdown files inside `claude/skills/` as skills, so set
 Add secrets to `~/.zshrc.local`:
 
 ```bash
-export TODOIST_TOKEN="..."
 export LINEAR_API_KEY="..."
 export DD_API_KEY="..."
 export DD_APP_KEY="..."
@@ -109,7 +107,6 @@ source ~/.zshrc.local
 
 ### Service-specific notes
 
-- `todoist`: create a token at <https://todoist.com/app/settings/integrations/developer>
 - `linear`: create a personal API key at <https://linear.app/settings/account/security>
 - `datadog`: create API and application keys in Datadog org settings
 - `airtable`: create a token at <https://airtable.com/create/tokens> with `data.records:read` and `schema.bases:read`
@@ -122,9 +119,6 @@ source ~/.zshrc.local
 ### Smoke tests
 
 ```bash
-curl -s "https://api.todoist.com/rest/v2/projects" \
-  -H "Authorization: Bearer $(printenv TODOIST_TOKEN)" | jq '.[].name'
-
 curl -s -X POST "https://api.linear.app/graphql" \
   -H "Authorization: $(printenv LINEAR_API_KEY)" \
   -H "Content-Type: application/json" \

@@ -166,7 +166,7 @@ ssh <host> 'sudo systemctl restart pirouette'
 
 `settings.json` loads `~/.claude/skills` (and `~/.codex/skills`) into pi, so
 agents can use those skills. Several skills authenticate with a single static
-token read from an env var (e.g. `TODOIST_TOKEN`, `AIRTABLE_TOKEN`,
+token read from an env var (e.g. `LINEAR_API_KEY`, `AIRTABLE_TOKEN`,
 `LINEAR_API_KEY`, `DD_API_KEY`). `extensions/agent-tokens.ts` makes those tokens
 available to every agent without per-agent setup: at load it reads
 `~/.pi/agent/agent-tokens.env` and sets each `KEY=VALUE` in the process

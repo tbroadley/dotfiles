@@ -26,7 +26,7 @@ Look ONLY for actual secret values directly embedded in the code:
 - High-entropy strings that look like actual secret values
 
 Do NOT flag:
-- References to environment variables (e.g. \`process.env.API_KEY\`, \`\$TODOIST_TOKEN\`, \`os.getenv()\`)
+- References to environment variables (e.g. \`process.env.API_KEY\`, \`\$LINEAR_API_KEY\`, \`os.getenv()\`)
 - Code that reads secrets from config files, vaults, or env vars at runtime
 - Variable names or keys that mention \"token\", \"secret\", \"key\", etc. without containing actual secret values
 - Authorization headers that use variables/env vars for the token value
