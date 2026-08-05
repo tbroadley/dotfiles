@@ -293,6 +293,29 @@ class TestRequests(unittest.TestCase):
         self.assertNotIn("value-of-DD_PAT", self.audit.read_text())
         self.assertIn("pup", self.audit_lines()[0]["argv"])
 
+    def test_the_vault_field_can_be_called_something_else(self):
+        # The box asks for the variable the command needs; what the vault calls
+        # that field is the vault's business.
+        broker = cb.Broker({
+            "CREDENTIAL_BROKER_TOKEN": TOKEN,
+            "CREDENTIAL_BROKER_AUDIT": str(self.audit),
+            "CREDENTIAL_BROKER_VAULT_FIELD_DD_PAT": "Datadog personal access token",
+            "DD_SITE": SITE,
+        })
+        asked = []
+        broker.vault.field = lambda name, title: asked.append(name) or "pretend-token-abcdef"
+        code, payload = broker.handle(
+            {"field": "DD_PAT", "argv": ["pup", "test"], "session": "s"}, "100.64.0.2")
+        self.assertEqual(code, 200)
+        self.assertEqual(asked, ["Datadog personal access token"])
+        self.assertEqual(payload["value"], "pretend-token-abcdef")
+
+    def test_without_a_mapping_the_names_are_the_same(self):
+        self.asked = []
+        self.broker.vault.field = lambda name, title: self.asked.append(name) or "v" * 20
+        self.request()
+        self.assertEqual(self.asked, ["DD_PAT"])
+
     def test_a_locked_vault_is_a_refusal_not_a_crash(self):
         def locked(name, title):
             raise PermissionError("locked")
