@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+# Refresh an AWS SSO session from a host with no browser on it.
+#
+# An SSO session lasts a fixed number of hours, so any long-lived agent on a
+# remote host eventually wakes up to `ExpiredToken` and cannot do a thing about
+# it: `aws sso login` wants a browser, and there is none here. This walks the
+# login through the url-listener on my laptop instead — the same path `notify`
+# and `open-url-on-host` use — so the approval page pops up in my browser with a
+# notification next to it, and the agent waits for me rather than stalling.
+#
+# Note --use-device-code. The default authorization-code flow redirects to
+# 127.0.0.1 on the machine that ran the command; with the browser on a different
+# machine that redirect lands nowhere and the login can never complete. The
+# device-code flow has no callback: the code travels in the URL, the CLI polls.
+#
+# Usage: aws-sso-login [--force] [--timeout SECONDS] [--profile] PROFILE
+#
+#   PROFILE     defaults to $AWS_PROFILE, else `default`
+#   --force     log in even if the current session still works
+#   --timeout   how long to wait for approval (default 240s)
+#
+# Exit codes: 0 session is good, 1 login failed or timed out, 2 no way to reach
+# the browser (laptop asleep, off the network, listener down).
+
+set -uo pipefail
+
+# Sibling scripts live next to this one, wherever it was symlinked from.
+_bindir="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
+
+profile="${AWS_PROFILE:-default}"
+force=0
+timeout="${AWS_SSO_LOGIN_TIMEOUT:-240}"
+
+usage() {
+    cat <<'EOF'
+Usage: aws-sso-login [--force] [--timeout SECONDS] [--profile] PROFILE
+
+Refresh an AWS SSO session from a host with no browser, by opening the approval
+page in the browser on my laptop via url-listener and waiting for me.
+
+  PROFILE     defaults to $AWS_PROFILE, else `default`
+  --force     log in even if the current session still works
+  --timeout   how long to wait for approval (default 240s)
+EOF
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --force) force=1; shift ;;
+        --timeout) timeout="${2:?--timeout needs a value}"; shift 2 ;;
+        --profile) profile="${2:?--profile needs a value}"; shift 2 ;;
+        -h|--help) usage; exit 0 ;;
+        -*) echo "aws-sso-login: unknown option $1" >&2; usage >&2; exit 64 ;;
+        *) profile="$1"; shift ;;
+    esac
+done
+
+# One login at a time: several agents hitting expired credentials at once
+# should mean one browser popup, not five. Latecomers wait for the winner and
+# then find the session already valid.
+if [ -z "${_AWS_SSO_LOGIN_LOCKED:-}" ] && command -v flock >/dev/null 2>&1; then
+    export _AWS_SSO_LOGIN_LOCKED=1
+    args=(--profile "$profile" --timeout "$timeout")
+    [ "$force" -eq 1 ] && args+=(--force)
+    flock -w "$timeout" -E 75 "/tmp/aws-sso-login.$(id -u).lock" "$0" "${args[@]}"
+    rc=$?
+    if [ "$rc" -eq 75 ]; then
+        echo "aws-sso-login: another login has held the lock for ${timeout}s without finishing." >&2
+        exit 1
+    fi
+    exit "$rc"
+fi
+
+identity() { aws sts get-caller-identity --profile "$profile" --query Arn --output text 2>/dev/null; }
+
+if [ "$force" -eq 0 ]; then
+    if arn="$(identity)" && [ -n "$arn" ]; then
+        echo "AWS SSO session for profile '$profile' is still valid: $arn"
+        exit 0
+    fi
+fi
+
+base="$("$_bindir/url-listener-url")" || exit 2
+if ! curl -sf --max-time 5 "$base/health" >/dev/null 2>&1; then
+    cat >&2 <<EOF
+aws-sso-login: url-listener at $base is not answering.
+That is the only way this host can put a login page in front of a human, so the
+SSO session cannot be refreshed right now — the laptop is probably asleep or off
+the network. Report this rather than retrying in a loop.
+EOF
+    exit 2
+fi
+
+out="$(mktemp)"
+trap 'rm -f "$out"' EXIT
+
+aws sso login --profile "$profile" --use-device-code --no-browser >"$out" 2>&1 &
+aws_pid=$!
+
+# The CLI prints two URLs: a bare device page, then one with the user code in
+# the query string that autofills it. Hold out for the second — nobody should
+# have to transcribe a code by hand — but don't hold out forever, since a future
+# CLI version might stop printing it.
+url=""
+plain=""
+for i in $(seq 1 60); do
+    url="$(grep -oE 'https://[^[:space:]]*user_code=[^[:space:]]+' "$out" | head -1)"
+    [ -n "$url" ] && break
+    plain="$(grep -oE 'https://[^[:space:]]+' "$out" | head -1)"
+    kill -0 "$aws_pid" 2>/dev/null || { url="$plain"; break; }
+    if [ -n "$plain" ] && [ "$i" -ge 10 ]; then
+        url="$plain"
+        break
+    fi
+    sleep 0.5
+done
+
+if [ -z "$url" ]; then
+    wait "$aws_pid"
+    echo "aws-sso-login: the CLI never printed a verification URL." >&2
+    cat "$out" >&2
+    exit 1
+fi
+
+code="$(grep -oE '\b[A-Z0-9]{4}-[A-Z0-9]{4}\b' "$out" | head -1)"
+echo "Verification URL: $url"
+
+curl -sf --max-time 10 -G --data-urlencode "url=$url" "$base/open" >/dev/null 2>&1 \
+    || echo "aws-sso-login: could not open the page remotely; the URL above still works." >&2
+curl -sf --max-time 10 -G \
+    --data-urlencode "title=AWS SSO" \
+    --data-urlencode "message=An agent needs an AWS SSO login${code:+ (code $code)} — approve in the browser" \
+    --data-urlencode "sound=Glass" \
+    "$base/notify" >/dev/null 2>&1 \
+    || echo "aws-sso-login: the notification did not go through; the page is open regardless." >&2
+
+echo "Waiting up to ${timeout}s for approval..."
+waited=0
+while kill -0 "$aws_pid" 2>/dev/null; do
+    if [ "$waited" -ge "$timeout" ]; then
+        kill "$aws_pid" 2>/dev/null
+        wait "$aws_pid" 2>/dev/null
+        echo "aws-sso-login: no approval within ${timeout}s. Nobody is at the laptop; stop and report." >&2
+        exit 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+done
+wait "$aws_pid"
+rc=$?
+
+if [ "$rc" -ne 0 ]; then
+    echo "aws-sso-login: login failed (exit $rc)." >&2
+    cat "$out" >&2
+    exit 1
+fi
+
+if arn="$(identity)" && [ -n "$arn" ]; then
+    echo "Signed in as $arn"
+    exit 0
+fi
+
+echo "aws-sso-login: login reported success but the profile still has no credentials." >&2
+cat "$out" >&2
+exit 1

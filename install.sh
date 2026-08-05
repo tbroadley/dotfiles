@@ -716,6 +716,13 @@ if _agent_allowed pi; then
       cp "$_pi_dotfiles_settings" "$_pi_local_settings"
     fi
     ln -sf "$SCRIPT_DIR/pi/agent/AGENTS.md" "$PI_AGENT_DIR/AGENTS.md"
+    # Helpers every agent should be able to reach. pi prepends this dir to the
+    # agent PATH, and an agent's shell does not source the interactive rc that
+    # puts ~/dotfiles/bin there, so link them in explicitly.
+    mkdir -p "$PI_AGENT_DIR/bin"
+    for _pi_helper in aws-sso-login notify open-url-on-host url-listener-url; do
+      ln -sf "$SCRIPT_DIR/bin/$_pi_helper" "$PI_AGENT_DIR/bin/$_pi_helper"
+    done
     # Symlink dotfiles-managed pi extensions. Only files tracked in this repo
     # are (re)linked; extension files that exist only in the target dir (not
     # tracked here) are left untouched.
