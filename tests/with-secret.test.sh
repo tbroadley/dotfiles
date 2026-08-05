@@ -95,6 +95,22 @@ out="$("$with_secret" DD_PAT -- printf '%s\n' 'Authorization: Bearer {{DD_PAT}}'
 check_eq "a {{FIELD}} placeholder in an argument is substituted, then redacted" \
     "Authorization: Bearer <DD_PAT redacted>" "$out"
 
+out="$("$with_secret" DD_PAT --as DD_ACCESS_TOKEN -- printenv DD_ACCESS_TOKEN 2>&1)"
+check_eq "--as puts the value in a differently named variable" "<DD_PAT redacted>" "$out"
+
+out="$("$with_secret" DD_PAT --as DD_ACCESS_TOKEN -- printenv DD_PAT 2>&1)"; rc=$?
+check_eq "--as means the field's own name is not set" "1" "$rc"
+check_eq "--as leaves nothing behind under the field name" "" "$out"
+
+out="$("$with_secret" DD_PAT --as DD_ACCESS_TOKEN -- printf '%s\n' 'Bearer {{DD_ACCESS_TOKEN}}' 2>&1)"
+check_eq "--as renames the placeholder too" "Bearer <DD_PAT redacted>" "$out"
+
+check_eq "the broker is told which variable it lands in" "DD_ACCESS_TOKEN" \
+    "$(jq -r .request.env <<<"$(tail -1 "$tmp/requests.jsonl")")"
+
+out="$("$with_secret" DD_PAT --as 'not a variable' -- echo hi 2>&1)"; rc=$?
+check_eq "a junk --as name is a usage error" "64" "$rc"
+
 out="$("$with_secret" DD_PAT -- printf '%s\n' 'no placeholder here' 2>&1)"
 check_eq "arguments without a placeholder are passed through unchanged" "no placeholder here" "$out"
 

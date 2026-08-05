@@ -294,6 +294,14 @@ CLI, no session key.
 
 ### Using it
 
+`--as` puts the value in a differently named variable, for when the vault's name
+for a credential is not what the tool reads (the Datadog CLI wants a bearer
+token in `DD_ACCESS_TOKEN`, and the allowlist is still keyed on the field):
+
+```bash
+with-secret DD_PAT --as DD_ACCESS_TOKEN -- pup metrics query --query='avg:system.cpu.user{*}'
+```
+
 Where a tool wants the credential in an argument rather than the environment,
 write `{{FIELD}}` and it is substituted just before exec — nothing else expands
 it, since no shell is involved:
