@@ -23,11 +23,27 @@
 typeset -ga METR_SECRET_COMMANDS
 METR_SECRET_COMMANDS=(linear datadog airtable golinks status-dashboard)
 
+# Keychain service name holding the Bitwarden master password. Create it once:
+#     security add-generic-password -U -s bw-master -a "$USER" -w
+: "${BW_MASTER_KEYCHAIN_ITEM:=bw-master}"
+
 # Unlock the vault for THIS shell only. BW_SESSION is deliberately never written
 # to disk.
+#
+# The master password comes from the login keychain, gated behind `sudo -v` so
+# unlocking takes a fingerprint rather than a typed password (pam_tid.so must be
+# enabled in /etc/pam.d/sudo_local). Treat that gate as consent rather than
+# encryption: it buys convenience, not extra protection for the password itself.
+# Falls back to `bw unlock`'s own prompt if either step is unavailable.
 bwunlock() {
-  local s
-  s="$(bw unlock --raw)" || return 1
+  local pw s
+  if sudo -v 2>/dev/null &&
+     pw="$(security find-generic-password -s "$BW_MASTER_KEYCHAIN_ITEM" -a "$USER" -w 2>/dev/null)" &&
+     [[ -n "$pw" ]]; then
+    s="$(BW_PASSWORD="$pw" bw unlock --passwordenv BW_PASSWORD --raw)" || return 1
+  else
+    s="$(bw unlock --raw)" || return 1
+  fi
   export BW_SESSION="$s"
   echo "Vault unlocked for this shell."
 }
@@ -42,9 +58,13 @@ secrets-load() {
     return 1
   fi
 
+  # Unlocking is a fingerprint, so do it inline rather than making the user run
+  # bwunlock and re-run the command.
   if [[ "$(bw status 2>/dev/null | sed -n 's/.*"status":"\([a-z]*\)".*/\1/p')" != "unlocked" ]]; then
-    print -u2 -P "%F{yellow}secrets-load: Bitwarden vault is locked.%f Run %B'bwunlock'%b, then re-run this command."
-    return 1
+    bwunlock || {
+      print -u2 -P "%F{yellow}secrets-load: Bitwarden vault is locked%f and could not be unlocked."
+      return 1
+    }
   fi
 
   local json

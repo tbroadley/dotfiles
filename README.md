@@ -123,7 +123,7 @@ METR_SECRET_COMMANDS+=(my-tool)
 - `linear`: create a personal API key at <https://linear.app/settings/account/security>
 - `datadog`: create API and application keys in Datadog org settings
 - `airtable`: create a token at <https://airtable.com/create/tokens> with `data.records:read` and `schema.bases:read`
-- `bitwarden`: install `bitwarden-cli` and run `bw login` once; thereafter `bwunlock` handles unlocking per shell
+- `bitwarden`: install `bitwarden-cli` and run `bw login` once; thereafter `bwunlock` handles unlocking per shell. Keep the master password in the login keychain and that unlock is a fingerprint rather than a typed password — `secrets.zsh` names the entry it looks for and how to create it. Without that entry, or without Touch ID for `sudo`, `bwunlock` prompts for the master password as before. `BW_SESSION` is never written to disk — it lives only in the shell that ran `bwunlock`.
 - Google Workspace skills: install `@googleworkspace/cli`, create a desktop OAuth client in the `metr-pub` project, export the client ID/secret, then run `gws auth login`
 - `read-inspect-eval`: `uv pip install inspect-ai`
 - `download-inspect-eval`: requires an authenticated AWS SSO session (run `aws sso login` first). The skill handles the specific access point and bucket.
