@@ -103,6 +103,13 @@ That belongs in the PR description: `gh pr edit --body-file <file>`, kept
 current as the branch evolves. Reply inside a review thread only when
 responding to that specific comment.
 
+Keeping it current means **rewriting it, not appending to it**. Re-derive the
+description from the current diff each time and delete what no longer earns its
+place; otherwise it ratchets from a readable page to an unreadable essay over
+the life of a branch. Aim for under 500 words: what the change is, how it works,
+and only those checks CI cannot run. Leave out bugs you hit on the way and
+justifications for decisions nobody questioned.
+
 ## Public vs private repos: check before you push
 
 Context from a private repo bleeds into work on a public one. Treat the
