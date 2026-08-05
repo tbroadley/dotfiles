@@ -1,0 +1,33 @@
+name: tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: shellcheck bin/with-secret bin/aws-sso-login bin/url-listener-url tests/with-secret.test.sh
+
+      - name: with-secret (box half, against a fake broker)
+        run: ./tests/with-secret.test.sh
+
+      - name: credential-broker (allowlist, curl parsing, grants, audit)
+        run: python3 tests/credential-broker.test.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pi/tests/package-lock.json
+
+      - name: pi extension tests
+        working-directory: pi/tests
+        run: |
+          npm ci
+          npx vitest run

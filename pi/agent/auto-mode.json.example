@@ -30,7 +30,13 @@
 
     // Datasets that should not be on this machine at all. Naming the repo and
     // the backing stores is what lets the classifier catch a re-clone.
-    "Re-cloning, re-creating or restoring <private repo> on this host, and querying its <database / object store> directly. It was removed deliberately; that work belongs on a host scoped for it."
+    "Re-cloning, re-creating or restoring <private repo> on this host, and querying its <database / object store> directly. It was removed deliberately; that work belongs on a host scoped for it.",
+
+    // Where credentials are brokered per-command from elsewhere, the thing to
+    // refuse is any attempt to get at the source directly rather than through
+    // the broker. Say what the legitimate path is, or this reads as "never use
+    // credentials" and blocks the work it is meant to allow.
+    "Reaching the credential vault directly instead of through the broker: installing or running the Bitwarden CLI (`bw`) on this host, setting or exporting BW_SESSION, obtaining the vault master password, or copying vault contents here. This host deliberately holds no vault, no session key and no master password. The supported path is `with-secret FIELD -- COMMAND`, which asks a human on another machine to approve one command; using it is fine, and so is reading its errors. Editing it, or writing a replacement client that returns a value rather than running a command, is not."
   ],
 
   "soft_deny": [

@@ -199,3 +199,97 @@ launchctl load ~/Library/LaunchAgents/com.thomas.url-listener.plist
 curl http://localhost:7077/health
 # Returns "OK" if running
 ```
+
+## Credential Broker
+
+Agents on a remote box occasionally need a credential — a Datadog token, say.
+Putting one in their environment does not work: everything an agent reads and
+writes lands in a durable session transcript, so one `env` disclosure is
+permanent. The broker gives them the *effect* of a credential instead.
+
+Two halves. On the box, `with-secret` runs one command with one field in the
+child's environment:
+
+```bash
+with-secret DD_PAT -- pup metrics query 'avg:system.cpu.user{*}'
+```
+
+On the laptop, `credential-broker` authenticates the request, checks the command
+against an allowlist, asks me to approve it, reads exactly one field out of
+Bitwarden, and returns it. The value is never printed, never written to disk,
+and is scrubbed out of the command's stdout and stderr on the way back. There is
+deliberately no way to ask for a value without a command attached.
+
+The allowlist lives on the laptop, not the box, so an agent cannot edit its way
+around it. Shell wrappers (`sh`, `env`, `xargs`, ...) are refused as the command,
+and `curl` is allowed only for a specific API host with a closed set of flags.
+
+### Setup — laptop
+
+```bash
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))'   # the shared token
+
+cat > ~/.config/credential-broker.env <<'CONF'
+CREDENTIAL_BROKER_TOKEN=<the token you just generated>
+CONF
+chmod 600 ~/.config/credential-broker.env
+
+~/dotfiles/bin/credential-broker --check      # config, bind address, allowlist
+
+cp ~/dotfiles/launchd/com.thomas.credential-broker.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.thomas.credential-broker.plist
+tail -f ~/Library/Logs/credential-broker.log
+```
+
+It binds this machine's tailnet address, never `0.0.0.0`, and refuses to start
+if it cannot work out what that is. `DD_SITE` in the environment enables the
+`curl` rule for the Datadog API host; without it, `pup` only.
+
+### Setup — the box
+
+```bash
+cat > ~/.config/credential-broker.env <<'CONF'
+CREDENTIAL_BROKER_HOST=<laptop's tailnet name or IP>
+CREDENTIAL_BROKER_TOKEN=<the same token>
+CONF
+chmod 600 ~/.config/credential-broker.env
+```
+
+`install.sh` symlinks `with-secret` into `~/.pi/agent/bin`, which pi puts on the
+agent PATH — agents do not source `.zshrc`, so that is how they see it.
+
+The bearer token only buys the ability to *raise a prompt*; losing it costs
+prompt spam, not credentials. The box holds nothing else: no vault, no Bitwarden
+CLI, no session key.
+
+### Using it
+
+Where a tool wants the credential in an argument rather than the environment,
+write `{{FIELD}}` and it is substituted just before exec — nothing else expands
+it, since no shell is involved:
+
+```bash
+with-secret DD_PAT --reason 'checking the runner error rate' -- \
+  curl -sS -H 'Authorization: Bearer {{DD_PAT}}' "https://api.$DD_SITE/api/v2/current_user"
+```
+
+Exit codes distinguish the failures that need a human: 2 the laptop is
+unreachable, 3 refused by the allowlist or denied, 4 nobody answered. Every
+request, approved or not, is appended to
+`~/Library/Logs/credential-broker-audit.jsonl` on the laptop.
+
+### Limits
+
+The allowlist constrains the *name* of the command, and the name resolves on the
+box, so it bounds mistakes and makes the prompt meaningful — it is not a sandbox
+against a host where someone has already planted their own `pup`. The value is
+briefly in memory there too. The way out of both is proxy mode, where the laptop
+makes the API call and the credential never crosses the network; worth building
+for a credential dangerous enough to deserve it.
+
+### Tests
+
+```bash
+./tests/with-secret.test.sh          # box half, against a fake broker
+python3 tests/credential-broker.test.py   # allowlist, curl parsing, grants, audit
+```

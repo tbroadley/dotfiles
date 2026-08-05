@@ -37,6 +37,31 @@ export DD_SITE="us3.datadoghq.com"
 `DD_PAT` replaces the old `DD_API_KEY` + `DD_APP_KEY` pair — one token instead of two.
 It is loaded on demand from Bitwarden by `~/dotfiles/secrets.zsh`; run `secrets-load` if unset.
 
+### On a host with no credentials on it
+
+Some hosts — the ones agents run on unattended — hold no token at all. There,
+`DD_PAT` is brokered one command at a time from the vault on my laptop, and a
+human approves each request:
+
+```bash
+with-secret DD_PAT -- pup logs search --query="service:api status:error" --from="1h"
+```
+
+The token goes into that one command's environment and is scrubbed out of its
+output; there is no way to print it, and asking for one is the wrong move. For
+the API fallback, write the placeholder `{{DD_PAT}}` — the command runs without
+a shell, so `$DD_PAT` in an argument expands to nothing:
+
+```bash
+with-secret DD_PAT -- curl -sS -H 'Authorization: Bearer {{DD_PAT}}' \
+  "https://api.us3.datadoghq.com/api/v2/current_user"
+```
+
+Only `pup` and `curl` may use `DD_PAT`, and `curl` only against the Datadog API
+host with a restricted set of flags — no `-o`, `-L`, `--proxy` or `--config`.
+That allowlist is enforced on the laptop; if something legitimate is blocked,
+ask for it to be added rather than looking for a way around it.
+
 ## When to Use
 
 Use this skill when the user:
@@ -155,6 +180,10 @@ Base URL: `https://api.$(printenv DD_SITE)/api/v1` or `v2`
 # Example: API endpoint not covered by pup
 curl -s "https://api.$(printenv DD_SITE)/api/v2/ENDPOINT" \
   -H "Authorization: Bearer $(printenv DD_PAT)"
+
+# Same thing on a host where the token is brokered (see Setup)
+with-secret DD_PAT -- curl -sS -H 'Authorization: Bearer {{DD_PAT}}' \
+  "https://api.us3.datadoghq.com/api/v2/ENDPOINT"
 ```
 
 Verified working with the PAT on `us3`: `POST /api/v2/logs/events/search`,
