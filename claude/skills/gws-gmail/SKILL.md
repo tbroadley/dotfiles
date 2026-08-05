@@ -21,6 +21,34 @@ gws gmail +triage --max 5 --query 'from:boss'
 gws gmail +triage --format json | jq '.[].subject'
 ```
 
+### Read a message's body (helper)
+
+```bash
+gws gmail +read --id MESSAGE_ID
+```
+
+Easier than `users messages get` — it extracts the body instead of leaving you to
+decode base64 MIME parts.
+
+### Sending and replying (helpers)
+
+These **send real mail**. Add `--dry-run` to validate without sending.
+
+```bash
+gws gmail +send --to a@b.com --subject "Hi" --body "Text" [--cc ...] [--from alias@…]
+gws gmail +reply --message-id MESSAGE_ID --body "Text"
+gws gmail +reply-all --message-id MESSAGE_ID --body "Text"
+gws gmail +forward --message-id MESSAGE_ID --to a@b.com
+```
+
+`+reply` and `+reply-all` handle threading headers automatically.
+
+### Watch for new mail
+
+```bash
+gws gmail +watch        # streams new messages as NDJSON
+```
+
 ### List messages
 
 ```bash

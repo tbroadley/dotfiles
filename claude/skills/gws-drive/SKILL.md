@@ -53,8 +53,11 @@ gws drive files export --params '{"fileId": "FILE_ID", "mimeType": "text/plain"}
 
 ### Upload a file
 
+The path is positional — there is no `--file` flag.
+
 ```bash
-gws drive +upload --file /path/to/file.pdf
+gws drive +upload /path/to/file.pdf
+gws drive +upload /path/to/file.pdf --name "Renamed.pdf" --parent FOLDER_ID
 ```
 
 ## Docs
@@ -73,8 +76,10 @@ gws docs documents create --json '{"title": "My Document"}'
 
 ### Append text to a document
 
+The flag is `--document`, not `--doc`.
+
 ```bash
-gws docs +write --doc DOC_ID --text "Hello, world"
+gws docs +write --document DOC_ID --text "Hello, world"
 ```
 
 ## Sheets
@@ -84,6 +89,13 @@ gws docs +write --doc DOC_ID --text "Hello, world"
 ```bash
 gws sheets +read --spreadsheet SHEET_ID --range 'Sheet1!A1:D10'
 gws sheets +read --spreadsheet SHEET_ID --range Sheet1
+```
+
+### Append a row
+
+```bash
+gws sheets +append --spreadsheet SHEET_ID --values 'a,b,c'
+gws sheets +append --spreadsheet SHEET_ID --json-values '[["a","b"],["c","d"]]'
 ```
 
 ### Get spreadsheet metadata
