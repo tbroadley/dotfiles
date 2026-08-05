@@ -433,16 +433,19 @@ install_pup() {
   case $ARCH in
     x86_64)
       PUP_ARCH="Linux_x86_64"
-      PUP_CHECKSUM="7f2a347c2b34ecf3cec4facae7528a4e36279f61b68c989a477f7c5ab312dbe6"
+      PUP_CHECKSUM="e768f381f20fc4ede7eb5bc55ce015b545856205f4b7d87b40d3c7aeabd40dab"
       ;;
     aarch64|arm64)
       PUP_ARCH="Linux_arm64"
-      PUP_CHECKSUM="186dcb5318a5efd066418b54285c362ecd270a54fa764d506a2b59093a657b55"
+      PUP_CHECKSUM="58ff322675c992f489b460e8c1e54a7dc78eda5a680aff763d99669908523dd6"
       ;;
     *) echo "Unsupported architecture for pup: $ARCH"; return 1 ;;
   esac
 
-  PUP_VERSION="0.9.2"
+  # Bearer auth (DD_ACCESS_TOKEN) arrived after 0.9.2, which only knows OAuth2
+  # and the API+APP key pair. Deliberately not the newest release: a week old
+  # is old enough for a bad build to have been noticed.
+  PUP_VERSION="1.10.0"
   local tmp_file="/tmp/pup-$$.tar.gz"
   local tmp_dir="/tmp/pup-$$"
   wget -q -O "$tmp_file" "https://github.com/DataDog/pup/releases/download/v${PUP_VERSION}/pup_${PUP_VERSION}_${PUP_ARCH}.tar.gz"

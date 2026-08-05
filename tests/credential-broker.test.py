@@ -255,6 +255,26 @@ class TestRequests(unittest.TestCase):
         self.assertIn("a-box", body)
         self.assertIn("checking", body)
 
+    def test_the_variable_the_value_lands_in_is_shown_and_audited(self):
+        # The vault's name for a credential and the variable a tool reads it
+        # from need not agree; whoever approves should see which is which.
+        code, _ = self.request(env="DD_ACCESS_TOKEN")
+        self.assertEqual(code, 200)
+        _, body = self.prompts[0]
+        self.assertIn("as DD_ACCESS_TOKEN", body)
+        self.assertEqual(self.audit_lines()[-1]["env"], "DD_ACCESS_TOKEN")
+
+    def test_a_junk_variable_name_is_refused_without_a_prompt(self):
+        code, _ = self.request(env="PATH; rm -rf /")
+        self.assertEqual(code, 403)
+        self.assertEqual(self.prompts, [])
+
+    def test_renaming_does_not_widen_the_allowlist(self):
+        # --as is not a way to ask for something you could not already have.
+        code, payload = self.request(argv=["bash", "-c", "x"], env="DD_ACCESS_TOKEN")
+        self.assertEqual(code, 403)
+        self.assertIn("any command", payload["error"])
+
     def test_a_denied_request_returns_nothing(self):
         self.answer = "deny"
         code, payload = self.request()
