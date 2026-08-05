@@ -187,7 +187,7 @@ dcr() {
 # start - spin up a dev container and start claude on a task
 # Usage: start <project> <task description...>
 # Example: start mon "fix the flaky monitoring test"
-# Requires ANTHROPIC_API_KEY in environment (e.g. .zshrc.local)
+# Claude Code authenticates via its own login; no ANTHROPIC_API_KEY needed.
 start() {
     if [[ $# -lt 2 ]]; then
         echo "Usage: start <project> <task description...>"
@@ -249,7 +249,10 @@ start() {
 # wt - git worktree helper with completion
 source ~/dotfiles/bin/wt.bash
 
-# Local config (secrets, machine-specific settings)
+# Vault-backed credentials (bwunlock, secrets-load, fail-fast command wrappers)
+source ~/dotfiles/secrets.zsh
+
+# Local config (machine-specific, non-secret settings)
 [ -f ~/.zshrc.local ] && source ~/.zshrc.local
 
 # >>> alias-suggest initialize >>>
