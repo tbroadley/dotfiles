@@ -91,6 +91,13 @@ check_eq "ordinary output passes through untouched" "hello" "$out"
 
 check_eq "the value is not in the caller's own environment afterwards" "" "${DD_PAT:-}"
 
+out="$("$with_secret" DD_PAT -- printf '%s\n' 'Authorization: Bearer {{DD_PAT}}' 2>&1)"
+check_eq "a {{FIELD}} placeholder in an argument is substituted, then redacted" \
+    "Authorization: Bearer <DD_PAT redacted>" "$out"
+
+out="$("$with_secret" DD_PAT -- printf '%s\n' 'no placeholder here' 2>&1)"
+check_eq "arguments without a placeholder are passed through unchanged" "no placeholder here" "$out"
+
 out="$("$with_secret" DD_PAT -- bash -c 'printf "%s\n" "$DD_PAT" >&2' 2>&1)"
 check_eq "stderr is scrubbed too" "<DD_PAT redacted>" "$out"
 
