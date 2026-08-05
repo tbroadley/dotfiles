@@ -418,6 +418,58 @@ class TestEndToEnd(unittest.TestCase):
         self.assertEqual(result.returncode, 3)
 
 
+class TestConfirmDialog(unittest.TestCase):
+    """The dialog itself cannot be tested here, but its failure modes can."""
+
+    class FakeResult:
+        def __init__(self, returncode=0, stdout="", stderr=""):
+            self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
+
+    def queue(self, *results):
+        calls = []
+        pending = list(results)
+
+        def fake_osascript(script, *args, timeout=None):
+            calls.append(script)
+            return pending.pop(0)
+
+        original = cb.osascript
+        cb.osascript = fake_osascript
+        self.addCleanup(lambda: setattr(cb, "osascript", original))
+        return calls
+
+    def test_an_answer_is_taken_at_face_value(self):
+        calls = self.queue(self.FakeResult(stdout="approve\n"))
+        self.assertEqual(cb.confirm("t", "b", 10), "approve")
+        self.assertEqual(len(calls), 1)
+
+    def test_anything_unrecognised_is_a_no(self):
+        self.queue(self.FakeResult(returncode=1, stderr="User cancelled. (-128)"))
+        self.assertEqual(cb.confirm("t", "b", 10), "deny")
+
+    def test_a_missing_automation_permission_falls_back_rather_than_denying_forever(self):
+        # The first run under launchd asks for Automation permission; if that is
+        # refused, driving System Events fails and no dialog ever appears, which
+        # would look like a silent denial forever.
+        calls = self.queue(
+            self.FakeResult(returncode=1, stderr="Not authorised to send Apple events (-1743)"),
+            self.FakeResult(stdout="approve\n"),
+        )
+        self.assertEqual(cb.confirm("t", "b", 10), "approve")
+        self.assertEqual(len(calls), 2)
+        self.assertIn("System Events", calls[0])
+        self.assertNotIn("System Events", calls[1])
+
+    def test_a_dialog_that_never_returns_is_a_timeout(self):
+        def hangs(script, *args, timeout=None):
+            raise subprocess.TimeoutExpired("osascript", timeout)
+
+        original = cb.osascript
+        cb.osascript = hangs
+        self.addCleanup(lambda: setattr(cb, "osascript", original))
+        self.assertEqual(cb.confirm("t", "b", 1), "timeout")
+
+
 class TestPromptRendering(unittest.TestCase):
     def test_arguments_are_quoted_so_the_prompt_reads_as_one_command(self):
         self.assertEqual(cb.quote_argv(["pup", "logs", "search"]), "pup logs search")
