@@ -437,8 +437,14 @@ class TestVault(unittest.TestCase):
             self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
 
     def vault(self, *results, password="hunter2"):
-        """A vault whose bw returns the given results in order."""
-        vault = cb.Vault("An item", session_ttl=900)
+        """A vault whose bw returns the given results in order.
+
+        The password source is stubbed rather than the keychain, since where the
+        password comes from is TestPasswordSource's problem, not this one's.
+        """
+        self.prompted = []
+        vault = cb.Vault("An item", session_ttl=900,
+                         password_source=lambda title: self.prompted.append(title) or password)
         vault.bw = "/fake/bw"
         vault._session = "stale-session"
         vault._touched = time.monotonic()   # a session it has no reason to doubt yet
@@ -452,10 +458,6 @@ class TestVault(unittest.TestCase):
         original = cb.subprocess.run
         cb.subprocess.run = fake_run
         self.addCleanup(lambda: setattr(cb.subprocess, "run", original))
-        self.prompted = []
-        original_ask = cb.ask_password
-        cb.ask_password = lambda title, body: self.prompted.append(title) or password
-        self.addCleanup(lambda: setattr(cb, "ask_password", original_ask))
         return vault
 
     def test_a_field_is_read_out_of_the_item(self):
@@ -523,6 +525,80 @@ class TestVault(unittest.TestCase):
         self.assertIn("--passwordenv", unlock_argv)
         self.assertNotIn("hunter2", " ".join(unlock_argv))
         self.assertEqual(unlock_env.get("BW_PASSWORD"), "hunter2")
+
+
+class TestPasswordSource(unittest.TestCase):
+    """Where the master password comes from, and what happens when it doesn't."""
+
+    class Result:
+        def __init__(self, returncode=0, stdout="", stderr=""):
+            self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
+
+    def fake_security(self, result):
+        calls = []
+
+        def fake_run(argv, **kwargs):
+            calls.append(argv)
+            return result
+
+        original = cb.subprocess.run
+        cb.subprocess.run = fake_run
+        self.addCleanup(lambda: setattr(cb.subprocess, "run", original))
+        return calls
+
+    def fake_dialog(self, answer="typed-password"):
+        asked = []
+        original = cb.ask_password
+        cb.ask_password = lambda title, body: asked.append((title, body)) or answer
+        self.addCleanup(lambda: setattr(cb, "ask_password", original))
+        return asked
+
+    def test_the_password_comes_from_the_keychain_without_asking(self):
+        calls = self.fake_security(self.Result(stdout="from-keychain\n"))
+        asked = self.fake_dialog()
+        source = cb.make_password_source("bw-master", account="someone")
+        self.assertEqual(source("unlock please"), "from-keychain")
+        self.assertEqual(asked, [])
+        self.assertEqual(
+            calls[0],
+            ["/usr/bin/security", "find-generic-password", "-s", "bw-master",
+             "-a", "someone", "-w"],
+        )
+
+    def test_a_missing_keychain_item_falls_back_to_asking(self):
+        self.fake_security(self.Result(returncode=44, stderr="SecKeychainSearchCopyNext"))
+        asked = self.fake_dialog()
+        source = cb.make_password_source("bw-master", account="someone")
+        self.assertEqual(source("unlock please"), "typed-password")
+        self.assertEqual(len(asked), 1)
+        title, body = asked[0]
+        self.assertEqual(title, "unlock please")
+        # The copy has to say which path we are on, and must not claim anything
+        # about where the password is or is not kept.
+        self.assertIn("keychain", body)
+        self.assertNotIn("not stored", body)
+
+    def test_the_keychain_item_is_configurable(self):
+        calls = self.fake_security(self.Result(stdout="x\n"))
+        cb.make_password_source("something-else", account="someone")("t")
+        self.assertIn("something-else", calls[0])
+
+    def test_the_broker_wires_the_configured_item_through(self):
+        broker = cb.Broker({
+            "CREDENTIAL_BROKER_TOKEN": TOKEN,
+            "CREDENTIAL_BROKER_AUDIT": str(Path(tempfile.mkdtemp()) / "audit.jsonl"),
+            "CREDENTIAL_BROKER_KEYCHAIN_ITEM": "another-item",
+        })
+        self.assertEqual(broker.keychain_item, "another-item")
+        calls = self.fake_security(self.Result(stdout="x\n"))
+        broker.vault.password_source("t")
+        self.assertIn("another-item", calls[0])
+
+    def test_nothing_is_unlocked_until_something_is_approved(self):
+        # No warming at startup: a long-lived process holding an unlocked vault
+        # that nobody asked anything of is the thing to avoid.
+        vault = cb.Vault("An item", session_ttl=900)
+        self.assertIsNone(vault._session)
 
 
 class TestConfirmDialog(unittest.TestCase):

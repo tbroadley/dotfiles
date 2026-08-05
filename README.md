@@ -215,8 +215,9 @@ with-secret DD_PAT -- pup metrics query 'avg:system.cpu.user{*}'
 ```
 
 On the laptop, `credential-broker` authenticates the request, checks the command
-against an allowlist, asks me to approve it, reads exactly one field out of
-Bitwarden, and returns it. The value is never printed, never written to disk,
+against an allowlist, asks me to approve it, unlocks the vault using the master
+password from the login keychain, reads exactly one field out of Bitwarden, and
+returns it. The value is never printed, never written to disk,
 and is scrubbed out of the command's stdout and stderr on the way back. There is
 deliberately no way to ask for a value without a command attached.
 
@@ -225,6 +226,20 @@ around it. Shell wrappers (`sh`, `env`, `xargs`, ...) are refused as the command
 and `curl` is allowed only for a specific API host with a closed set of flags.
 
 ### Setup — laptop
+
+The master password must be in the login keychain under the service `bw-master`
+(`CREDENTIAL_BROKER_KEYCHAIN_ITEM` to use another), which is a prerequisite:
+
+```bash
+security add-generic-password -U -s bw-master -a "$USER" -w
+```
+
+The broker reads it only *after* an approval — the vault is never unlocked
+speculatively — and falls back to asking at the keyboard if the item is missing.
+That is not a weakening of the gate: the gate is the per-request approval alert,
+and anything running as me could read the same keychain item directly. The
+unlocked session lives in the broker's memory, never on disk, and is dropped
+after `CREDENTIAL_BROKER_SESSION_TTL` seconds of inactivity.
 
 ```bash
 python3 -c 'import secrets; print(secrets.token_urlsafe(32))'   # the shared token
