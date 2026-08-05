@@ -18,9 +18,8 @@ pup is installed via `install.sh`. Authenticate with OAuth2 or API keys:
 export DD_SITE="us3.datadoghq.com"
 pup auth login
 
-# Or API keys (fallback)
-export DD_API_KEY="your-api-key"
-export DD_APP_KEY="your-application-key"
+# Or a personal access token (fallback)
+export DD_PAT="your-personal-access-token"
 export DD_SITE="us3.datadoghq.com"
 ```
 
@@ -28,13 +27,15 @@ Verify: `pup auth status` or `pup test`
 
 ### API fallback
 
-For features pup doesn't cover, use curl with API keys:
+For features pup doesn't cover, use curl with the PAT:
 
 ```bash
-export DD_API_KEY="your-api-key"
-export DD_APP_KEY="your-application-key"
+export DD_PAT="your-personal-access-token"
 export DD_SITE="us3.datadoghq.com"
 ```
+
+`DD_PAT` replaces the old `DD_API_KEY` + `DD_APP_KEY` pair — one token instead of two.
+It is loaded on demand from Bitwarden by `~/dotfiles/secrets.zsh`; run `secrets-load` if unset.
 
 ## When to Use
 
@@ -153,9 +154,15 @@ Base URL: `https://api.$(printenv DD_SITE)/api/v1` or `v2`
 ```bash
 # Example: API endpoint not covered by pup
 curl -s "https://api.$(printenv DD_SITE)/api/v2/ENDPOINT" \
-  -H "DD-API-KEY: $(printenv DD_API_KEY)" \
-  -H "DD-APPLICATION-KEY: $(printenv DD_APP_KEY)"
+  -H "Authorization: Bearer $(printenv DD_PAT)"
 ```
+
+Verified working with the PAT on `us3`: `POST /api/v2/logs/events/search`,
+`GET /api/v1/query` (metrics), `GET /api/v1/dashboard/lists/manual`.
+
+Note: `GET /api/v1/validate` returns 403 with a PAT — that endpoint validates an
+API key specifically, so a 403 there does NOT mean the PAT is bad. To check a PAT,
+use `GET /api/v2/current_user` instead.
 
 ## Log Query Syntax
 
