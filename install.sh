@@ -720,7 +720,7 @@ if _agent_allowed pi; then
     # agent PATH, and an agent's shell does not source the interactive rc that
     # puts ~/dotfiles/bin there, so link them in explicitly.
     mkdir -p "$PI_AGENT_DIR/bin"
-    for _pi_helper in aws-sso-login notify open-url-on-host url-listener-url; do
+    for _pi_helper in aws-sso-login notify open-url-on-host url-listener-url with-secret; do
       ln -sf "$SCRIPT_DIR/bin/$_pi_helper" "$PI_AGENT_DIR/bin/$_pi_helper"
     done
     # Symlink dotfiles-managed pi extensions. Only files tracked in this repo
