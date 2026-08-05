@@ -227,12 +227,11 @@ and `curl` is allowed only for a specific API host with a closed set of flags.
 
 ### Setup — laptop
 
-The master password must be in the login keychain under the service `bw-master`
-(`CREDENTIAL_BROKER_KEYCHAIN_ITEM` to use another), which is a prerequisite:
-
-```bash
-security add-generic-password -U -s bw-master -a "$USER" -w
-```
+The broker unlocks the vault with the master password from the login keychain —
+the same `bw-master` entry `bwunlock` uses (see the bitwarden note under
+Service-specific notes), or another named by
+`CREDENTIAL_BROKER_KEYCHAIN_ITEM`. Without it the broker still works, but every
+release stops to ask for the password at the keyboard.
 
 The broker reads it only *after* an approval — the vault is never unlocked
 speculatively — and falls back to asking at the keyboard if the item is missing.

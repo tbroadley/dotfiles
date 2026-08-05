@@ -191,6 +191,13 @@ check_eq "a lowercase field name is a usage error" "64" "$rc"
 out="$("$with_secret" DD_PAT -- 2>&1)"; rc=$?
 check_eq "no command is a usage error" "64" "$rc"
 
+# Nobody should be woken up to approve a credential for a command that cannot run.
+before="$(wc -l < "$tmp/requests.jsonl")"
+out="$("$with_secret" DD_PAT -- definitely-not-installed --flag 2>&1)"; rc=$?
+check_eq "a command that is not installed exits 127" "127" "$rc"
+check_contains "a missing command says why nobody was asked" "no point asking" "$out"
+check_eq "a missing command never reaches the broker" "$before" "$(wc -l < "$tmp/requests.jsonl")"
+
 # A config file holding a bearer token has to be 0600. Everything above already
 # read the token out of one; this checks the file is read for the URL too, and
 # that a loose mode is refused rather than shrugged at.
