@@ -2,6 +2,27 @@ Avoid using Markdown headings in your replies.
 
 Please use the default AWS profile unless Thomas explicitly instructs otherwise.
 
+## Expired AWS credentials
+
+The SSO session on this host expires after a few hours, so an agent that has
+been running for a while starts seeing `ExpiredToken`, `Error loading SSO
+Token`, or `The SSO session associated with this profile has expired`. Fix it
+yourself:
+
+```sh
+aws-sso-login              # --profile <name> for a profile other than default
+```
+
+It opens the approval page in Thomas's browser and sends him a notification,
+then waits for him to click through. That takes minutes of wall clock, so give
+it a long tool timeout or run it in the background and poll — don't let a 30s
+default kill it mid-login. It is a no-op when the session is still good, so
+running it speculatively costs nothing.
+
+Exit 2 means the laptop is unreachable (asleep, off the network) and no login is
+possible from here: say so and stop, rather than retrying in a loop. Don't ask
+Thomas to run `aws sso login` for you — that is what this tool is for.
+
 ## Know which model you are
 
 Before stating which model you are — in a PR description, a commit message, a

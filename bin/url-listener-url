@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Print the base URL of the host machine's url-listener, e.g.
+# http://host.docker.internal:7077 — the endpoint that opens URLs in my
+# browser, sends notifications, and forwards the clipboard.
+#
+# Two callers, two shapes:
+#   - dev container on the laptop: the host is host.docker.internal.
+#   - remote host (a pirouette box, say): the host is the laptop itself,
+#     reachable over the private network. Its name is environment-specific and
+#     deliberately absent from this repo, so it comes from the environment or a
+#     host-local config file.
+#
+# Resolution order:
+#   1. $URL_LISTENER_URL              — full base URL, wins outright
+#   2. $URL_LISTENER_HOST             — host or IP, combined with the port
+#   3. ~/.config/url-listener.env     — KEY=VALUE lines for either of the above
+#   4. host.docker.internal           — only inside a container
+#
+# Port comes from $URL_LISTENER_PORT, else the config file, else 7077.
+# Exits 1 with an explanation on stderr when there is nothing to point at.
+
+set -uo pipefail
+
+config="${URL_LISTENER_CONFIG:-$HOME/.config/url-listener.env}"
+url="${URL_LISTENER_URL:-}"
+host="${URL_LISTENER_HOST:-}"
+port="${URL_LISTENER_PORT:-}"
+
+if [ -f "$config" ] && { [ -z "$url" ] && [ -z "$host" ] || [ -z "$port" ]; }; then
+    while IFS= read -r line; do
+        line="${line%%#*}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        case "$line" in
+            URL_LISTENER_URL=*) [ -n "$url" ] || url="${line#*=}" ;;
+            URL_LISTENER_HOST=*) [ -n "$host" ] || host="${line#*=}" ;;
+            URL_LISTENER_PORT=*) [ -n "$port" ] || port="${line#*=}" ;;
+        esac
+    done < "$config"
+fi
+
+if [ -z "$url" ] && [ -z "$host" ] && [ -f /.dockerenv ]; then
+    host="host.docker.internal"
+fi
+
+if [ -z "$url" ] && [ -z "$host" ]; then
+    cat >&2 <<EOF
+url-listener: don't know where the host machine is.
+Set URL_LISTENER_HOST (or URL_LISTENER_URL) in the environment, or write it to
+$config:
+
+    URL_LISTENER_HOST=<hostname or IP of the machine running url-listener>
+EOF
+    exit 1
+fi
+
+if [ -n "$url" ]; then
+    printf '%s\n' "${url%/}"
+else
+    printf 'http://%s:%s\n' "$host" "${port:-7077}"
+fi

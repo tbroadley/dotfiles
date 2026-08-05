@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# Send a macOS notification. Works on host and in dev containers.
+# Send a macOS notification. Works on the laptop itself, in a dev container,
+# and on a remote host that can reach the laptop's url-listener (see
+# url-listener-url for how that address is resolved).
 # Usage: notify [-t title] [-s sound] message
+
+# Sibling scripts live next to this one, wherever it was symlinked from.
+_bindir="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
 
 TITLE="Claude Code"
 SOUND=""
@@ -23,9 +28,9 @@ fi
 urlencode() { python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read()))" <<< "$1"; }
 json_quote() { python3 -c "import json, sys; print(json.dumps(sys.stdin.read().strip()))" <<< "$1"; }
 
-if [ -f /.dockerenv ]; then
-    PORT="${URL_LISTENER_PORT:-7077}"
-    URL="http://host.docker.internal:${PORT}/notify?title=$(urlencode "$TITLE")&message=$(urlencode "$MESSAGE")"
+if [ "$(uname -s)" != "Darwin" ]; then
+    BASE="$("$_bindir/url-listener-url")" || exit 1
+    URL="${BASE}/notify?title=$(urlencode "$TITLE")&message=$(urlencode "$MESSAGE")"
     if [ -n "$SOUND" ]; then
         URL="${URL}&sound=$(urlencode "$SOUND")"
     fi
