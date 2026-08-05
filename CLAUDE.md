@@ -32,7 +32,6 @@ Personal dotfiles for dev container setup. The `install.sh` script configures a 
 - `open-url-on-host`: forward URLs to host browser
 - `cursor-in-container`: open files in Cursor on host
 - `pbcopy`/`pbpaste`: clipboard forwarding
-- `improve`: Todoist watcher for autonomous tasks
 
 ### Key Files
 
@@ -44,7 +43,6 @@ Personal dotfiles for dev container setup. The `install.sh` script configures a 
 | `claude/CLAUDE.md` | Global coding style rules (symlinked to `~/.claude/CLAUDE.md`) |
 | `claude/settings.json` | Claude Code permissions and hooks |
 | `pi/agent/settings.json` | pi defaults (symlinked to `~/.pi/agent/settings.json`) |
-| `bin/improve` | Todoist polling script for autonomous Claude Code tasks |
 
 ### Shell Aliases: Host vs Dev Container
 

@@ -52,11 +52,6 @@ devc() {
         exec_opts+=(--remote-env "ANTHROPIC_API_KEY=$claude_api_key")
     fi
 
-    if [ -n "${TODOIST_TOKEN:-}" ]; then
-        up_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
-        exec_opts+=(--remote-env "TODOIST_TOKEN=$TODOIST_TOKEN")
-    fi
-
     if [ -n "${LINEAR_API_KEY:-}" ]; then
         up_opts+=(--remote-env "LINEAR_API_KEY=$LINEAR_API_KEY")
         exec_opts+=(--remote-env "LINEAR_API_KEY=$LINEAR_API_KEY")
@@ -166,7 +161,6 @@ devc() {
         [ -n "${GH_TOKEN:-}" ] && echo "export GH_TOKEN=\"$GH_TOKEN\"" >> "$env_file"
         [ -n "${ANTHROPIC_API_KEY:-}" ] && echo "export ANTHROPIC_API_KEY=\"$ANTHROPIC_API_KEY\"" >> "$env_file"
 
-        [ -n "${TODOIST_TOKEN:-}" ] && echo "export TODOIST_TOKEN=\"$TODOIST_TOKEN\"" >> "$env_file"
         [ -n "${LINEAR_API_KEY:-}" ] && echo "export LINEAR_API_KEY=\"$LINEAR_API_KEY\"" >> "$env_file"
         [ -n "${BW_SESSION:-}" ] && echo "export BW_SESSION=\"$BW_SESSION\"" >> "$env_file"
         [ -n "${TZ:-}" ] && echo "export TZ=\"$TZ\"" >> "$env_file"
