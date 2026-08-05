@@ -78,7 +78,7 @@ The skill loader treats Markdown files inside `claude/skills/` as skills, so set
 | linear | API key | `LINEAR_API_KEY` |
 | datadog | API + app keys | `DD_API_KEY`, `DD_APP_KEY`, `DD_SITE` |
 | airtable | Personal access token | `AIRTABLE_TOKEN` |
-| bitwarden | CLI + vault login | `BW_SESSION` |
+| bitwarden | CLI + vault login | `BW_SESSION` (set by `bwunlock`) |
 | gws-calendar / gws-gmail / gws-drive | gws CLI + auth | `GOOGLE_WORKSPACE_CLI_CLIENT_ID`, `GOOGLE_WORKSPACE_CLI_CLIENT_SECRET` |
 | read-inspect-eval | Python package | `uv pip install inspect-ai` |
 | download-inspect-eval | AWS CLI + SSO | default profile (downloads); `prd` profile for listing |
@@ -86,23 +86,36 @@ The skill loader treats Markdown files inside `claude/skills/` as skills, so set
 
 ### Common setup
 
-Add secrets to `~/.zshrc.local`:
+**No secrets go on disk.** They live as custom fields on a single Bitwarden item
+and are pulled into the environment on demand by `secrets.zsh`, which `.zshrc`
+sources. Add a new credential by adding a field to that item — nothing here
+needs to change.
+
+Unlock once per shell, then run whatever you need:
 
 ```bash
-export LINEAR_API_KEY="..."
-export DD_API_KEY="..."
-export DD_APP_KEY="..."
-export DD_SITE="us3.datadoghq.com"
-export AIRTABLE_TOKEN="..."
-export BW_SESSION="..."
-export GOOGLE_WORKSPACE_CLI_CLIENT_ID="..."
-export GOOGLE_WORKSPACE_CLI_CLIENT_SECRET="..."
+bwunlock          # prompts for the master password; exports BW_SESSION
 ```
 
-Then reload your shell:
+Commands listed in `METR_SECRET_COMMANDS` (see `secrets.zsh`) load credentials
+automatically on first use, so `bwunlock` is usually the only manual step. To
+load them eagerly, or to refresh after rotating a key:
 
 ```bash
-source ~/.zshrc.local
+secrets-load      # no-op if already loaded
+secrets-load -f   # force a re-fetch
+```
+
+`secrets-load` is idempotent for the life of a shell, so **a key rotated
+elsewhere will not appear in shells that already loaded the old value** until
+you run `secrets-load -f` or open a new terminal.
+
+Non-secret machine config — `DD_SITE`, OAuth client ids, the vault item name —
+belongs in `~/.zshrc.local`, which is deliberately untracked because this repo
+is public. Extend the auto-load list there too:
+
+```bash
+METR_SECRET_COMMANDS+=(my-tool)
 ```
 
 ### Service-specific notes
@@ -110,7 +123,7 @@ source ~/.zshrc.local
 - `linear`: create a personal API key at <https://linear.app/settings/account/security>
 - `datadog`: create API and application keys in Datadog org settings
 - `airtable`: create a token at <https://airtable.com/create/tokens> with `data.records:read` and `schema.bases:read`
-- `bitwarden`: install `bitwarden-cli`, run `bw login`, then `bw unlock` and export `BW_SESSION`
+- `bitwarden`: install `bitwarden-cli` and run `bw login` once; thereafter `bwunlock` handles unlocking per shell
 - Google Workspace skills: install `@googleworkspace/cli`, create a desktop OAuth client in the `metr-pub` project, export the client ID/secret, then run `gws auth login`
 - `read-inspect-eval`: `uv pip install inspect-ai`
 - `download-inspect-eval`: requires an authenticated AWS SSO session (run `aws sso login` first). The skill handles the specific access point and bucket.
