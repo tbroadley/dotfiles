@@ -131,7 +131,8 @@ curl -sf --max-time 10 -G \
     --data-urlencode "title=AWS SSO" \
     --data-urlencode "message=An agent needs an AWS SSO login${code:+ (code $code)} — approve in the browser" \
     --data-urlencode "sound=Glass" \
-    "$base/notify" >/dev/null 2>&1 || true
+    "$base/notify" >/dev/null 2>&1 \
+    || echo "aws-sso-login: the notification did not go through; the page is open regardless." >&2
 
 echo "Waiting up to ${timeout}s for approval..."
 waited=0
