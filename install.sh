@@ -423,11 +423,14 @@ install_pup() {
     echo "Skipping pup (not Linux)"
     return 0
   fi
-  # Anything before 1.x predates personal access tokens: those builds have no
-  # DD_PAT in them at all, so `with-secret DD_PAT -- pup ...` releases the token
-  # and then fails to authenticate. Upgrade in place rather than leaving an old
-  # binary that fails confusingly.
-  PUP_VERSION="1.10.4"
+  # No version of pup reads DD_PAT. Before 1.x there is no bearer auth at all
+  # (OAuth2 or the API+APP key pair only); 1.x reads a bearer token from
+  # DD_ACCESS_TOKEN, which is why the broker injects it under that name. Upgrade
+  # in place rather than leaving an old binary that fails confusingly.
+  #
+  # Deliberately not the newest release: a week is long enough for a bad build
+  # to have been noticed, and 1.10.0 is the newest that clears it.
+  PUP_VERSION="1.10.0"
   if command -v pup >/dev/null 2>&1; then
     installed=$(pup --version 2>&1 | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
     if [ "$installed" = "$PUP_VERSION" ]; then
@@ -443,14 +446,15 @@ install_pup() {
   case $ARCH in
     x86_64)
       PUP_ARCH="Linux_x86_64"
-      PUP_CHECKSUM="9d99ca0229fb0c767c6f74e07a0efa3e12091e9cfc297757e190247d26b537c5"
+      PUP_CHECKSUM="e768f381f20fc4ede7eb5bc55ce015b545856205f4b7d87b40d3c7aeabd40dab"
       ;;
     aarch64|arm64)
       PUP_ARCH="Linux_arm64"
-      PUP_CHECKSUM="00c1f600d1da95302a457f69944d2069f74ed0037c9ab3bfc30c2041d4c24af2"
+      PUP_CHECKSUM="58ff322675c992f489b460e8c1e54a7dc78eda5a680aff763d99669908523dd6"
       ;;
     *) echo "Unsupported architecture for pup: $ARCH"; return 1 ;;
   esac
+
 
   local tmp_file="/tmp/pup-$$.tar.gz"
   local tmp_dir="/tmp/pup-$$"

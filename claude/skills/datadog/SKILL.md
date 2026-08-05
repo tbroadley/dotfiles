@@ -18,8 +18,10 @@ pup is installed via `install.sh`. Authenticate with OAuth2 or API keys:
 export DD_SITE="us3.datadoghq.com"
 pup auth login
 
-# Or a personal access token (fallback)
-export DD_PAT="your-personal-access-token"
+# Or a personal access token (fallback). pup reads a bearer token from
+# DD_ACCESS_TOKEN, not from DD_PAT — DD_PAT is only the name the vault and the
+# curl examples below use. Needs pup >= 1.x; 0.9.2 has no bearer auth at all.
+export DD_ACCESS_TOKEN="your-personal-access-token"
 export DD_SITE="us3.datadoghq.com"
 ```
 
@@ -44,8 +46,11 @@ Some hosts — the ones agents run on unattended — hold no token at all. There
 human approves each request:
 
 ```bash
-with-secret DD_PAT -- pup logs search --query="service:api status:error" --from="1h"
+with-secret DD_PAT --as DD_ACCESS_TOKEN -- \
+  pup logs search --query="service:api status:error" --from="1h"
 ```
+
+`--as` because the vault field is `DD_PAT` and pup reads `DD_ACCESS_TOKEN`.
 
 The token goes into that one command's environment and is scrubbed out of its
 output; there is no way to print it, and asking for one is the wrong move. For
