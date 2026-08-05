@@ -234,7 +234,8 @@ CREDENTIAL_BROKER_TOKEN=<the token you just generated>
 CONF
 chmod 600 ~/.config/credential-broker.env
 
-~/dotfiles/bin/credential-broker --check      # config, bind address, allowlist
+~/dotfiles/bin/credential-broker --check             # config, bind address, allowlist
+~/dotfiles/bin/credential-broker --test-field DD_PAT # is that field really there?
 
 cp ~/dotfiles/launchd/com.thomas.credential-broker.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.thomas.credential-broker.plist
@@ -244,6 +245,16 @@ tail -f ~/Library/Logs/credential-broker.log
 It binds this machine's tailnet address, never `0.0.0.0`, and refuses to start
 if it cannot work out what that is. `DD_SITE` in the environment enables the
 `curl` rule for the Datadog API host; without it, `pup` only.
+
+`--test-field` reads one field and reports its length, never its value, which is
+the quick way to confirm the vault item actually has the field before an agent
+finds out the hard way. The name the box asks for is the variable the command
+needs (`pup` wants `DD_PAT`); if the vault calls that field something else, map
+it rather than renaming either:
+
+```
+CREDENTIAL_BROKER_VAULT_FIELD_DD_PAT=<whatever the field is called in the item>
+```
 
 ### Setup — the box
 
