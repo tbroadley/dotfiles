@@ -12,24 +12,32 @@ clipboard, open things on the host, and drive the host's UI. Being reachable
 only from the tailnet is a smaller blast radius than every interface, not an
 authorisation decision. credential-broker next door already works this way.
 
-Usage: url-listener [--port PORT]
+It listens on loopback only, v4 and v6; `tailscale serve` fronts it for the
+tailnet and is started and torn down with this process. Serve terminates TLS, so
+the tailnet hop is not plaintext.
+
+Usage: url-listener [--port PORT] [--no-tailnet]
 Default port: 7077
 
 Configuration, ~/.config/url-listener.env (mode 0600), environment wins:
 
     URL_LISTENER_TOKEN=<shared bearer token, >= 32 chars>
     URL_LISTENER_PORT=7077
+    URL_LISTENER_TAILNET=0          # loopback only; do not run tailscale serve
 
 Clients resolve the same token through bin/url-listener-token.
 """
 
 import argparse
+import atexit
+import contextlib
 import json
 import os
 import re
 import secrets
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -371,44 +379,81 @@ class URLHandler(BaseHTTPRequestHandler):
     # worth having); clipboard bodies are not, since they never appear in one.
 
 
-def tailnet_address():
-    """This machine's tailnet IPv4, or None when tailscaled isn't up."""
-    tailscale = shutil.which("tailscale", path=GUI_ENV["PATH"]) or "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
-    try:
-        result = subprocess.run([tailscale, "ip", "-4"], capture_output=True, text=True, timeout=10)
-    except Exception:
-        return None
-    if result.returncode != 0:
-        return None
-    for line in result.stdout.split():
-        if line.count(".") == 3:
-            return line.strip()
-    return None
+# One socket per loopback address: `localhost` resolves to ::1 first, so a
+# v4-only listener is unreachable to a client that does not fall back to v4.
+BIND_ADDRESSES = ("127.0.0.1", "::1")
+
+# What `tailscale serve` proxies to, so it is the one that has to bind.
+PROXY_TARGET = "127.0.0.1"
+
+TAILSCALE = shutil.which("tailscale", path=GUI_ENV["PATH"]) or "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 
 
-def bind_addresses():
-    """Loopback and the tailnet, never every interface.
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
 
-    This used to bind 0.0.0.0, which put /paste — the host clipboard — and
-    /open on every network the laptop joined, unauthenticated. Anyone on the
-    same cafe wifi could read whatever was last copied.
+    def __init__(self, address, port, handler):
+        self.address_family = socket.AF_INET6 if ":" in address else socket.AF_INET
+        super().__init__((address, port), handler)
 
-    Loopback covers dev containers: Docker Desktop forwards
-    host.docker.internal to the host's 127.0.0.1. The tailnet address covers
-    remote hosts. Nothing else has any business here.
+
+def run_tailscale(*serve_args):
+    return subprocess.run(
+        [TAILSCALE, "serve", *serve_args],
+        capture_output=True, text=True, timeout=30, env=GUI_ENV,
+    )
+
+
+@contextlib.contextmanager
+def tailnet_proxy(port):
+    """Front the loopback socket on the tailnet while this process runs.
+
+    Teardown names this port; `serve reset` would take down anything else served.
     """
-    addresses = ["127.0.0.1"]
-    tailnet = tailnet_address()
-    if tailnet:
-        addresses.append(tailnet)
-    else:
-        print("url-listener: no tailnet address; listening on loopback only.", file=sys.stderr)
-    return addresses
+    try:
+        started = run_tailscale("--bg", "--yes", "--https", str(port), f"http://{PROXY_TARGET}:{port}")
+    except (OSError, subprocess.SubprocessError) as exc:
+        sys.exit(f"url-listener: could not run {TAILSCALE}: {exc}")
+    if started.returncode != 0:
+        sys.exit(
+            "url-listener: `tailscale serve` failed, so nothing off this machine could reach\n"
+            "the listener. Exiting rather than coming up quietly loopback-only — launchd will\n"
+            "retry, which is what recovers the case where tailscaled is not up yet.\n"
+            "Pass --no-tailnet (or set URL_LISTENER_TAILNET=0) to run loopback-only on purpose.\n\n"
+            f"{started.stderr.strip()}"
+        )
+
+    torn_down = False
+
+    def stop():
+        # Both the context manager and the atexit hook call this.
+        nonlocal torn_down
+        if torn_down:
+            return
+        torn_down = True
+        try:
+            stopped = run_tailscale("--https", str(port), "off")
+        except (OSError, subprocess.SubprocessError) as exc:
+            print(f"url-listener: could not take down tailscale serve: {exc}", file=sys.stderr)
+            return
+        if stopped.returncode != 0:
+            print(f"url-listener: tailscale serve is still up: {stopped.stderr.strip()}", file=sys.stderr)
+
+    # Backs up the `with` for exits that skip it. Neither survives SIGKILL;
+    # clear a leftover with `tailscale serve --https PORT off`.
+    atexit.register(stop)
+    print(started.stdout.strip(), file=sys.stderr)
+    try:
+        yield
+    finally:
+        stop()
 
 
 def main():
     parser = argparse.ArgumentParser(description="URL listener for dev containers")
     parser.add_argument("--port", type=int, help="Port to listen on")
+    parser.add_argument("--no-tailnet", action="store_true",
+                        help="Listen on loopback only; do not run `tailscale serve`")
     args = parser.parse_args()
 
     config = read_config()
@@ -423,37 +468,37 @@ def main():
             f"        >> {CONFIG_PATH}\n"
         )
     port = args.port or int(config.get("URL_LISTENER_PORT", 7077))
+    tailnet = not args.no_tailnet and config.get("URL_LISTENER_TAILNET", "1") != "0"
 
+    # Threaded, so one slow handler — `docker inspect` for /preview, say —
+    # cannot stall every other request the way the single-threaded server
+    # did. credential-broker has always used the threading server.
     servers = []
-    for address in bind_addresses():
-        # Threaded, so one slow handler — `docker inspect` for /preview, say —
-        # cannot stall every other request the way the single-threaded server
-        # did. credential-broker has always used the threading server.
-        server = ThreadingHTTPServer((address, port), URLHandler, bind_and_activate=False)
-        server.daemon_threads = True
-        server.allow_reuse_address = True
-        server.server_bind()
-        server.server_activate()
-        servers.append(server)
+    for address in BIND_ADDRESSES:
+        try:
+            servers.append(Server(address, port, URLHandler))
+        except OSError as exc:
+            if address == PROXY_TARGET:
+                sys.exit(f"url-listener: cannot bind {address}:{port}: {exc}")
+            print(f"url-listener: skipping {address}:{port}: {exc}", file=sys.stderr)
 
-    def stop(*_):
+    stopping = threading.Event()
+    signal.signal(signal.SIGTERM, lambda *_: stopping.set())
+
+    # Entered once the sockets are listening: serve proxies at once, and a proxy
+    # pointed at a closed port 502s at the whole tailnet.
+    with tailnet_proxy(port) if tailnet else contextlib.nullcontext():
         for server in servers:
-            threading.Thread(target=server.shutdown).start()
-
-    signal.signal(signal.SIGTERM, stop)
-    bound = ", ".join(f"{s.server_address[0]}:{port}" for s in servers)
-    print(f"URL listener started on {bound}", file=sys.stderr)
-
-    threads = [threading.Thread(target=s.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True)
-               for s in servers[1:]]
-    for thread in threads:
-        thread.start()
-    try:
-        servers[0].serve_forever(poll_interval=0.1)
-    except KeyboardInterrupt:
-        stop()
-    for thread in threads:
-        thread.join(timeout=5)
+            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.1},
+                             daemon=True).start()
+        bound = ", ".join(f"{s.server_address[0]}:{port}" for s in servers)
+        print(f"URL listener started on {bound}", file=sys.stderr)
+        try:
+            stopping.wait()
+        except KeyboardInterrupt:
+            pass
+        for server in servers:
+            server.shutdown()
     for server in servers:
         server.server_close()
 
