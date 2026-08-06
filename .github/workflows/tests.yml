@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: shellcheck
-        run: shellcheck bin/with-secret bin/aws-sso-login bin/url-listener-url bin/url-listener-token bin/open-url-on-host bin/notify bin/pbcopy bin/pbpaste tests/with-secret.test.sh
+        run: shellcheck bin/with-secret bin/aws-sso-login bin/url-listener-url bin/url-listener-token bin/open-url-on-host bin/notify bin/pbcopy bin/pbpaste claude/hooks/pre-push-secrets-scan.sh tests/with-secret.test.sh
 
       - name: with-secret (box half, against a fake broker)
         run: ./tests/with-secret.test.sh
