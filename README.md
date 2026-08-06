@@ -164,6 +164,32 @@ The `url-listener` is an HTTP server (port 7077) that enables dev containers to 
 - **Clipboard forwarding** (pbcopy/pbpaste) between container and host
 - **Wispr dictionary** additions from within containers
 
+It listens on `127.0.0.1` and `::1`, never a routable address — both, because
+`localhost` resolves to `::1` first, so a v4-only listener is unreachable to any
+client that does not fall back to v4. Dev containers on this laptop reach it
+already, since Docker points `host.docker.internal` at the host's loopback.
+
+Remote hosts reach it through `tailscale serve`, which the listener starts on
+its way up and takes down on its way out — so tailscaled, which is the thing
+that actually knows whether the tailnet is up, owns that exposure rather than
+this script resolving an address once at startup and being wrong after a
+reboot. That also means the tailnet hop is HTTPS with a MagicDNS certificate
+instead of plaintext, so remote clients point at
+`https://<host>.<tailnet>.ts.net:7077`:
+
+```
+URL_LISTENER_URL=https://<host>.<tailnet>.ts.net:7077
+```
+
+If `tailscale serve` fails, the listener exits rather than coming up quietly
+loopback-only; launchd retries, which is what recovers a boot where tailscaled
+was not up yet. `--no-tailnet` (or `URL_LISTENER_TAILNET=0`) skips serve on
+purpose for a loopback-only run.
+
+Every endpoint except `/health` still needs the bearer token. Serve restricts
+*who can reach* the port; it is not an authorisation decision, and the tailnet
+is the whole org.
+
 ### Setup
 
 The service is managed by launchd and starts automatically on login:
