@@ -34,8 +34,18 @@ import subprocess
 import sys
 import threading
 import urllib.parse
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
+
+# A connection that goes quiet is dropped rather than held forever. Without
+# this, one socket that opens and never finishes its request line hangs the
+# whole server: the read blocks before any routing or token check happens, so
+# it costs an attacker nothing and no credential.
+CONNECTION_TIMEOUT = 30
+
+# The clipboard is text. Generous for a paste, bounded so a declared
+# Content-Length cannot ask the server to read something enormous.
+MAX_COPY_BYTES = 16 * 1024 * 1024
 
 CONFIG_PATH = Path(os.environ.get("URL_LISTENER_CONFIG", Path.home() / ".config/url-listener.env"))
 
@@ -170,6 +180,7 @@ def write_container_config(
 
 class URLHandler(BaseHTTPRequestHandler):
     token = ""
+    timeout = CONNECTION_TIMEOUT
 
     def authenticated(self, parsed):
         """/health is open on purpose; everything else needs the bearer token.
@@ -325,7 +336,20 @@ class URLHandler(BaseHTTPRequestHandler):
         if not self.authenticated(parsed):
             return
         if parsed.path == "/copy":
-            content_length = int(self.headers.get("Content-Length", 0))
+            # A header is not a promise. Both a non-numeric Content-Length and
+            # an enormous one used to reach rfile.read() and raise, which
+            # socketserver turned into a traceback and a dropped connection
+            # rather than an answer.
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                content_length = -1
+            if not 0 <= content_length <= MAX_COPY_BYTES:
+                self.send_response(400)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(f"Content-Length must be 0..{MAX_COPY_BYTES}\n".encode())
+                return
             body = self.rfile.read(content_length)
             subprocess.run(["/usr/bin/pbcopy"], input=body, check=False)
             self.send_response(200)
@@ -402,7 +426,11 @@ def main():
 
     servers = []
     for address in bind_addresses():
-        server = HTTPServer((address, port), URLHandler, bind_and_activate=False)
+        # Threaded, so one slow handler — `docker inspect` for /preview, say —
+        # cannot stall every other request the way the single-threaded server
+        # did. credential-broker has always used the threading server.
+        server = ThreadingHTTPServer((address, port), URLHandler, bind_and_activate=False)
+        server.daemon_threads = True
         server.allow_reuse_address = True
         server.server_bind()
         server.server_activate()
