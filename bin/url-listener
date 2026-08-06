@@ -48,6 +48,24 @@ CURSOR_CONTAINER_CONFIG_DIR = Path.home() / "Library/Application Support/Cursor/
 CONTAINER_NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}")
 
 
+# /open hands its argument to `/usr/bin/open`, which is not a browser: it acts on
+# filesystem paths and on every URL scheme the machine has a handler for, so it
+# will launch an application, open a `.command` file, or drive something like
+# `x-apple.systempreferences:`. Every caller here sends a web URL — BROWSER for a
+# dev container, the AWS SSO device page — so that is all this accepts.
+OPENABLE_SCHEMES = {"http", "https"}
+
+
+def openable(url: str) -> bool:
+    try:
+        parsed = urllib.parse.urlsplit(url)
+    except ValueError:
+        return False
+    # A hostname is required too: "https:///etc/passwd" parses with the right
+    # scheme and no host, and `open` would treat what is left as a local path.
+    return parsed.scheme.lower() in OPENABLE_SCHEMES and bool(parsed.netloc)
+
+
 def read_config():
     """Environment first, then the config file. Refuses a loose file mode."""
     config = {}
@@ -180,6 +198,13 @@ class URLHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/open" and "url" in params:
             url = params["url"][0]
+            if not openable(url):
+                self.log_message("REFUSED /open for a non-web URL")
+                self.send_response(400)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"only http and https URLs can be opened")
+                return
             subprocess.run(["/usr/bin/open", url], check=False)
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
