@@ -81,6 +81,10 @@ if [ "$force" -eq 0 ]; then
 fi
 
 base="$("$_bindir/url-listener-url")" || exit 2
+token="$("$_bindir/url-listener-token")" || exit 2
+# /health is the one unauthenticated endpoint, so this really does distinguish
+# "the laptop is not there" from "my token is wrong" — the latter shows up as a
+# 401 on the calls below instead.
 if ! curl -sf --max-time 5 "$base/health" >/dev/null 2>&1; then
     cat >&2 <<EOF
 aws-sso-login: url-listener at $base is not answering.
@@ -125,9 +129,12 @@ fi
 code="$(grep -oE '\b[A-Z0-9]{4}-[A-Z0-9]{4}\b' "$out" | head -1)"
 echo "Verification URL: $url"
 
-curl -sf --max-time 10 -G --data-urlencode "url=$url" "$base/open" >/dev/null 2>&1 \
+auth=$(printf 'header = "Authorization: Bearer %s"\n' "$token")
+
+curl -sf --max-time 10 -G -K <(printf '%s' "$auth") \
+    --data-urlencode "url=$url" "$base/open" >/dev/null 2>&1 \
     || echo "aws-sso-login: could not open the page remotely; the URL above still works." >&2
-curl -sf --max-time 10 -G \
+curl -sf --max-time 10 -G -K <(printf '%s' "$auth") \
     --data-urlencode "title=AWS SSO" \
     --data-urlencode "message=An agent needs an AWS SSO login${code:+ (code $code)} — approve in the browser" \
     --data-urlencode "sound=Glass" \

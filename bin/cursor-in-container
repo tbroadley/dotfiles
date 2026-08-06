@@ -61,7 +61,11 @@ for devcontainer_path in ".devcontainer/devcontainer.json" ".devcontainer.json";
     fi
 done
 
-PORT="${URL_LISTENER_PORT:-7077}"
+# Sibling scripts live next to this one, wherever it was symlinked from.
+_bindir="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
+BASE="$("$_bindir/url-listener-url")" || exit 1
+TOKEN="$("$_bindir/url-listener-token")" || exit 1
+
 ENCODED_NAME=$(printf '%s' "$DEVCONTAINER_NAME" | jq -sRr @uri)
 ENCODED_EXTENSIONS=$(printf '%s' "$EXTENSIONS" | jq -sRr @uri)
 ENCODED_SETTINGS=$(printf '%s' "$SETTINGS" | jq -sRr @uri)
@@ -75,4 +79,5 @@ for TARGET in "$@"; do
     PATH_PARAMS="${PATH_PARAMS}&path=${ENCODED_PATH}"
 done
 
-curl -sf "http://host.docker.internal:${PORT}/cursor?container=${ENCODED_NAME}${PATH_PARAMS}&file=${IS_FILE}&extensions=${ENCODED_EXTENSIONS}&settings=${ENCODED_SETTINGS}&user=${ENCODED_USER}" >/dev/null 2>&1 &
+curl -sf -K <(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN") \
+    "${BASE}/cursor?container=${ENCODED_NAME}${PATH_PARAMS}&file=${IS_FILE}&extensions=${ENCODED_EXTENSIONS}&settings=${ENCODED_SETTINGS}&user=${ENCODED_USER}" >/dev/null 2>&1 &

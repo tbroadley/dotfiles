@@ -42,17 +42,21 @@ if [ -z "$PHRASE" ]; then
     exit 1
 fi
 
-PORT="${URL_LISTENER_PORT:-7077}"
+# Sibling scripts live next to this one, wherever it was symlinked from.
+_bindir="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
+BASE="$("$_bindir/url-listener-url")" || exit 1
+TOKEN="$("$_bindir/url-listener-token")" || exit 1
+
 ENCODED_PHRASE=$(printf '%s' "$PHRASE" | jq -sRr @uri)
 
-URL="http://host.docker.internal:${PORT}/wispr-dictionary?phrase=${ENCODED_PHRASE}&snippet=${SNIPPET}&no_refresh=${NO_REFRESH}"
+URL="${BASE}/wispr-dictionary?phrase=${ENCODED_PHRASE}&snippet=${SNIPPET}&no_refresh=${NO_REFRESH}"
 
 if [ -n "$REPLACEMENT" ]; then
     ENCODED_REPLACEMENT=$(printf '%s' "$REPLACEMENT" | jq -sRr @uri)
     URL="${URL}&replacement=${ENCODED_REPLACEMENT}"
 fi
 
-RESPONSE=$(curl -sf "$URL" 2>&1) || {
+RESPONSE=$(curl -sf -K <(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN") "$URL" 2>&1) || {
     echo "Error: Failed to connect to url-listener on host. Is it running?" >&2
     exit 1
 }

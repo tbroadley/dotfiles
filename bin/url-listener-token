@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Print the bearer token for the host machine's url-listener.
+#
+# The companion to url-listener-url: that one says *where* the listener is,
+# this one says what to authenticate to it with. Every endpoint except /health
+# needs it, because the tailnet the listener sits on is the whole org and these
+# endpoints read the clipboard and drive the host's UI.
+#
+# Resolution order:
+#   1. $URL_LISTENER_TOKEN            — set directly, or forwarded into a dev
+#                                       container by devc.zsh
+#   2. ~/.config/url-listener.env     — URL_LISTENER_TOKEN=... , mode 0600
+#
+# Exits 1 with an explanation on stderr when there is no token to be had.
+#
+# Callers should hand the token to curl through a config file on /dev/fd rather
+# than in argv, where any process on the host could read it out of `ps`:
+#
+#     token="$(url-listener-token)" || exit 1
+#     curl -K <(printf 'header = "Authorization: Bearer %s"\n' "$token") ...
+
+set -uo pipefail
+
+config="${URL_LISTENER_CONFIG:-$HOME/.config/url-listener.env}"
+token="${URL_LISTENER_TOKEN:-}"
+
+if [ -z "$token" ] && [ -f "$config" ]; then
+    perms="$(stat -c '%a' "$config" 2>/dev/null || stat -f '%Lp' "$config" 2>/dev/null || echo '')"
+    case "$perms" in
+        ''|*00) : ;;
+        *)
+            printf 'url-listener-token: %s is mode %s; it holds a bearer token, so run: chmod 600 %s\n' \
+                "$config" "$perms" "$config" >&2
+            exit 1 ;;
+    esac
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%%#*}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        case "$line" in
+            URL_LISTENER_TOKEN=*) token="${line#*=}" ;;
+        esac
+    done < "$config"
+fi
+
+if [ -z "$token" ]; then
+    cat >&2 <<EOF
+url-listener-token: no bearer token for the url-listener.
+Set URL_LISTENER_TOKEN in the environment, or write it to $config:
+
+    URL_LISTENER_TOKEN=<the same token the listener was started with>
+
+On the machine running the listener, generate one with:
+
+    umask 077 && printf 'URL_LISTENER_TOKEN=%s\n' \\
+        "\$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" \\
+        >> $config
+EOF
+    exit 1
+fi
+
+printf '%s\n' "$token"

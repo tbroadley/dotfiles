@@ -2,9 +2,15 @@
 # Outputs the host clipboard contents to stdout via url-listener.
 # Used in dev containers to forward clipboard operations to macOS host.
 
-PORT="${URL_LISTENER_PORT:-7077}"
-if [ -f /.dockerenv ] || [ -n "$REMOTE_CONTAINERS" ]; then
-  curl -fsS --connect-timeout 2 --max-time 5 "http://host.docker.internal:${PORT}/paste"
+# Sibling scripts live next to this one, wherever it was symlinked from.
+_bindir="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
+
+if [ -f /.dockerenv ] || [ -n "${REMOTE_CONTAINERS:-}" ]; then
+  BASE="$("$_bindir/url-listener-url")" || exit 1
+  TOKEN="$("$_bindir/url-listener-token")" || exit 1
+  curl -fsS --connect-timeout 2 --max-time 5 \
+    -K <(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN") \
+    "${BASE}/paste"
 else
   exec /usr/bin/pbpaste
 fi

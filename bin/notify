@@ -30,11 +30,13 @@ json_quote() { python3 -c "import json, sys; print(json.dumps(sys.stdin.read().s
 
 if [ "$(uname -s)" != "Darwin" ]; then
     BASE="$("$_bindir/url-listener-url")" || exit 1
+    TOKEN="$("$_bindir/url-listener-token")" || exit 1
     URL="${BASE}/notify?title=$(urlencode "$TITLE")&message=$(urlencode "$MESSAGE")"
     if [ -n "$SOUND" ]; then
         URL="${URL}&sound=$(urlencode "$SOUND")"
     fi
-    curl -sf "$URL" >/dev/null 2>&1 &
+    curl -sf -K <(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN") \
+        "$URL" >/dev/null 2>&1 &
 else
     SCRIPT="display notification $(json_quote "$MESSAGE") with title $(json_quote "$TITLE")"
     if [ -n "$SOUND" ]; then

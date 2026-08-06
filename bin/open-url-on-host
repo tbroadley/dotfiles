@@ -12,6 +12,10 @@ if [ -z "$URL" ]; then
 fi
 
 BASE="$("$_bindir/url-listener-url")" || exit 1
+TOKEN="$("$_bindir/url-listener-token")" || exit 1
 ENCODED_URL=$(printf '%s' "$URL" | jq -sRr @uri)
 
-curl -sf "${BASE}/open?url=${ENCODED_URL}" >/dev/null 2>&1 &
+# The token goes through a curl config file on /dev/fd, not argv, so it does not
+# show up in `ps` for every process on this host.
+curl -sf -K <(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN") \
+    "${BASE}/open?url=${ENCODED_URL}" >/dev/null 2>&1 &

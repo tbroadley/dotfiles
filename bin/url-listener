@@ -6,13 +6,28 @@ Simple HTTP server that listens for requests from dev containers.
 - Opens files in Preview on the host
 - Clipboard forwarding (pbcopy/pbpaste) between container and host
 
+Every endpoint except /health needs a bearer token. The tailnet is not a
+single-user network — it is the whole org — and these endpoints read the host
+clipboard, open things on the host, and drive the host's UI. Being reachable
+only from the tailnet is a smaller blast radius than every interface, not an
+authorisation decision. credential-broker next door already works this way.
+
 Usage: url-listener [--port PORT]
 Default port: 7077
+
+Configuration, ~/.config/url-listener.env (mode 0600), environment wins:
+
+    URL_LISTENER_TOKEN=<shared bearer token, >= 32 chars>
+    URL_LISTENER_PORT=7077
+
+Clients resolve the same token through bin/url-listener-token.
 """
 
 import argparse
 import json
 import os
+import re
+import secrets
 import shutil
 import signal
 import subprocess
@@ -22,8 +37,45 @@ import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
+CONFIG_PATH = Path(os.environ.get("URL_LISTENER_CONFIG", Path.home() / ".config/url-listener.env"))
+
 
 CURSOR_CONTAINER_CONFIG_DIR = Path.home() / "Library/Application Support/Cursor/User/globalStorage/anysphere.remote-containers/nameConfigs"
+
+# What Docker itself accepts as a container name or id. Everything reaching this
+# server comes off a query string, so a name is checked before it is used as a
+# path component or handed to `docker inspect`.
+CONTAINER_NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}")
+
+
+def read_config():
+    """Environment first, then the config file. Refuses a loose file mode."""
+    config = {}
+    if CONFIG_PATH.is_file():
+        if CONFIG_PATH.stat().st_mode & 0o077:
+            sys.exit(
+                f"url-listener: {CONFIG_PATH} is group- or world-readable and holds a\n"
+                f"bearer token. Run: chmod 600 {CONFIG_PATH}"
+            )
+        for line in CONFIG_PATH.read_text().splitlines():
+            line = line.split("#", 1)[0].strip()
+            if "=" in line:
+                key, value = line.split("=", 1)
+                config[key.strip()] = value.strip()
+    config.update({k: v for k, v in os.environ.items() if k.startswith("URL_LISTENER_")})
+    return config
+
+
+def valid_container_name(name: str) -> bool:
+    """A container name, and nothing that is really a path or a flag.
+
+    `container` used to go straight into f"{name}.json" under the Cursor config
+    dir, so a name of `../../../../tmp/x` wrote an attacker-shaped JSON file
+    anywhere the user could write — ~/.claude/settings.json, say. The leading
+    character class also keeps a name from starting with `-` and being read as
+    an option by `docker inspect`.
+    """
+    return bool(CONTAINER_NAME.fullmatch(name))
 
 # Environment for launching GUI apps - launchd has minimal PATH
 GUI_ENV = {
@@ -80,6 +132,11 @@ def write_container_config(
     """Write extensions and settings to Cursor's attached container config file."""
     CURSOR_CONTAINER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     config_path = CURSOR_CONTAINER_CONFIG_DIR / f"{container_name}.json"
+    # The handler validated the name; this is the sink, so it says so too. A
+    # future caller that forgets the check gets an error, not a file written
+    # somewhere else.
+    if config_path.parent.resolve() != CURSOR_CONTAINER_CONFIG_DIR.resolve():
+        raise ValueError(f"container name escapes the config directory: {container_name!r}")
     # Use provided settings from devcontainer.json, default to empty dict
     config_settings = settings if settings else {}
     # Ensure python.defaultInterpreterPath is set if not specified
@@ -94,9 +151,32 @@ def write_container_config(
 
 
 class URLHandler(BaseHTTPRequestHandler):
+    token = ""
+
+    def authenticated(self, parsed):
+        """/health is open on purpose; everything else needs the bearer token.
+
+        A caller needs to tell "the laptop is asleep" apart from "my token is
+        wrong" without holding a credential, and /health says nothing but "up".
+        """
+        if parsed.path == "/health":
+            return True
+        header = self.headers.get("Authorization", "")
+        if secrets.compare_digest(header, f"Bearer {self.token}"):
+            return True
+        self.log_message("REJECTED unauthenticated %s %s", self.command, parsed.path)
+        self.send_response(401)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"bad bearer token\n")
+        return False
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed.query)
+
+        if not self.authenticated(parsed):
+            return
 
         if parsed.path == "/open" and "url" in params:
             url = params["url"][0]
@@ -107,6 +187,12 @@ class URLHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"OK")
         elif parsed.path == "/cursor" and "container" in params and "path" in params:
             container_name = params["container"][0]
+            if not valid_container_name(container_name):
+                self.send_response(400)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"Invalid container name")
+                return
             paths = params["path"]
             is_file = params.get("file", ["0"])[0] == "1"
             extensions_param = params.get("extensions", [""])[0]
@@ -134,8 +220,14 @@ class URLHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"OK")
         elif parsed.path == "/preview" and "container" in params and "path" in params:
+            container_name = params["container"][0]
+            if not valid_container_name(container_name):
+                self.send_response(400)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"Invalid container name")
+                return
             try:
-                container_name = params["container"][0]
                 host_paths = [map_container_path_to_host(container_name, path) for path in params["path"]]
                 subprocess.run(["/usr/bin/open", "-a", "Preview", *[str(path) for path in host_paths]], check=False, env=GUI_ENV)
                 self.send_response(200)
@@ -205,6 +297,8 @@ class URLHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
+        if not self.authenticated(parsed):
+            return
         if parsed.path == "/copy":
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
@@ -217,8 +311,15 @@ class URLHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args):
-        pass
+    # No log_message override. This used to be `pass`, which meant that when the
+    # server was bound to 0.0.0.0 and reachable from any network the laptop
+    # joined, there was no record of a single request — so "was that abused for
+    # the months it was exposed?" had no answer. The default logs peer, request
+    # line and status to stderr, which the launchd plist keeps in
+    # ~/Library/Logs/url-listener.log.
+    #
+    # Query strings are logged (that is where /open's URL is, which is the part
+    # worth having); clipboard bodies are not, since they never appear in one.
 
 
 def tailnet_address():
@@ -258,12 +359,25 @@ def bind_addresses():
 
 def main():
     parser = argparse.ArgumentParser(description="URL listener for dev containers")
-    parser.add_argument("--port", type=int, default=7077, help="Port to listen on")
+    parser.add_argument("--port", type=int, help="Port to listen on")
     args = parser.parse_args()
+
+    config = read_config()
+    URLHandler.token = config.get("URL_LISTENER_TOKEN", "")
+    if len(URLHandler.token) < 32:
+        sys.exit(
+            "url-listener: URL_LISTENER_TOKEN is missing or too short (want >= 32 characters).\n"
+            f"These endpoints read the clipboard and drive the host, and the tailnet is the whole\n"
+            f"org, so there is no unauthenticated mode. Set one up with:\n\n"
+            f"    umask 077 && printf 'URL_LISTENER_TOKEN=%s\\n' \\\n"
+            f"        \"$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')\" \\\n"
+            f"        >> {CONFIG_PATH}\n"
+        )
+    port = args.port or int(config.get("URL_LISTENER_PORT", 7077))
 
     servers = []
     for address in bind_addresses():
-        server = HTTPServer((address, args.port), URLHandler, bind_and_activate=False)
+        server = HTTPServer((address, port), URLHandler, bind_and_activate=False)
         server.allow_reuse_address = True
         server.server_bind()
         server.server_activate()
@@ -274,7 +388,7 @@ def main():
             threading.Thread(target=server.shutdown).start()
 
     signal.signal(signal.SIGTERM, stop)
-    bound = ", ".join(f"{s.server_address[0]}:{args.port}" for s in servers)
+    bound = ", ".join(f"{s.server_address[0]}:{port}" for s in servers)
     print(f"URL listener started on {bound}", file=sys.stderr)
 
     threads = [threading.Thread(target=s.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True)

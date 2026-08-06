@@ -22,7 +22,11 @@ if [ -z "${DEVCONTAINER_NAME:-}" ]; then
     exec /usr/bin/open -a Preview "$@"
 fi
 
-PORT="${URL_LISTENER_PORT:-7077}"
+# Sibling scripts live next to this one, wherever it was symlinked from.
+_bindir="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")")" && pwd)"
+BASE="$("$_bindir/url-listener-url")" || exit 1
+TOKEN="$("$_bindir/url-listener-token")" || exit 1
+
 ENCODED_NAME=$(printf '%s' "$DEVCONTAINER_NAME" | jq -sRr @uri)
 PATH_PARAMS=""
 for TARGET in "$@"; do
@@ -31,7 +35,8 @@ for TARGET in "$@"; do
     PATH_PARAMS="${PATH_PARAMS}&path=${ENCODED_PATH}"
 done
 
-if ! curl -fsS "http://host.docker.internal:${PORT}/preview?container=${ENCODED_NAME}${PATH_PARAMS}" >/dev/null; then
+if ! curl -fsS -K <(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN") \
+    "${BASE}/preview?container=${ENCODED_NAME}${PATH_PARAMS}" >/dev/null; then
     echo "Error: Failed to open file(s) in Preview on host. Is url-listener running?" >&2
     exit 1
 fi
