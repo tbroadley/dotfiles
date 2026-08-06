@@ -1,31 +1,19 @@
 {
   "cleanupPeriodDays": 999999,
   "permissions": {
-    "allow": [
-      "Bash",
-      "Edit",
-      "Write",
-      "Read(//opt/python/**)",
-      "Read(//tmp/**)",
-      "Read(~/.cache/uv/**)",
-      "Read(~/.local/share/uv/tools/**)",
-      "Read(~/.claude/**)",
-      "Read(~/dotfiles/**)",
-      "Edit(~/dotfiles/**)",
-      "NotebookEdit",
-      "mcp__linear__search_documentation",
-      "mcp__linear__create_issue",
-      "mcp__linear__create_comment",
-      "WebFetch(domain:github.com/METR)",
-      "WebFetch(domain:raw.githubusercontent.com/METR)",
-      "WebFetch(domain:inspect.aisi.org.uk)",
-      "WebFetch(domain:meridianlabs-ai.github.io)"
-    ],
+    "allow": [],
     "deny": [
       "Bash(dd:*)",
+      "Bash(/bin/dd:*)",
+      "Bash(/usr/bin/dd:*)",
       "Bash(mkfs:*)",
+      "Bash(mkfs.*:*)",
+      "Bash(/sbin/mkfs:*)",
       "Bash(truncate:*)",
-      "Bash(sudo:*)"
+      "Bash(/usr/bin/truncate:*)",
+      "Bash(sudo:*)",
+      "Bash(/usr/bin/sudo:*)",
+      "Bash(doas:*)"
     ],
     "defaultMode": "auto",
     "additionalDirectories": [
@@ -33,6 +21,9 @@
       "~/dotfiles",
       "~/.worktrees"
     ]
+  },
+  "autoMode": {
+    "classifyAllShell": true
   },
   "model": "opus[1m]",
   "hooks": {
@@ -82,7 +73,7 @@
   "effortLevel": "medium",
   "fastMode": true,
   "tui": "fullscreen",
-  "skipDangerousModePermissionPrompt": true,
+  "skipDangerousModePermissionPrompt": false,
   "skipWorkflowUsageWarning": true,
   "theme": "light"
 }
