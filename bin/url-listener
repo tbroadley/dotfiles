@@ -221,22 +221,74 @@ class URLHandler(BaseHTTPRequestHandler):
         pass
 
 
+def tailnet_address():
+    """This machine's tailnet IPv4, or None when tailscaled isn't up."""
+    tailscale = shutil.which("tailscale", path=GUI_ENV["PATH"]) or "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+    try:
+        result = subprocess.run([tailscale, "ip", "-4"], capture_output=True, text=True, timeout=10)
+    except Exception:
+        return None
+    if result.returncode != 0:
+        return None
+    for line in result.stdout.split():
+        if line.count(".") == 3:
+            return line.strip()
+    return None
+
+
+def bind_addresses():
+    """Loopback and the tailnet, never every interface.
+
+    This used to bind 0.0.0.0, which put /paste — the host clipboard — and
+    /open on every network the laptop joined, unauthenticated. Anyone on the
+    same cafe wifi could read whatever was last copied.
+
+    Loopback covers dev containers: Docker Desktop forwards
+    host.docker.internal to the host's 127.0.0.1. The tailnet address covers
+    remote hosts. Nothing else has any business here.
+    """
+    addresses = ["127.0.0.1"]
+    tailnet = tailnet_address()
+    if tailnet:
+        addresses.append(tailnet)
+    else:
+        print("url-listener: no tailnet address; listening on loopback only.", file=sys.stderr)
+    return addresses
+
+
 def main():
     parser = argparse.ArgumentParser(description="URL listener for dev containers")
     parser.add_argument("--port", type=int, default=7077, help="Port to listen on")
     args = parser.parse_args()
 
-    server = HTTPServer(("0.0.0.0", args.port), URLHandler, bind_and_activate=False)
-    server.allow_reuse_address = True
-    server.server_bind()
-    server.server_activate()
-    signal.signal(signal.SIGTERM, lambda *_: threading.Thread(target=server.shutdown).start())
-    print(f"URL listener started on port {args.port}", file=sys.stderr)
+    servers = []
+    for address in bind_addresses():
+        server = HTTPServer((address, args.port), URLHandler, bind_and_activate=False)
+        server.allow_reuse_address = True
+        server.server_bind()
+        server.server_activate()
+        servers.append(server)
+
+    def stop(*_):
+        for server in servers:
+            threading.Thread(target=server.shutdown).start()
+
+    signal.signal(signal.SIGTERM, stop)
+    bound = ", ".join(f"{s.server_address[0]}:{args.port}" for s in servers)
+    print(f"URL listener started on {bound}", file=sys.stderr)
+
+    threads = [threading.Thread(target=s.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True)
+               for s in servers[1:]]
+    for thread in threads:
+        thread.start()
     try:
-        server.serve_forever(poll_interval=0.1)
+        servers[0].serve_forever(poll_interval=0.1)
     except KeyboardInterrupt:
-        pass
-    server.server_close()
+        stop()
+    for thread in threads:
+        thread.join(timeout=5)
+    for server in servers:
+        server.server_close()
 
 
 if __name__ == "__main__":
