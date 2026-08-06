@@ -90,6 +90,11 @@ describe("credential stores are never fast-pathed", () => {
 		"cat ~/.docker/config.json",
 		"cat ~/.kube/config | head -40",
 		"cat ~/.npmrc",
+		// this repo's own credential stores
+		"cat ~/.config/credential-broker.env",
+		"grep TOKEN /home/ubuntu/.config/credential-broker.env",
+		"cat ~/.config/url-listener.env",
+		"cat ~/.devcontainer_env",
 		// still caught when hidden mid-pipeline behind innocuous commands
 		"ls -la /tmp && cat /home/ubuntu/.aws/sso/cache/token.json | jq -r .accessToken",
 	];

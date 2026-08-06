@@ -279,6 +279,14 @@ const CREDENTIAL_PATH_FRAGMENTS = [
 	".kube/config",
 	"auth.json",
 	"agent-tokens.env",
+	// The dotfiles repo's own credential stores. credential-broker.env holds the
+	// bearer token that authorises raising a credential-release prompt;
+	// url-listener.env holds the one for the host clipboard and browser; and
+	// .devcontainer_env is where devc.zsh parks GH_TOKEN and friends inside a
+	// container. All three are exactly the "reading is the risk" case above.
+	"credential-broker.env",
+	"url-listener.env",
+	".devcontainer_env",
 ];
 
 export function touchesCredentialStore(command: string): boolean {
