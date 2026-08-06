@@ -517,7 +517,27 @@ install_claude_code() {
   fi
 
   echo "Installing Claude Code (native)..."
-  curl -fsSL https://claude.ai/install.sh | bash
+  # Verify the installer before running it, the same as every other download in
+  # this script. The installer itself already checks the claude binary against a
+  # signed-over-HTTPS manifest checksum; what was missing was any check on the
+  # installer, which was piped straight from the network into bash.
+  #
+  # This pins the installer *script*, not the Claude version — the script fetches
+  # whatever is current. Anthropic changes it rarely; when they do, this fails
+  # loudly rather than silently trusting new code. To bump, read the diff first:
+  #   curl -fsSL -o /tmp/new.sh https://claude.ai/install.sh
+  #   diff <(curl -fsSL https://claude.ai/install.sh) /tmp/new.sh; sha256sum /tmp/new.sh
+  CLAUDE_INSTALLER_CHECKSUM="cde4f1702d3b1695f92b73d26888364e17bca476e17f0fd676484c951d36c125"
+  local tmp_installer="/tmp/claude-install-$$.sh"
+  curl -fsSL -o "$tmp_installer" https://claude.ai/install.sh
+  if ! verify_checksum "$tmp_installer" "$CLAUDE_INSTALLER_CHECKSUM"; then
+    rm -f "$tmp_installer"
+    echo "Refusing to run the Claude Code installer: it is not the script this repo reviewed." >&2
+    echo "If Anthropic legitimately changed it, review the diff and update CLAUDE_INSTALLER_CHECKSUM." >&2
+    return 1
+  fi
+  bash "$tmp_installer"
+  rm -f "$tmp_installer"
   echo "Claude Code installation completed"
 }
 
@@ -729,7 +749,7 @@ if _agent_allowed pi; then
     # agent PATH, and an agent's shell does not source the interactive rc that
     # puts ~/dotfiles/bin there, so link them in explicitly.
     mkdir -p "$PI_AGENT_DIR/bin"
-    for _pi_helper in aws-sso-login notify open-url-on-host url-listener-url with-secret; do
+    for _pi_helper in aws-sso-login notify open-url-on-host url-listener-url url-listener-token with-secret; do
       ln -sf "$SCRIPT_DIR/bin/$_pi_helper" "$PI_AGENT_DIR/bin/$_pi_helper"
     done
     # Symlink dotfiles-managed pi extensions. Only files tracked in this repo
