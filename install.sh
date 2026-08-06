@@ -423,26 +423,35 @@ install_pup() {
     echo "Skipping pup (not Linux)"
     return 0
   fi
+  # Anything before 1.x predates personal access tokens: those builds have no
+  # DD_PAT in them at all, so `with-secret DD_PAT -- pup ...` releases the token
+  # and then fails to authenticate. Upgrade in place rather than leaving an old
+  # binary that fails confusingly.
+  PUP_VERSION="1.10.4"
   if command -v pup >/dev/null 2>&1; then
-    echo "pup is already installed: pup $(pup --version 2>&1 | head -1)"
-    return 0
+    installed=$(pup --version 2>&1 | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    if [ "$installed" = "$PUP_VERSION" ]; then
+      echo "pup is already installed: pup $installed"
+      return 0
+    fi
+    echo "Upgrading pup $installed -> $PUP_VERSION..."
+  else
+    echo "Installing pup..."
   fi
 
-  echo "Installing pup..."
   ARCH=$(uname -m)
   case $ARCH in
     x86_64)
       PUP_ARCH="Linux_x86_64"
-      PUP_CHECKSUM="7f2a347c2b34ecf3cec4facae7528a4e36279f61b68c989a477f7c5ab312dbe6"
+      PUP_CHECKSUM="9d99ca0229fb0c767c6f74e07a0efa3e12091e9cfc297757e190247d26b537c5"
       ;;
     aarch64|arm64)
       PUP_ARCH="Linux_arm64"
-      PUP_CHECKSUM="186dcb5318a5efd066418b54285c362ecd270a54fa764d506a2b59093a657b55"
+      PUP_CHECKSUM="00c1f600d1da95302a457f69944d2069f74ed0037c9ab3bfc30c2041d4c24af2"
       ;;
     *) echo "Unsupported architecture for pup: $ARCH"; return 1 ;;
   esac
 
-  PUP_VERSION="0.9.2"
   local tmp_file="/tmp/pup-$$.tar.gz"
   local tmp_dir="/tmp/pup-$$"
   wget -q -O "$tmp_file" "https://github.com/DataDog/pup/releases/download/v${PUP_VERSION}/pup_${PUP_VERSION}_${PUP_ARCH}.tar.gz"
