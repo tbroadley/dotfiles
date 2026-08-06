@@ -57,9 +57,28 @@ devc() {
         exec_opts+=(--remote-env "LINEAR_API_KEY=$LINEAR_API_KEY")
     fi
 
-    if [ -n "${BW_SESSION:-}" ]; then
-        up_opts+=(--remote-env "BW_SESSION=$BW_SESSION")
-        exec_opts+=(--remote-env "BW_SESSION=$BW_SESSION")
+    # BW_SESSION is deliberately NOT forwarded. It is not one credential, it is
+    # the key to the whole vault: anything in the container can `bw list items`
+    # and read every secret I own, METR's and otherwise. Containers run agents
+    # with --dangerously-skip-permissions, so that is a very short path from a
+    # malicious PR comment to the whole vault.
+    #
+    # A container that needs one specific field asks for it the way remote hosts
+    # do: `with-secret FIELD -- command`, which the broker on this laptop
+    # authenticates, checks against an allowlist the container cannot edit, and
+    # puts in front of me to approve. See bin/credential-broker.
+
+    # The url-listener bearer token. Unlike the vault session above, this is
+    # scoped to exactly what the container already needs the listener for —
+    # clipboard, opening a URL, notifications — so forwarding it grants nothing
+    # the container did not have when those endpoints were unauthenticated.
+    local url_listener_token
+    url_listener_token="${URL_LISTENER_TOKEN:-$("$HOME/dotfiles/bin/url-listener-token" 2>/dev/null)}"
+    if [ -n "$url_listener_token" ]; then
+        up_opts+=(--remote-env "URL_LISTENER_TOKEN=$url_listener_token")
+        exec_opts+=(--remote-env "URL_LISTENER_TOKEN=$url_listener_token")
+    else
+        echo "Warning: no url-listener token; clipboard/notify/open forwarding will 401 in the container." >&2
     fi
 
     # Forward Codex auth cache if present on host
@@ -157,12 +176,16 @@ devc() {
 
         # Persist auth tokens in container
         env_file="$HOME/.devcontainer_env"
+        # It holds bearer tokens, so create it private and keep it that way —
+        # the same discipline as ~/.codex/auth.json above. `: >` alone leaves it
+        # at whatever the container umask says, usually world-readable.
         : > "$env_file"
+        chmod 600 "$env_file"
         [ -n "${GH_TOKEN:-}" ] && echo "export GH_TOKEN=\"$GH_TOKEN\"" >> "$env_file"
         [ -n "${ANTHROPIC_API_KEY:-}" ] && echo "export ANTHROPIC_API_KEY=\"$ANTHROPIC_API_KEY\"" >> "$env_file"
 
         [ -n "${LINEAR_API_KEY:-}" ] && echo "export LINEAR_API_KEY=\"$LINEAR_API_KEY\"" >> "$env_file"
-        [ -n "${BW_SESSION:-}" ] && echo "export BW_SESSION=\"$BW_SESSION\"" >> "$env_file"
+        [ -n "${URL_LISTENER_TOKEN:-}" ] && echo "export URL_LISTENER_TOKEN=\"$URL_LISTENER_TOKEN\"" >> "$env_file"
         [ -n "${TZ:-}" ] && echo "export TZ=\"$TZ\"" >> "$env_file"
         [ -n "${SSH_AUTH_SOCK:-}" ] && echo "export SSH_AUTH_SOCK=\"$SSH_AUTH_SOCK\"" >> "$env_file"
 
