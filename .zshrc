@@ -26,7 +26,7 @@ export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"
 # OrbStack
 export PATH="$PATH:$HOME/.orbstack/bin"
 
-# Local binaries (apf, etc.)
+# Local binaries
 export PATH="$HOME/.local/bin:$PATH"
 
 # Dotfiles scripts (iterate)

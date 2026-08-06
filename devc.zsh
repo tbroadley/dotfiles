@@ -137,21 +137,22 @@ devc() {
         return 1
     fi
 
-    # Get container ID and name for port forwarding and Cursor integration
+    # Get container name for Cursor integration.
+    #
+    # There is deliberately no automatic port forwarding here. This used to run
+    # apf, which discovers every listening socket in the container and opens a
+    # matching host listener for each one -- on 0.0.0.0, with no allowlist and
+    # no opt-in. That put anything a container happened to serve (Postgres, ssh,
+    # Streamlit, the editor server) on whatever wifi the laptop was joined to.
+    # Same bug as url-listener's old 0.0.0.0 bind, but automatic and unbounded.
+    #
+    # To reach a container port, forward exactly the one you want, to loopback:
+    #     docker exec ... / ssh -L, or publish with -p 127.0.0.1:PORT:PORT
     local container_id container_name
     container_id=$(docker ps -q --filter "label=devcontainer.local_folder=$workspace")
     if [[ -n "$container_id" ]]; then
         container_name=$(docker inspect --format '{{.Name}}' "$container_id" 2>/dev/null | sed 's/^\///')
         [[ -n "$container_name" ]] && exec_opts+=(--remote-env "DEVCONTAINER_NAME=$container_name")
-
-        if command -v apf &> /dev/null; then
-            echo "Starting automatic port forwarding with watchdog..."
-            ( ~/dotfiles/bin/apf-watchdog "$container_id" &>/dev/null & )
-            echo "  Logs: ~/.local/log/apf.log"
-        else
-            echo "ERROR: apf not found. Install apf or ensure ~/.local/bin is in PATH." >&2
-            return 1
-        fi
     fi
 
     if [[ -n "$rebuild_flag" || "$container_existed" == "false" ]]; then
