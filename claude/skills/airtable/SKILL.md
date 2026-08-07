@@ -25,6 +25,16 @@ Set the token as an environment variable:
 export AIRTABLE_TOKEN="pat..."
 ```
 
+> **On my machines the token is not in the environment**, and you should not ask
+> for it. It lives in the vault and is released per-run by `with-secret`, to the
+> specific scripts the credential broker's policy allowlists by name. Ad-hoc
+> `curl` against `api.airtable.com` is **not** on that allowlist, so the raw
+> recipes below will fail with either "Set AIRTABLE_TOKEN" or, via
+> `with-secret`, "curl is not on the allowlist for AIRTABLE_TOKEN". A project
+> that needs Airtable ships its own scripts and says so in its own skill; for
+> anything else, ask me to add a rule to `~/.config/credential-broker-policy.json`
+> rather than working around it.
+
 ## When to Use
 
 Use this skill when the user:
