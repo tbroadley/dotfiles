@@ -682,6 +682,25 @@ class TestPromptRendering(unittest.TestCase):
         )
         self.assertEqual(cb.quote_argv(["pup", "it's"]), "pup 'it'\\''s'")
 
+    def test_a_long_command_breaks_between_arguments_not_mid_flag(self):
+        lines = cb.wrap_command(
+            ["write_grade.sh", "--review", "reviews/Jackson_Hassell.json", "--dry-run"])
+        self.assertEqual(lines, [
+            "write_grade.sh --review \\",
+            "  reviews/Jackson_Hassell.json --dry-run",
+        ])
+
+    def test_the_body_keeps_its_blank_lines_between_blocks(self):
+        body = cb.describe_request("AIRTABLE_TOKEN", ["pup", "test"], "a-box", "/tmp",
+                                   "checking", "AIRTABLE_TOKEN")
+        self.assertIn("COMMAND\n  pup test\n\nON  a-box\nIN  /tmp\n\nWHY\n  checking\n\n", body)
+
+    def test_a_missing_reason_still_gets_its_own_block(self):
+        body = cb.describe_request("DD_PAT", ["pup"], "", "", "", "DD_PAT")
+        self.assertIn("WHY\n  No reason given.", body)
+        self.assertIn("ON  a remote host", body)
+        self.assertNotIn("IN  ", body)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
