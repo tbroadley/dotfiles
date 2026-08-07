@@ -83,10 +83,19 @@ permission prompt has nobody to answer it.
   `claude-sonnet-5`, OpenAI agent → `gpt-5.6-luna`, anything else is a hard
   error at `before_agent_start`. The agent keeps its own model.
 - **Off by default.** Turn on per session with `--auto-mode` or `/auto-mode on`;
-  other subcommands are `off`, `status`, `config`, `defaults`.
+  other subcommands are `off`, `reset`, `status`, `config`, `defaults`.
 - **On by default** via `~/.pi/agent/auto-mode.json`: `{"enabled": true}` for
   every pi session on the host, or `{"enabled": "pirouette"}` for only the
   agents the pirouette server starts (detected from `PIROUETTE_*` env vars).
+- **Scoped per agent.** `/auto-mode on|off` affects the current chat only.
+  Pirouette runs many agents in one process and loads each extension once, so
+  state is keyed by the agent's working directory rather than held in a
+  module-level variable — otherwise one chat's `off` would disable the
+  classifier for every agent on the host. Overrides are persisted to
+  `$PIROUETTE_DATA_DIR/state/auto-mode-agents.json` (or
+  `~/.pi/agent/auto-mode-agents.json`) so they survive a restart;
+  `/auto-mode reset` clears one and returns that agent to the default.
+  Precedence is `--auto-mode` flag > per-agent override > `enabled` default.
 - **The gate runs in every mode the agent uses tools** (interactive, RPC and
   `-p` print). In non-interactive modes there is no status line or
   notification, but blocked tool calls still come back with the reason.
@@ -112,7 +121,8 @@ keep the built-in rules and add to them, or omit it to take full ownership.
 ```
 
 `/auto-mode config` prints the merged config along with the resolved trusted
-roots, so the boundary is inspectable from inside a session.
+roots, this agent's key and its current override, so the boundary is
+inspectable from inside a session.
 
 ### Design notes
 
@@ -146,9 +156,39 @@ every segment is provably read-only (quote-aware, so a `|` inside a grep regex
 isn't a pipe), which removes both the latency and a false-positive roll on every
 `git log`.
 
-Not loosened: third-party exfiltration, publishing secrets, force pushes and
-history rewriting, production writes, `curl | bash` from unknown sources, DB
-drops, and fail-closed behaviour on classifier errors.
+A second audit found six more recurring shapes, all variations on treating
+*unfamiliarity* as risk, now addressed in the rules:
+
+- **The agent's own worktree was treated as precious.** `git reset --hard
+  origin/main` to start from a clean base was repeatedly blocked because it
+  "could discard uncommitted work" — in a checkout that exists for the agent
+  and where nobody else keeps anything. Resetting, cleaning and stashing there
+  is now explicitly routine; discarding a checkout *someone else* is using
+  stays denied.
+- **Force-pushing the agent's own branch.** The draft-PR workflow amends and
+  re-pushes constantly. `--force-with-lease` on the agent's own feature branch
+  is now carved out; default, shared and release branches, and unrelated
+  repositories, are not.
+- **The user's own dev boxes read as third parties** because they are named by
+  private IP. The rules now say private and tailnet ranges are inside the
+  user's network, that the trusted-roots list describes *local paths* rather
+  than an allowlist of hosts, and that shipping code and running benchmarks on
+  those boxes is what they are for. Moving credentials to them stays a
+  separate question.
+- **Filtered environment reads.** The env-dump hard deny caught `env | grep
+  '^PI_'` on the theory that the filter might match a secret. It is now scoped
+  to *unfiltered* output only.
+- **`sudo` host housekeeping** (packages, swap, disk) was blocked as
+  "unrelated to the task". Incidental maintenance of the machine the agent runs
+  on is allowed, and "unrelated to the stated task" is called out as not being
+  a safety property.
+- **Speculative harm.** Added to the not-reasons list: being unable to see an
+  authorization given in an earlier turn, not recognising a host, and
+  imagining a way the command *could* destroy something.
+
+Not loosened: third-party exfiltration, publishing secrets, rewriting shared
+history, production writes, `curl | bash` from unknown sources, DB drops, and
+fail-closed behaviour on classifier errors.
 
 ### Deploying to a pirouette host
 

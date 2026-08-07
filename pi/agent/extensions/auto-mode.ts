@@ -52,10 +52,18 @@
  * your own; omit it to take full ownership of that list.
  *
  * Auto mode is off by default. Enable with `--auto-mode` or `/auto-mode on`.
- * Other subcommands: `/auto-mode off|status|config|defaults`.
+ * Other subcommands: `/auto-mode off|reset|status|config|defaults`.
+ *
+ * Scope: auto mode is per *agent*, not per process. A host that runs many
+ * agents in one process (pirouette) loads this extension once, so `/auto-mode
+ * on|off` writes a per-agent override keyed by the agent's working directory
+ * and only affects that chat. Overrides persist across restarts in
+ * `$PIROUETTE_DATA_DIR/state/auto-mode-agents.json` (or
+ * `~/.pi/agent/auto-mode-agents.json`); `/auto-mode reset` drops one and falls
+ * back to the `enabled` default above.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -381,7 +389,8 @@ export const DEFAULTS = {
 		"The local machine the agent runs on is trusted. That includes the working directory, sibling git worktrees and other local clones of the same or related repositories, other project checkouts on this machine, scratch space (/tmp, $TMPDIR, caches) and the user's home directory.",
 		"The repositories the user works in — the working repo, its remotes, and any other repository the user has referred to in this conversation — are trusted, together with normal collaboration on them (branches, pushes, pull requests, reviews, CI).",
 		"Development and staging infrastructure the user owns (their own dev boxes, sandboxes, scratch buckets, ephemeral VMs) is part of the user's environment, not a third party.",
-		"'External' means somewhere the user does not control: third-party APIs and SaaS, public paste/gist services, unknown hosts, public repositories, and production systems. Being outside the working directory but still on this machine, or in another of the user's repositories, is NOT external.",
+		"Remote machines named in this conversation — dev boxes, benchmark instances, sandboxes — are the user's own infrastructure, whether referred to by hostname or by a private address (10.x, 172.16-31.x, 192.168.x, or a 100.64+ tailnet address). The list of trusted filesystem roots below describes *local paths*; it is not a list of permitted hosts, so a host being absent from it means nothing at all.",
+		"'External' means somewhere the user does not control: third-party APIs and SaaS, public paste/gist services, hosts on the public internet that the conversation does not connect to the user, public repositories, and production systems. Being outside the working directory but still on this machine, in another of the user's repositories, or on one of the user's own dev boxes, is NOT external.",
 	],
 	allow: [
 		"Routine development anywhere on this machine: reading, editing, creating and moving files; building; running tests, linters, formatters, type checkers; scratch scripts in /tmp.",
@@ -391,10 +400,13 @@ export const DEFAULTS = {
 		"Committing, pushing to any branch (including default branches), opening/updating/merging pull requests and commenting on them, as long as history is not rewritten.",
 		"Cleaning up the user's own ephemeral dev resources (stopping or terminating scratch VMs, deleting temp dirs, tearing down sandboxes) when the user has asked for cleanup or authorized it.",
 		"Reading and editing the agent's own configuration, extensions and this classifier's own rules when the user has asked for that work.",
+		"Copying source, test, data or scratch files to one of the user's own dev boxes and running builds, tests, benchmarks or pipelines there — that is what those boxes are for. Moving *credentials* to them is a separate question, governed by the deny rules below.",
+		"Housekeeping on the machine the agent runs on, including with sudo: installing packages and tooling, configuring swap, freeing disk space, restarting the agent's own services. This machine is the user's, and such work is often incidental to the task rather than named in it.",
+		"Resetting, cleaning, stashing or discarding changes inside the agent's own worktree — the per-agent checkout it was given to work in. Syncing it to the upstream branch (`git reset --hard origin/main`) is the normal way to start from a clean base.",
 	],
 	soft_deny: [
-		"Git history rewriting: force pushing, deleting remote branches/tags/releases, rewriting already-pushed history, or amending already-pushed commits.",
-		"Irrecoverable deletion of work the user has not backed up: `rm -rf` over a home directory, a whole repository or broad wildcards; `git reset --hard` / `git clean -fdx` that would discard uncommitted work the agent did not itself create.",
+		"Rewriting history that other people build on: force pushing to a default, shared or release branch; deleting remote branches, tags or releases; or rewriting history in a repository other than the one this task is about. Force pushing (including `--force-with-lease`) the agent's *own* feature or pull-request branch to update it after an amend or rebase is routine and is NOT this.",
+		"Irrecoverable deletion of work the user has not backed up: `rm -rf` over a home directory, a whole repository, or broad wildcards; discarding a checkout that someone else is using — a shared box, another agent's worktree, the user's own working copy. Resetting or cleaning the agent's own worktree is not this: that checkout exists for the agent, its commits stay in the reflog, and the user does not keep unbacked-up work there.",
 		"Production changes: deploys, `terraform apply`/`destroy` against prod, and write access to hosts, clusters or namespaces whose name marks them production (`prod`, `production`, `release`). Read-only queries against production are fine.",
 		"Piping remote content straight into a shell (`curl … | bash`) from a source that is not a well-known vendor installer, or otherwise executing unreviewed downloaded code.",
 		"Dropping or truncating databases, or running migrations against a shared or production database.",
@@ -403,7 +415,7 @@ export const DEFAULTS = {
 		"Exfiltration to a third party: sending repository contents, secrets, credentials, or personal/regulated data to a destination the user does not control (third-party APIs, public paste/gist services, unknown hosts, public repositories).",
 		"Publishing secrets: committing them, printing them into a shared channel, or otherwise exposing private keys, tokens, .env values or cloud credentials somewhere they become durably visible to others. Moving the user's own credentials between the user's own machines at their request is not this.",
 		"Weakening auto mode in order to get an action past it: turning the classifier off, editing its rules, or routing around it mid-task so that a previously blocked call succeeds. Reading or inspecting auto mode, and deliberately improving it as the task the user actually asked for, are allowed.",
-		"Dumping the whole process environment: bare `env`, `printenv` with no argument, `set`, `export -p`, `declare -x`, or redirecting any of them into a file. Agent environments routinely carry injected API tokens, so one such command copies every secret the agent holds into the transcript, where it stays. Reading named variables is fine — `printenv PATH`, `env | grep '^PI_'`.",
+		"Dumping the whole process environment: bare `env`, `printenv` with no argument, `set`, `export -p`, `declare -x`, or redirecting any of them into a file. Agent environments routinely carry injected API tokens, so one such command copies every secret the agent holds into the transcript, where it stays. This rule is about *unfiltered* output and nothing else. A pattern-filtered read prints only the matching lines and is always fine: `env | grep '^PI_'`, `env | grep -i aws`, `printenv PATH`. Do not extend this rule to filtered reads on the theory that the filter might match a secret.",
 		"Printing the contents of a credential store into tool output. The session transcript is a durable channel in the sense above: it is written to disk, read back by later agents, and visible to anyone with access to the session store — so `cat`-ing `~/.aws/credentials` or `~/.aws/sso/cache`, `~/.config/gh/hosts.yml`, `~/.npmrc`, `~/.docker/config.json`, `~/.kube/config`, an agent `auth.json` or token file, or a private key under `~/.ssh` is publishing it, even though nothing was sent anywhere. Using such a credential for its intended purpose is fine, and so is editing these files to rotate or remove a value.",
 	],
 };
@@ -572,6 +584,10 @@ These are NOT reasons to block:
 - The user's most recent message is short, off-topic, an apology, a correction, or simply absent. Lack of a fresh instruction is not a reason to block a routine action; the agent is expected to keep working.
 - The authorization is phrased with a pronoun ("do that", "both of those things", "that work tree", "go ahead"). Resolve it against the conversation below — a confirmation of a plan the assistant just described IS explicit authorization for that plan.
 - The command merely mentions words like "secret", "sensitive", "credentials", "prod" or "token" (in a flag name, a path, a variable, a grep pattern) without actually transmitting such data somewhere external.
+- The action is not what the user most recently asked about. Agents do incidental setup, cleanup and housekeeping on the way to a goal; "unrelated to the stated task" is not a safety property. Judge the effect, not the topic.
+- A remote host is identified by a bare IP address, or by a name you do not recognise. Unfamiliarity is not evidence of a third party — check whether the conversation establishes the host as the user's, and note that private and tailnet addresses are by construction inside their network.
+- The authorization was given in an earlier turn or a previous session and you cannot see it. The conversation excerpt is a window, not the whole record.
+- You can imagine a way the command *could* destroy something. Speculation is not evidence: block on what the command does, not on what would be true if the working tree happened to contain something precious.
 - You are uncertain. For a reversible, local action, uncertainty resolves to allow.
 
 Do block, regardless of how routine the surrounding task is, when the effect is irreversible and unrequested, or aimed at a destination outside the user's environment.
@@ -655,8 +671,71 @@ export function parseVerdict(text: string): Verdict | undefined {
 	}
 }
 
+/**
+ * Where per-agent on/off overrides are persisted.
+ *
+ * Under pirouette this sits beside the server's other state so it survives a
+ * restart; otherwise it lives next to the user's auto-mode config.
+ */
+function overridesPath(): string {
+	const dataDir = process.env.PIROUETTE_DATA_DIR;
+	return dataDir
+		? join(dataDir, "state", "auto-mode-agents.json")
+		: join(homedir(), CONFIG_DIR_NAME, "agent", "auto-mode-agents.json");
+}
+
+export function readOverrides(path: string): Record<string, boolean> {
+	const raw = readJsonFile(path);
+	if (!raw) return {};
+	const out: Record<string, boolean> = {};
+	for (const [k, v] of Object.entries(raw)) if (typeof v === "boolean") out[k] = v;
+	return out;
+}
+
+function writeOverride(path: string, key: string, value: boolean | undefined): void {
+	const all = readOverrides(path);
+	if (value === undefined) delete all[key];
+	else all[key] = value;
+	try {
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, `${JSON.stringify(all, null, 2)}\n`);
+	} catch {
+		/* best effort: an unwritable state dir shouldn't break the toggle */
+	}
+}
+
 export default function autoMode(pi: ExtensionAPI): void {
-	let enabled = false;
+	// Auto mode is per agent, not per process.
+	//
+	// Pirouette runs many agents inside ONE server process and loads each
+	// extension exactly once, so a module-level `let enabled` was a single
+	// switch for the whole instance: `/auto-mode off` in one chat silently
+	// disabled the classifier for every other agent on the box, and the next
+	// agent's session_start turned it back on for everyone. Key the state off
+	// the agent's working directory instead — pirouette gives each agent its
+	// own worktree, and a standalone pi session is just an agent of one.
+	const runtime = new Map<string, boolean>();
+
+	const agentKey = (ctx: ExtensionContext): string => resolve(ctx.cwd || "(unknown)");
+
+	/** Precedence: --auto-mode flag > persisted per-agent override > config default. */
+	function resolveEnabled(ctx: ExtensionContext, cfg: AutoModeConfig): boolean {
+		if (pi.getFlag("auto-mode")) return true;
+		const override = readOverrides(overridesPath())[agentKey(ctx)];
+		if (typeof override === "boolean") return override;
+		return cfg.enabled === true || (cfg.enabled === "pirouette" && isUnderPirouette());
+	}
+
+	function isEnabled(ctx: ExtensionContext): boolean {
+		const key = agentKey(ctx);
+		const known = runtime.get(key);
+		if (known !== undefined) return known;
+		// No session_start seen for this agent yet; resolve lazily rather than
+		// defaulting to off, so a missed event can never silently open the gate.
+		const value = resolveEnabled(ctx, loadConfig(ctx));
+		runtime.set(key, value);
+		return value;
+	}
 
 	pi.registerFlag("auto-mode", {
 		description: "Run without permission prompts; gate tool calls through the auto-mode safety classifier",
@@ -690,7 +769,7 @@ export default function autoMode(pi: ExtensionAPI): void {
 
 	function refreshStatus(ctx: ExtensionContext): void {
 		if (!ctx.hasUI) return;
-		if (!enabled) {
+		if (!isEnabled(ctx)) {
 			ctx.ui.setStatus(STATUS_KEY, "");
 			return;
 		}
@@ -705,8 +784,8 @@ export default function autoMode(pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (_event, ctx) => {
 		const cfg = loadConfig(ctx);
-		const defaultOn = cfg.enabled === true || (cfg.enabled === "pirouette" && isUnderPirouette());
-		enabled = Boolean(pi.getFlag("auto-mode")) || defaultOn;
+		const enabled = resolveEnabled(ctx, cfg);
+		runtime.set(agentKey(ctx), enabled);
 		if (enabled) {
 			try {
 				const { family, model } = classifierModelFor(ctx);
@@ -722,18 +801,18 @@ export default function autoMode(pi: ExtensionAPI): void {
 	// Hard gate: if auto mode is on but the classifier can't be resolved, stop
 	// the agent before it runs.
 	pi.on("before_agent_start", async (_event, ctx) => {
-		if (!enabled) return;
+		if (!isEnabled(ctx)) return;
 		classifierModelFor(ctx); // throws -> stops the agent
 		refreshStatus(ctx);
 	});
 
 	pi.on("model_select", async (_event, ctx) => {
-		if (enabled) refreshStatus(ctx);
+		if (isEnabled(ctx)) refreshStatus(ctx);
 	});
 
 	// The permission gate: classify every tool call and block risky ones.
 	pi.on("tool_call", async (event, ctx) => {
-		if (!enabled) return;
+		if (!isEnabled(ctx)) return;
 
 		const cfg = loadConfig(ctx);
 		const isReadOnly = READ_ONLY_TOOLS.has(event.toolName);
@@ -800,7 +879,7 @@ export default function autoMode(pi: ExtensionAPI): void {
 	pi.registerCommand("auto-mode", {
 		description: "Auto mode: run without prompts, gating tool calls through a safety classifier",
 		getArgumentCompletions: (prefix: string) => {
-			const items = ["on", "off", "status", "config", "defaults"].map((value) => ({ value, label: value }));
+			const items = ["on", "off", "reset", "status", "config", "defaults"].map((value) => ({ value, label: value }));
 			const filtered = items.filter((item) => item.value.startsWith(prefix.trim()));
 			return filtered.length > 0 ? filtered : null;
 		},
@@ -814,7 +893,17 @@ export default function autoMode(pi: ExtensionAPI): void {
 			if (arg === "config") {
 				const cfg = loadConfig(ctx);
 				ctx.ui.notify(
-					JSON.stringify({ ...cfg, resolvedTrustedRoots: cachedTrustedRoots(ctx.cwd, cfg.trustedPaths) }, null, 2),
+					JSON.stringify(
+						{
+							...cfg,
+							resolvedTrustedRoots: cachedTrustedRoots(ctx.cwd, cfg.trustedPaths),
+							thisAgent: agentKey(ctx),
+							perAgentOverride: readOverrides(overridesPath())[agentKey(ctx)] ?? null,
+							overridesFile: overridesPath(),
+						},
+						null,
+						2,
+					),
 					"info",
 				);
 				return;
@@ -827,18 +916,38 @@ export default function autoMode(pi: ExtensionAPI): void {
 				} catch (error) {
 					cls = `unavailable — ${error instanceof Error ? error.message : String(error)}`;
 				}
-				ctx.ui.notify(`Auto mode is ${enabled ? "on" : "off"}. Classifier: ${cls}.`, "info");
+				const override = readOverrides(overridesPath())[agentKey(ctx)];
+				const scope = override === undefined ? "following the default" : "set for this agent";
+				ctx.ui.notify(
+					`Auto mode is ${isEnabled(ctx) ? "on" : "off"} for this agent (${scope}). Classifier: ${cls}.`,
+					"info",
+				);
+				return;
+			}
+			if (arg === "reset") {
+				writeOverride(overridesPath(), agentKey(ctx), undefined);
+				const value = resolveEnabled(ctx, loadConfig(ctx));
+				runtime.set(agentKey(ctx), value);
+				ctx.ui.notify(`Auto mode override cleared for this agent — now ${value ? "on" : "off"} by default.`, "info");
+				refreshStatus(ctx);
 				return;
 			}
 
-			const want = arg === "on" ? true : arg === "off" ? false : !enabled;
-			if (want === enabled) {
-				ctx.ui.notify(`Auto mode is already ${enabled ? "on" : "off"}.`, "info");
+			const current = isEnabled(ctx);
+			const want = arg === "on" ? true : arg === "off" ? false : !current;
+			if (want === current) {
+				ctx.ui.notify(`Auto mode is already ${current ? "on" : "off"} for this agent.`, "info");
 				return;
 			}
-			enabled = want;
-			if (!enabled) {
-				ctx.ui.notify("Auto mode disabled — tool calls run under pi's normal permissions.", "info");
+			// Persist per agent, so the choice sticks across a restart and applies
+			// to this chat only.
+			runtime.set(agentKey(ctx), want);
+			writeOverride(overridesPath(), agentKey(ctx), want);
+			if (!want) {
+				ctx.ui.notify(
+					"Auto mode disabled for this agent — tool calls run under pi's normal permissions. Other agents are unaffected; `/auto-mode reset` restores the default.",
+					"info",
+				);
 				refreshStatus(ctx);
 				return;
 			}
