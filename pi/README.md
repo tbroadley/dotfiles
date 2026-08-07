@@ -190,6 +190,23 @@ Not loosened: third-party exfiltration, publishing secrets, rewriting shared
 history, production writes, `curl | bash` from unknown sources, DB drops, and
 fail-closed behaviour on classifier errors.
 
+### Auditing the rules
+
+The rules above were derived from real block events, and the next round should
+be too. `tools/scan-auto-mode-blocks.mjs` pairs every `Auto mode blocked …`
+result in a session store with the tool call that triggered it and the user
+turns the classifier saw as intent, and flags sessions where the user gave up
+and turned auto mode off:
+
+```sh
+node pi/tools/scan-auto-mode-blocks.mjs "$PIROUETTE_DATA_DIR/sessions" --since=2026-01-01
+node pi/tools/scan-auto-mode-blocks.mjs "$PIROUETTE_DATA_DIR/sessions" --full   # untruncated
+```
+
+Read the reasons in bulk before changing any rule text: the same wording tends
+to misfire in several different disguises, and the sessions where auto mode was
+switched off are the ones worth reading in full.
+
 ### Deploying to a pirouette host
 
 The pirouette host does not run `install.sh`, and pi auto-loads every `.ts` in
