@@ -718,9 +718,33 @@ export default function autoMode(pi: ExtensionAPI): void {
 
 	const agentKey = (ctx: ExtensionContext): string => resolve(ctx.cwd || "(unknown)");
 
+	/** Is `--auto-mode` forcing the gate on?
+	 *
+	 *  `pi.getFlag` is an ExtensionAPI *action*: it calls `assertActive()` on
+	 *  the extension runtime before answering. Under pirouette that runtime is
+	 *  shared by every agent in the server process, and pi marks it stale
+	 *  forever as soon as ANY session is disposed (`pru stop`, `/new`, archive,
+	 *  handoff). One stopped chat therefore used to make this throw for every
+	 *  agent launched afterwards — and since this sits on the `tool_call` path,
+	 *  the throw surfaced as "This extension ctx is stale after session
+	 *  replacement or reload" in place of every tool result, wedging each new
+	 *  agent on its first bash call until the server was restarted.
+	 *
+	 *  A stale runtime says nothing about what the user wants, so fall through
+	 *  to the persisted override / config default rather than guessing. That
+	 *  keeps the gate CLOSED (auto mode stays on for pirouette agents); it can
+	 *  only miss an explicit `--auto-mode`, which pirouette never passes. */
+	function flagForcedOn(): boolean {
+		try {
+			return pi.getFlag("auto-mode") === true;
+		} catch {
+			return false;
+		}
+	}
+
 	/** Precedence: --auto-mode flag > persisted per-agent override > config default. */
 	function resolveEnabled(ctx: ExtensionContext, cfg: AutoModeConfig): boolean {
-		if (pi.getFlag("auto-mode")) return true;
+		if (flagForcedOn()) return true;
 		const override = readOverrides(overridesPath())[agentKey(ctx)];
 		if (typeof override === "boolean") return override;
 		return cfg.enabled === true || (cfg.enabled === "pirouette" && isUnderPirouette());
