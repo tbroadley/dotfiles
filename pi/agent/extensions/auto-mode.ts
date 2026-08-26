@@ -16,14 +16,12 @@
  *     data to third parties, production deploys, ...) are blocked with a reason;
  *     everything else runs without a prompt.
  *
- *   - The *classifier* runs on a small model chosen from the running agent's
- *     family, by model id (the agent keeps its own model):
+ *   - The *classifier* runs on a small model of the running agent's family,
+ *     which is read from the model id first (the agent keeps its own model):
  *         gpt-* agent      ->  gpt-5.6-terra
- *         anything else    ->  claude-sonnet-5
- *     A GPT agent gets a GPT classifier because that is the family whose
- *     credentials and routing it is already using; every other agent — Claude
- *     or otherwise — gets Sonnet, which is the classifier these rules were
- *     written and tuned against. Validated at `before_agent_start`, so an
+ *         claude-* agent   ->  claude-sonnet-5
+ *         anything else    ->  a hard error that stops the agent
+ *     Validated at `before_agent_start`, so an unsupported family or an
  *     unavailable classifier model stops the run before it starts.
  *
  * The trust boundary is *the user's environment*, not the current working
@@ -84,10 +82,6 @@ const CLASSIFIER_MODEL_ID: Record<Family, string> = {
 	anthropic: "claude-sonnet-5",
 	openai: "gpt-5.6-terra",
 };
-
-/** Family used when the agent's own model belongs to neither — see
- *  `classifierFamilyFor`. */
-const FALLBACK_FAMILY: Family = "anthropic";
 
 const STATUS_KEY = "auto-mode";
 
@@ -436,33 +430,34 @@ function isUnderPirouette(): boolean {
 	);
 }
 
-/** Anything with an id and, usually, a provider — `Model`, or a stub in a test. */
+/** Anything with an id and, usually, a provider and api — `Model`, or a stub
+ *  in a test. */
 export interface ModelLike {
 	id?: string;
 	provider?: string;
+	name?: string;
+	api?: string;
 }
 
-/** Detect the running agent's model family, or undefined if it is in neither.
+/** Detect the running agent's model family, or undefined if unsupported.
  *
- *  By model id, deliberately not by API type: a provider can serve a model
- *  over the OpenAI Chat Completions API without it being a GPT, and the point
- *  here is to name one specific classifier rather than to be generous about
- *  what counts as a family. Everything the id doesn't identify is undefined,
- *  and `classifierFamilyFor` decides what to do about that. */
+ *  The model id is consulted before the API type, because a provider can serve
+ *  a model over the OpenAI Chat Completions API without it being a GPT and the
+ *  point here is to name one specific classifier. The API and provider hints
+ *  stay as a second pass so that a model with an unrevealing id (an alias, a
+ *  custom entry in models.json) keeps the classifier it has always had rather
+ *  than becoming a hard error. */
 export function detectFamily(model: ModelLike | undefined): Family | undefined {
 	const id = String(model?.id ?? "").toLowerCase();
 	if (id.includes("claude")) return "anthropic";
 	if (/(^|[^a-z0-9])gpt[-._0-9]/.test(id)) return "openai";
+	const api = String(model?.api ?? "").toLowerCase();
+	if (api.startsWith("anthropic")) return "anthropic";
+	if (api.startsWith("openai")) return "openai";
+	const hint = `${model?.provider ?? ""} ${id} ${model?.name ?? ""}`.toLowerCase();
+	if (/anthropic/.test(hint)) return "anthropic";
+	if (/openai|\bo[0-9]/.test(hint)) return "openai";
 	return undefined;
-}
-
-/** The family whose classifier judges this agent's tool calls.
- *
- *  Unrecognised models fall back rather than failing: auto mode blocking every
- *  tool call on, say, a Gemini agent is worse than judging it with Sonnet, and
- *  Sonnet is the model the rule text has actually been tuned against. */
-export function classifierFamilyFor(model: ModelLike | undefined): Family {
-	return detectFamily(model) ?? FALLBACK_FAMILY;
 }
 
 /** Find the classifier model, preferring the agent's own provider. */
@@ -796,7 +791,14 @@ export default function autoMode(pi: ExtensionAPI): void {
 		if (!agent) {
 			throw new Error("Auto mode is enabled but there is no active agent model to derive a classifier from.");
 		}
-		const family = classifierFamilyFor(agent);
+		const family = detectFamily(agent);
+		if (!family) {
+			throw new Error(
+				`Auto mode supports only Anthropic and OpenAI agents, but the current model ` +
+					`"${agent.provider}/${agent.id}" (api "${agent.api}") is neither. ` +
+					`Switch the agent to an Anthropic or OpenAI model, or disable auto mode with /auto-mode off.`,
+			);
+		}
 		const targetId = CLASSIFIER_MODEL_ID[family];
 		const model = resolveClassifierModel(ctx, agent.provider, targetId);
 		if (!model) {
