@@ -16,10 +16,10 @@
  *     data to third parties, production deploys, ...) are blocked with a reason;
  *     everything else runs without a prompt.
  *
- *   - The *classifier* runs on a model chosen from the running agent's family
- *     (the agent keeps its own model):
- *         Anthropic agent  ->  claude-sonnet-5
- *         OpenAI agent     ->  gpt-5.6-luna
+ *   - The *classifier* runs on a small model of the running agent's family,
+ *     which is read from the model id first (the agent keeps its own model):
+ *         gpt-* agent      ->  gpt-5.6-terra
+ *         claude-* agent   ->  claude-sonnet-5
  *         anything else    ->  a hard error that stops the agent
  *     Validated at `before_agent_start`, so an unsupported family or an
  *     unavailable classifier model stops the run before it starts.
@@ -80,7 +80,7 @@ type Family = "anthropic" | "openai";
 
 const CLASSIFIER_MODEL_ID: Record<Family, string> = {
 	anthropic: "claude-sonnet-5",
-	openai: "gpt-5.6-luna",
+	openai: "gpt-5.6-terra",
 };
 
 const STATUS_KEY = "auto-mode";
@@ -430,14 +430,33 @@ function isUnderPirouette(): boolean {
 	);
 }
 
-/** Detect the running agent's model family, or undefined if unsupported. */
-export function detectFamily(model: Model<any>): Family | undefined {
-	const api = String(model.api ?? "").toLowerCase();
+/** Anything with an id and, usually, a provider and api — `Model`, or a stub
+ *  in a test. */
+export interface ModelLike {
+	id?: string;
+	provider?: string;
+	name?: string;
+	api?: string;
+}
+
+/** Detect the running agent's model family, or undefined if unsupported.
+ *
+ *  The model id is consulted before the API type, because a provider can serve
+ *  a model over the OpenAI Chat Completions API without it being a GPT and the
+ *  point here is to name one specific classifier. The API and provider hints
+ *  stay as a second pass so that a model with an unrevealing id (an alias, a
+ *  custom entry in models.json) keeps the classifier it has always had rather
+ *  than becoming a hard error. */
+export function detectFamily(model: ModelLike | undefined): Family | undefined {
+	const id = String(model?.id ?? "").toLowerCase();
+	if (id.includes("claude")) return "anthropic";
+	if (/(^|[^a-z0-9])gpt[-._0-9]/.test(id)) return "openai";
+	const api = String(model?.api ?? "").toLowerCase();
 	if (api.startsWith("anthropic")) return "anthropic";
 	if (api.startsWith("openai")) return "openai";
-	const hint = `${model.provider ?? ""} ${model.id ?? ""} ${model.name ?? ""}`.toLowerCase();
-	if (/claude|anthropic/.test(hint)) return "anthropic";
-	if (/\bgpt|openai|\bo[0-9]/.test(hint)) return "openai";
+	const hint = `${model?.provider ?? ""} ${id} ${model?.name ?? ""}`.toLowerCase();
+	if (/anthropic/.test(hint)) return "anthropic";
+	if (/openai|\bo[0-9]/.test(hint)) return "openai";
 	return undefined;
 }
 
