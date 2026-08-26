@@ -51,13 +51,19 @@ function loadAutoMode(getFlag: () => unknown): Handler {
 	return onToolCall!;
 }
 
-/** A ctx whose model is neither Anthropic nor OpenAI. Auto mode blocks those
- *  with a specific message *after* deciding the gate is on, which lets us
- *  observe the gate without calling a classifier over the network. */
+/** A ctx whose model registry knows no models at all, so resolving the
+ *  classifier fails with a specific message *after* auto mode has decided the
+ *  gate is on — which lets us observe the gate without calling a classifier
+ *  over the network. */
 function fakeCtx() {
 	return {
 		cwd,
 		model: { provider: "local", id: "llama-3", name: "Llama 3", api: "ollama" },
+		modelRegistry: {
+			find: () => undefined,
+			getAvailable: () => [],
+			getAll: () => [],
+		},
 		isProjectTrusted: () => false,
 		hasUI: false,
 		ui: { setStatus: () => {}, notify: () => {} },
@@ -94,7 +100,7 @@ describe("the tool_call gate with a stale extension runtime", () => {
 
 		expect(result?.block).toBe(true);
 		expect(result?.reason).not.toMatch(/stale/i);
-		expect(result?.reason).toMatch(/only Anthropic and OpenAI/);
+		expect(result?.reason).toMatch(/classifier model "claude-sonnet-5"/);
 	});
 
 	it("does not let the stale error escape as a tool result", async () => {
@@ -123,6 +129,6 @@ describe("the tool_call gate with a healthy extension runtime", () => {
 		const result = await onToolCall(toolCall, fakeCtx());
 
 		expect(result?.block).toBe(true);
-		expect(result?.reason).toMatch(/only Anthropic and OpenAI/);
+		expect(result?.reason).toMatch(/classifier model "claude-sonnet-5"/);
 	});
 });

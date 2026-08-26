@@ -79,9 +79,10 @@ blocks irreversible, destructive or externally-aimed actions and lets routine
 work through. It is meant for unattended agents (a pirouette host), where a
 permission prompt has nobody to answer it.
 
-- **Classifier model** follows the agent's family — Anthropic agent →
-  `claude-sonnet-5`, OpenAI agent → `gpt-5.6-luna`, anything else is a hard
-  error at `before_agent_start`. The agent keeps its own model.
+- **Classifier model** follows the agent's family, by model id — a `gpt-*`
+  agent → `gpt-5.6-terra`, everything else (Claude included) →
+  `claude-sonnet-5`. The agent keeps its own model. A classifier that no
+  configured provider can serve is a hard error at `before_agent_start`.
 - **Off by default.** Turn on per session with `--auto-mode` or `/auto-mode on`;
   other subcommands are `off`, `reset`, `status`, `config`, `defaults`.
 - **On by default** via `~/.pi/agent/auto-mode.json`: `{"enabled": true}` for
