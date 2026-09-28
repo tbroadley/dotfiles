@@ -22,10 +22,6 @@
       "~/.worktrees"
     ]
   },
-  "autoMode": {
-    "classifyAllShell": true
-  },
-  "model": "opus[1m]",
   "hooks": {
     "SessionStart": [
       {
@@ -75,5 +71,9 @@
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": false,
   "skipWorkflowUsageWarning": true,
-  "theme": "light"
+  "theme": "light",
+  "autoMode": {
+    "classifyAllShell": true
+  },
+  "model": "opus[1m]"
 }
