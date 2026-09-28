@@ -4,10 +4,24 @@ Please use the default AWS profile unless Thomas explicitly instructs otherwise.
 
 ## Expired AWS credentials
 
-The SSO session on this host expires after a few hours, so an agent that has
-been running for a while starts seeing `ExpiredToken`, `Error loading SSO
-Token`, or `The SSO session associated with this profile has expired`. Fix it
-yourself:
+The SSO session expires after a few hours, so an agent that has been running
+for a while starts seeing `ExpiredToken`, `Error loading SSO Token`, or `The SSO
+session associated with this profile has expired`. Fix it yourself. Which
+command depends on where you are running, so check `uname -s` first.
+
+On Thomas's laptop (`uname -s` is `Darwin`), the browser is local, so use
+the AWS CLI directly:
+
+```sh
+aws sso login              # --profile <name> for a profile other than default
+```
+
+It opens the approval page in the local browser and returns once Thomas
+approves. Give it a long tool timeout (several minutes). Do not use
+`aws-sso-login` here: it relays through url-listener to reach a browser on
+another machine, and on the laptop it just fails with exit 2.
+
+On a remote host (Linux dev box, no browser), use the relay wrapper:
 
 ```sh
 aws-sso-login              # --profile <name> for a profile other than default
@@ -21,7 +35,8 @@ running it speculatively costs nothing.
 
 Exit 2 means the laptop is unreachable (asleep, off the network) and no login is
 possible from here: say so and stop, rather than retrying in a loop. Don't ask
-Thomas to run `aws sso login` for you — that is what this tool is for.
+Thomas to run `aws sso login` for you. On either kind of host, running the
+login is your job.
 
 ## Know which model you are
 
